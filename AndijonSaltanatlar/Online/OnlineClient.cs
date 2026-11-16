@@ -1,0 +1,412 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Threading.Tasks;
+using AndijonSaltanatlar.Shared.DTOs;
+using Microsoft.AspNetCore.SignalR.Client;
+
+namespace AndijonSaltanatlar.Online
+{
+    /// <summary>Server manzili va login (parol saqlanmaydi).</summary>
+    public sealed class OnlineSettings
+    {
+        /// <summary>
+        /// Standart server. Windows'da server odatda shu kompyuterda — "localhost" Wi-Fi manzili o'zgarsa ham ishlaydi.
+        /// Android telefonda "localhost" ISHLATILMAYDI (telefonning o'zi bo'lib qoladi) — kompyuterning Wi-Fi manzili
+        /// qo'lda kiritiladi (u tarmoq qayta ulanganda o'zgarishi mumkin). Internet uchun https://... manzil kiritiladi.
+        /// </summary>
+#if ANDROID
+        public string ServerUrl { get; set; } = "";
+#else
+        public string ServerUrl { get; set; } = "http://localhost:5080";
+#endif
+        public string Username { get; set; } = "";
+        public int WorldId { get; set; } = 1;
+
+        private static string FilePath => Path.Combine(
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "AndijonSaltanatlar", "online.json");
+
+        public static OnlineSettings Load()
+        {
+            try
+            {
+                if (File.Exists(FilePath)) return JsonSerializer.Deserialize<OnlineSettings>(File.ReadAllText(FilePath)) ?? new OnlineSettings();
+            }
+            catch { }
+            return new OnlineSettings();
+        }
+
+        public void Save()
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
+                File.WriteAllText(FilePath, JsonSerializer.Serialize(this));
+            }
+            catch { }
+        }
+    }
+
+    /// <summary>
+    /// O'yin clienti ↔ server aloqasi (Windows va Android uchun bir xil kod).
+    ///  - REST (HttpClient): login, dunyoga qo'shilish, buyruqlar. Har bir buyruqning CommandId'si bor —
+    ///    tarmoq uzilib qayta yuborilsa ham server uni ikki marta bajarmaydi.
+    ///  - SignalR (/gamehub): bozor o'zgardi, guruchingiz sotildi, o'yinchi kirdi — xabarlari.
+    /// Tarmoq ishlari fonda bajariladi; natijalar asosiy (o'yin) oqimiga navbat orqali o'tadi (<see cref="Pump"/>),
+    /// shuning uchun render sikli hech qachon kutib qolmaydi.
+    /// Client hech narsani o'zi hisoblamaydi — ko'rsatiladigan holat faqat server javobidan olinadi.
+    /// </summary>
+    public sealed class OnlineClient : IDisposable
+    {
+        private static readonly JsonSerializerOptions Json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+
+        private readonly ConcurrentQueue<Action> _main = new ConcurrentQueue<Action>();
+        private HttpClient _http;
+        private HubConnection _hub;
+        private string _token;
+        private DateTime _stateReceivedUtc;
+        private bool _refreshQueued;
+
+        public OnlineSettings Settings { get; } = OnlineSettings.Load();
+        public OnlineStateDto State { get; private set; }
+        public List<MarketOfferDto> Offers { get; private set; } = new List<MarketOfferDto>();
+        public List<TradeRecordDto> History { get; private set; } = new List<TradeRecordDto>();
+        /// <summary>PROMPT 19B: saltanat boshqaruvi (shaharlar, hududlar, munosabatlar, Vazir eslatmalari).</summary>
+        public KingdomOverviewDto Kingdom { get; private set; }
+        /// <summary>PROMPT 20: ittifoq, takliflar, kelishuvlar, dunyo yangiliklari.</summary>
+        public AllianceDto Alliance { get; private set; }
+        public List<AllianceInvitationDto> Invitations { get; private set; } = new List<AllianceInvitationDto>();
+        public List<DiplomaticAgreementDto> Agreements { get; private set; } = new List<DiplomaticAgreementDto>();
+        public List<WorldNewsDto> News { get; private set; } = new List<WorldNewsDto>();
+        public List<AllianceDto> AlliancesInWorld { get; private set; } = new List<AllianceDto>();
+        /// <summary>PROMPT 20: faqat o'z ittifoqi a'zolari ko'radigan bozor takliflari.</summary>
+        public List<MarketOfferDto> AllianceOffers { get; private set; } = new List<MarketOfferDto>();
+        /// <summary>Har yangi hudud transferi xabarida oshadi (xarita animatsiyasi uchun).</summary>
+        public int TerritorySerial { get; private set; }
+        public int LastTransferredRegionId { get; private set; }
+
+        public bool Busy { get; private set; }
+        public bool LoggedIn => _token != null && State != null;
+        public bool HubConnected => _hub != null && _hub.State == HubConnectionState.Connected;
+        public string Message { get; private set; } = "";
+        public bool MessageIsError { get; private set; }
+        /// <summary>Har yangi xabarda oshadi (UI toast'ni qayta ko'rsatishi uchun).</summary>
+        public int MessageSerial { get; private set; }
+        /// <summary>Real vaqt xabari (masalan "Guruchingiz sotildi") — UI bir marta ko'rsatadi va null qiladi.</summary>
+        public string Notification { get; set; }
+
+        /// <summary>Oxirgi server javobidan beri o'tgan vaqtni hisobga olgan taxminiy server o'yin daqiqasi (faqat ko'rsatish uchun).</summary>
+        public long EstimatedGameMinute
+            => State == null ? 0 : State.ServerGameMinute + (long)((DateTime.UtcNow - _stateReceivedUtc).TotalSeconds * Shared.Farming.RiceFarmingRules.GameMinutesPerRealSecond);
+
+        /// <summary>Asosiy oqimda har kadr chaqiriladi: fon vazifalari natijalarini qo'llaydi.</summary>
+        public void Pump()
+        {
+            while (_main.TryDequeue(out Action a))
+            {
+                try { a(); } catch { }
+            }
+        }
+
+        private void Post(Action a) => _main.Enqueue(a);
+
+        private void SetMessage(string text, bool error)
+        {
+            Post(() => { Message = text ?? ""; MessageIsError = error; MessageSerial++; });
+        }
+
+        /// <summary>Fon vazifasi: istisno o'yinni to'xtatmaydi, foydalanuvchiga tushunarli xabar bo'ladi.</summary>
+        private void Run(Func<Task> work)
+        {
+            if (Busy) return;
+            Busy = true;
+            Task.Run(async () =>
+            {
+                try { await work(); }
+                catch (HttpRequestException ex) { SetMessage("Serverga ulanib bo'lmadi: " + Short(ex.Message), true); }
+                catch (TaskCanceledException) { SetMessage("Server javob bermadi (vaqt tugadi)", true); }
+                catch (Exception ex) { SetMessage("Xato: " + Short(ex.Message), true); }
+                finally { Post(() => Busy = false); }
+            });
+        }
+
+        private static string Short(string s) => string.IsNullOrEmpty(s) ? "" : (s.Length > 70 ? s.Substring(0, 70) : s);
+
+        private static string NormalizeUrl(string url)
+        {
+            url = (url ?? "").Trim().TrimEnd('/');
+            if (url.Length > 0 && !url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                url = "http://" + url;
+            return url;
+        }
+
+        // ------------------------------------------------------------------
+        // Login va dunyoga qo'shilish
+        // ------------------------------------------------------------------
+        public void Login(string serverUrl, string username, string password, bool register)
+        {
+            string url = NormalizeUrl(serverUrl);
+            string user = (username ?? "").Trim();
+            if (url.Length == 0 || user.Length == 0 || string.IsNullOrEmpty(password))
+            {
+                SetMessage("Server, login va parolni kiriting", true);
+                return;
+            }
+            Run(async () =>
+            {
+                await DisconnectAsync();
+                _http = new HttpClient { BaseAddress = new Uri(url + "/"), Timeout = TimeSpan.FromSeconds(12) };
+
+                HttpResponseMessage resp = register
+                    ? await _http.PostAsJsonAsync("api/auth/register", new RegisterRequest { Username = user, Email = user.ToLowerInvariant() + "@andijon.local", Password = password })
+                    : await _http.PostAsJsonAsync("api/auth/login", new LoginRequest { Email = user, Password = password });
+                if (!resp.IsSuccessStatusCode)
+                {
+                    SetMessage(await ErrorText(resp, register ? "Ro'yxatdan o'tib bo'lmadi" : "Login yoki parol noto'g'ri"), true);
+                    return;
+                }
+                AuthResponse auth = await resp.Content.ReadFromJsonAsync<AuthResponse>(Json);
+                _token = auth.Token;
+                _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+
+                HttpResponseMessage join = await _http.PostAsJsonAsync("api/online/join", new JoinWorldRequest { WorldId = Settings.WorldId });
+                if (!join.IsSuccessStatusCode) { SetMessage(await ErrorText(join, "Dunyoga qo'shilib bo'lmadi"), true); return; }
+                OnlineStateDto state = await join.Content.ReadFromJsonAsync<OnlineStateDto>(Json);
+                await LoadMarketAsync();
+                Post(() =>
+                {
+                    ApplyState(state);
+                    Settings.ServerUrl = url;
+                    Settings.Username = user;
+                    Settings.Save();
+                });
+                SetMessage("Xush kelibsiz, " + auth.Username + "! Dunyo: " + state.WorldName, false);
+                await ConnectHubAsync(url, state.WorldId);
+            });
+        }
+
+        private async Task ConnectHubAsync(string url, int worldId)
+        {
+            try
+            {
+                _hub = new HubConnectionBuilder()
+                    .WithUrl(url + "/gamehub", o => o.AccessTokenProvider = () => Task.FromResult(_token))
+                    .WithAutomaticReconnect()
+                    .Build();
+                _hub.On<int>("MarketChanged", _ => QueueRefresh());
+                _hub.On<int>("PlayersChanged", _ => QueueRefresh());
+                _hub.On<int, string>("StateChanged", (_, msg) =>
+                {
+                    if (!string.IsNullOrEmpty(msg)) Post(() => Notification = msg);
+                    QueueRefresh();
+                });
+                _hub.On<int, int, int, int, string>("TerritoryTransferred", (_, regionId, __, ___, msg) =>
+                {
+                    Post(() => { Notification = msg; LastTransferredRegionId = regionId; TerritorySerial++; });
+                    QueueRefresh();
+                });
+                _hub.On<int, string, int>("AllianceInvitationReceived", (_, fromName, __) =>
+                {
+                    Post(() => Notification = fromName + " sizni ittifoqqa taklif qildi");
+                    QueueRefresh();
+                });
+                _hub.On<int, int, string>("AllianceMemberJoined", (_, __, name) =>
+                {
+                    Post(() => Notification = name + " ittifoqqa qo'shildi");
+                    QueueRefresh();
+                });
+                _hub.On<int, string, int>("DiplomaticAgreementCreated", (_, fromName, __) =>
+                {
+                    Post(() => Notification = fromName + " kelishuv taklifi yubordi");
+                    QueueRefresh();
+                });
+                _hub.On<int, string>("WorldNewsPublished", (_, text) =>
+                {
+                    Post(() => Notification = text);
+                    QueueRefresh();
+                });
+                _hub.On<int, int>("AllianceProjectUpdated", (_, __) => QueueRefresh());
+                _hub.Reconnected += async _ => { await _hub.InvokeAsync("JoinWorld", worldId); QueueRefresh(); };
+                await _hub.StartAsync();
+                await _hub.InvokeAsync("JoinWorld", worldId);
+                QueueRefresh();
+            }
+            catch (Exception ex)
+            {
+                // Real vaqt kanali bo'lmasa ham o'yin ishlaydi — holat davriy so'rov bilan yangilanadi.
+                SetMessage("Real vaqt aloqasi o'rnatilmadi: " + Short(ex.Message), true);
+            }
+        }
+
+        private static async Task<string> ErrorText(HttpResponseMessage resp, string fallback)
+        {
+            try
+            {
+                string body = await resp.Content.ReadAsStringAsync();
+                using JsonDocument doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("messageUz", out JsonElement m)) return m.GetString();
+            }
+            catch { }
+            return fallback + " (" + (int)resp.StatusCode + ")";
+        }
+
+        public void Logout()
+        {
+            Task.Run(DisconnectAsync);
+            _token = null;
+            State = null;
+            Offers = new List<MarketOfferDto>();
+            History = new List<TradeRecordDto>();
+            SetMessage("Chiqildi", false);
+        }
+
+        private async Task DisconnectAsync()
+        {
+            try { if (_hub != null) await _hub.DisposeAsync(); } catch { }
+            _hub = null;
+            _http?.Dispose();
+            _http = null;
+        }
+
+        // ------------------------------------------------------------------
+        // Holatni yangilash
+        // ------------------------------------------------------------------
+        private void ApplyState(OnlineStateDto s)
+        {
+            if (s == null) return;
+            State = s;
+            _stateReceivedUtc = DateTime.UtcNow;
+        }
+
+        /// <summary>Real vaqt xabari kelganda holat va bozorni qayta oladi (bir vaqtda bitta so'rov).</summary>
+        public void QueueRefresh()
+        {
+            if (_refreshQueued || _http == null) return;
+            _refreshQueued = true;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    OnlineStateDto s = await _http.GetFromJsonAsync<OnlineStateDto>("api/online/state", Json);
+                    await LoadMarketAsync();
+                    Post(() => ApplyState(s));
+                }
+                catch { }
+                finally { _refreshQueued = false; }
+            });
+        }
+
+        private async Task LoadMarketAsync()
+        {
+            List<MarketOfferDto> offers = await _http.GetFromJsonAsync<List<MarketOfferDto>>("api/online/market", Json);
+            List<TradeRecordDto> history = await _http.GetFromJsonAsync<List<TradeRecordDto>>("api/online/market/history", Json);
+            KingdomOverviewDto kingdom = null;
+            try { kingdom = await _http.GetFromJsonAsync<KingdomOverviewDto>("api/kingdom/overview", Json); } catch { }
+            await LoadDiplomacyAsync();
+            Post(() =>
+            {
+                Offers = offers ?? new List<MarketOfferDto>();
+                History = history ?? new List<TradeRecordDto>();
+                if (kingdom != null) Kingdom = kingdom;
+            });
+        }
+
+        private async Task LoadDiplomacyAsync()
+        {
+            // Har bir bo'lim alohida yuklanadi: bittasi muvaffaqiyatsiz bo'lsa ham qolganlari (masalan takliflar) ko'rinadi.
+            // Ittifoqi yo'q o'yinchi uchun server 204 (bo'sh) qaytaradi — bu xato emas, "ittifoq yo'q" degani.
+            AllianceDto alliance = null;
+            bool allianceOk = false;
+            try
+            {
+                HttpResponseMessage r = await _http.GetAsync("api/diplomacy/alliance/mine");
+                if (r.IsSuccessStatusCode)
+                {
+                    allianceOk = true;
+                    if (r.StatusCode != System.Net.HttpStatusCode.NoContent && (r.Content.Headers.ContentLength ?? 1) > 0)
+                        alliance = await r.Content.ReadFromJsonAsync<AllianceDto>(Json);
+                }
+            }
+            catch { }
+            List<AllianceInvitationDto> invs = await TryGet<List<AllianceInvitationDto>>("api/diplomacy/alliance/invitations");
+            List<DiplomaticAgreementDto> ags = await TryGet<List<DiplomaticAgreementDto>>("api/diplomacy/agreement/list");
+            List<WorldNewsDto> news = await TryGet<List<WorldNewsDto>>("api/diplomacy/news?take=20");
+            List<AllianceDto> alls = await TryGet<List<AllianceDto>>("api/diplomacy/alliance/list");
+            List<MarketOfferDto> allianceOffers = alliance != null ? await TryGet<List<MarketOfferDto>>("api/diplomacy/market/offers/" + alliance.Id) : new List<MarketOfferDto>();
+            Post(() =>
+            {
+                if (allianceOk) { Alliance = alliance; AllianceOffers = allianceOffers ?? new List<MarketOfferDto>(); }
+                if (invs != null) Invitations = invs;
+                if (ags != null) Agreements = ags;
+                if (news != null) News = news;
+                if (alls != null) AlliancesInWorld = alls;
+            });
+        }
+
+        private async Task<T> TryGet<T>(string path) where T : class
+        {
+            try { return await _http.GetFromJsonAsync<T>(path, Json); }
+            catch { return null; }
+        }
+
+        // ------------------------------------------------------------------
+        // Buyruqlar (har biri o'z CommandId'si bilan; tarmoq xatosida bir marta xuddi shu Id bilan qayta yuboriladi)
+        // ------------------------------------------------------------------
+        private void Command(string path, Func<string, object> body)
+        {
+            if (!LoggedIn) { SetMessage("Avval serverga kiring", true); return; }
+            string commandId = Guid.NewGuid().ToString("N");
+            Run(async () =>
+            {
+                HttpResponseMessage resp;
+                try { resp = await _http.PostAsJsonAsync(path, body(commandId)); }
+                catch (HttpRequestException) { resp = await _http.PostAsJsonAsync(path, body(commandId)); } // xavfsiz takror (idempotent)
+                if (!resp.IsSuccessStatusCode) { SetMessage(await ErrorText(resp, "Buyruq bajarilmadi"), true); return; }
+                ActionResultDto r = await resp.Content.ReadFromJsonAsync<ActionResultDto>(Json);
+                await LoadMarketAsync();
+                Post(() => ApplyState(r.State));
+                SetMessage(r.MessageUz, !r.Success);
+            });
+        }
+
+        public void BuildField() => Command("api/online/fields/build", id => new FieldActionRequest { CommandId = id });
+        public void BuildWater() => Command("api/online/water/build", id => new FieldActionRequest { CommandId = id });
+        public void Plant(int fieldId) => Command("api/online/fields/plant", id => new FieldActionRequest { CommandId = id, FieldId = fieldId });
+        public void Harvest(int fieldId) => Command("api/online/fields/harvest", id => new FieldActionRequest { CommandId = id, FieldId = fieldId });
+        public void CreateOffer(int quantity, int totalPrice) => CreateOffer("Rice", quantity, totalPrice);
+        public void CreateOffer(string product, int quantity, int totalPrice) => Command("api/online/market/offers", id => new CreateOfferRequest { CommandId = id, Product = product, Quantity = quantity, TotalPrice = totalPrice });
+        public void PlantCrop(int fieldId, string crop) => Command("api/online/fields/plant-crop", id => new PlantCropRequest { CommandId = id, FieldId = fieldId, Crop = crop });
+
+        // ---- PROMPT 19B: saltanat boshqaruvi ----
+        public void SendEnvoy(int regionId) => Command("api/kingdom/envoy", id => new RegionActionRequest { CommandId = id, RegionId = regionId });
+        public void Annex(int regionId) => Command("api/kingdom/annex", id => new RegionActionRequest { CommandId = id, RegionId = regionId });
+        public void SetGovernorMode(int cityId, GovernorMode mode) => Command("api/kingdom/governor/mode", id => new GovernorRequest { CommandId = id, CityId = cityId, Mode = mode });
+        public void GovernorAnalyze(int cityId) => Command("api/kingdom/governor/analyze", id => new GovernorRequest { CommandId = id, CityId = cityId });
+        public void ApprovePlan(int planId) => Command("api/kingdom/governor/approve", id => new GovernorRequest { CommandId = id, PlanId = planId });
+        public void RejectPlan(int planId) => Command("api/kingdom/governor/reject", id => new GovernorRequest { CommandId = id, PlanId = planId });
+        public void Buy(int offerId) => Command("api/online/market/buy", id => new BuyOfferRequest { CommandId = id, OfferId = offerId });
+        public void Cancel(int offerId) => Command("api/online/market/cancel", id => new BuyOfferRequest { CommandId = id, OfferId = offerId });
+
+        // ---- PROMPT 20: ittifoqlar, kelishuvlar ----
+        public void CreateAlliance(string name, int emblem) => Command("api/diplomacy/alliance/create", id => new CreateAllianceRequest { CommandId = id, Name = name, Emblem = emblem });
+        public void InviteAlliance(int allianceId, int toKingdomId) => Command("api/diplomacy/alliance/invite", id => new InviteToAllianceRequest { CommandId = id, AllianceId = allianceId, ToKingdomId = toKingdomId });
+        public void RespondInvitation(int invitationId, bool accept) => Command("api/diplomacy/alliance/respond", id => new RespondInvitationRequest { CommandId = id, InvitationId = invitationId, Accept = accept });
+        public void SetAllianceRole(int kingdomId, int role) => Command("api/diplomacy/alliance/role", id => new SetAllianceRoleRequest { CommandId = id, KingdomId = kingdomId, Role = role });
+        public void LeaveAlliance(int allianceId) => Command("api/diplomacy/alliance/leave", id => new LeaveAllianceRequest { CommandId = id, AllianceId = allianceId });
+        public void CreateAllianceProject(int allianceId, int type) => Command("api/diplomacy/alliance/project/create", id => new CreateAllianceProjectRequest { CommandId = id, AllianceId = allianceId, Type = type });
+        public void ContributeAlliance(int allianceId, int projectId, string resource, int amount) => Command("api/diplomacy/alliance/contribute", id => new ContributeAllianceRequest { CommandId = id, AllianceId = allianceId, ProjectId = projectId, Resource = resource, Amount = amount });
+        public void ProposeAgreement(int type, int toKingdomId, int regionId, int price) => Command("api/diplomacy/agreement/propose", id => new ProposeAgreementRequest { CommandId = id, Type = type, ToKingdomId = toKingdomId, RegionId = regionId, Price = price });
+        public void RespondAgreement(int agreementId, bool accept) => Command("api/diplomacy/agreement/respond", id => new RespondAgreementRequest { CommandId = id, AgreementId = agreementId, Accept = accept });
+        public void CreateAllianceOffer(string product, int quantity, int totalPrice, int allianceId) => Command("api/online/market/offers", id => new CreateOfferRequest { CommandId = id, Product = product, Quantity = quantity, TotalPrice = totalPrice, AllianceId = allianceId });
+
+        public void Dispose()
+        {
+            try { DisconnectAsync().Wait(2000); } catch { }
+        }
+    }
+}

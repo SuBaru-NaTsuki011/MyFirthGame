@@ -1,0 +1,19 @@
+# Build natijalari
+bin/
+obj/
+*.user
+.vs/
+
+# Tayyor relizlar (katta; GitHub Releases orqali tarqatiladi)
+release/
+
+# Lokal zaxira va test bazalari (o'yinchi ma'lumotlari)
+_backup_*/
+*.db
+*.db-shm
+*.db-wal
+
+# Sinov natijalari va tokenlar
+tools/e2e_last_state.json
+**/smoke_test_result.txt
+*.log

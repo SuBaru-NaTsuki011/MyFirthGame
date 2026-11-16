@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Andijon: Saltanatlar",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/AndijonSaltanatlar/bin/Debug/net8.0/AndijonSaltanatlar.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/AndijonSaltanatlar",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    }
+  ]
+}

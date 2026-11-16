@@ -1,0 +1,1378 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Text;
+using AndijonSaltanatlar.AIGovernor;
+using AndijonSaltanatlar.Battles;
+using AndijonSaltanatlar.Blueprints;
+using AndijonSaltanatlar.Buildings;
+using AndijonSaltanatlar.Campaigns;
+using AndijonSaltanatlar.CityPlanning;
+using AndijonSaltanatlar.Core;
+using AndijonSaltanatlar.Core.Graphics;
+using AndijonSaltanatlar.Environment;
+using AndijonSaltanatlar.Graphics;
+using AndijonSaltanatlar.LandExpansion;
+using AndijonSaltanatlar.SaveSystem;
+using AndijonSaltanatlar.SmartConstruction;
+using AndijonSaltanatlar.Technology;
+using AndijonSaltanatlar.UI;
+using AndijonSaltanatlar.Units;
+using AndijonSaltanatlar.World;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
+
+namespace AndijonSaltanatlar;
+
+public sealed class Game1 : Game
+{
+	private readonly GraphicsDeviceManager _graphics;
+
+	private readonly LaunchOptions _opt;
+
+	private SpriteBatch _sb;
+
+	private AssetManager _assets;
+
+	private PixelFont _font;
+
+	private MapManager _map;
+
+	private BuildingManager _buildings;
+
+	private UnitManager _units;
+
+	private CameraManager _camera;
+
+	private Core.PerformanceMonitor _perf;
+
+	private InputManager _input;
+
+	private GameStateManager _state;
+
+	private ConstructionSystem _construction;
+
+	private AIGovernorManager _governor;
+
+	private BlueprintRenderer _blueprintRenderer;
+
+	private WorldRenderer _renderer;
+
+	private UIManager _ui;
+
+	private StrategicView _strategic;
+
+	private bool _strategicMode;
+
+	private CivilizationView _civ;
+
+	private bool _civMode;
+
+	private QuestJournalView _quest;
+
+	// PROMPT 19A: online (server bilan aloqa + Saltanatlar bozori paneli)
+	private AndijonSaltanatlar.Online.OnlineClient _online;
+
+	private OnlinePanel _onlinePanel;
+
+	private AndijonSaltanatlar.UI.Design.UiKit _uiKit;
+
+	private bool _questMode;
+
+	private StoryOverlay _storyOverlay;
+
+	private MainMenuScreen _mainMenu;
+
+	private bool _menuMode;
+
+	private bool _pendingStoryMode;
+
+	private CampaignState _pendingStory;
+
+	private readonly DayNightCycle _dayNight = new DayNightCycle();
+
+	private Texture2D _glow;
+
+	private float _time;
+
+	private int _currentSeed = 1483;
+
+	private int _frames;
+
+	private bool _captureNextDraw;
+
+	private bool _exitRequested;
+
+	private static readonly BlendState Multiply = new BlendState
+	{
+		ColorSourceBlend = Blend.DestinationColor,
+		ColorDestinationBlend = Blend.Zero,
+		AlphaSourceBlend = Blend.DestinationAlpha,
+		AlphaDestinationBlend = Blend.Zero
+	};
+
+	public Game1(LaunchOptions opt)
+	{
+		_opt = opt ?? new LaunchOptions();
+		_graphics = new GraphicsDeviceManager(this)
+		{
+			PreferredBackBufferWidth = 1280,
+			PreferredBackBufferHeight = 720,
+			SynchronizeWithVerticalRetrace = true,
+			PreferMultiSampling = false
+		};
+		Content.RootDirectory = "Content";
+		IsMouseVisible = true;
+		IsFixedTimeStep = true;
+		if (_opt.WindowSize.HasValue)
+		{
+			_graphics.PreferredBackBufferWidth = _opt.WindowSize.Value.X;
+			_graphics.PreferredBackBufferHeight = _opt.WindowSize.Value.Y;
+		}
+#if ANDROID
+		// Telefon: to'liq ekran, gorizontal holat.
+		_graphics.IsFullScreen = true;
+		_graphics.SupportedOrientations = DisplayOrientation.LandscapeLeft | DisplayOrientation.LandscapeRight;
+#endif
+	}
+
+	protected override void Initialize()
+	{
+		Window.Title = "ANDIJON: SALTANATLAR";
+#if !ANDROID
+		Window.AllowUserResizing = true;
+#endif
+		_graphics.ApplyChanges();
+		base.Initialize();
+	}
+
+	protected override void LoadContent()
+	{
+		_sb = new SpriteBatch(GraphicsDevice);
+		string contentDir = Path.Combine(AppContext.BaseDirectory, "Content");
+		_assets = new AssetManager(GraphicsDevice, contentDir, _opt.ExportSpritesDir);
+		_assets.LoadAll();
+		_font = new PixelFont(GraphicsDevice);
+		if (_opt.ExportSpritesDir != null)
+		{
+			_exitRequested = true;
+			return;
+		}
+		_input = new InputManager();
+#if !ANDROID
+		// PC: klaviaturadan matn (login maydonlari uchun). Android'da ekran klaviaturasi ishlatiladi.
+		Window.TextInput += (object s, TextInputEventArgs e) => _input.PushText(e.Character);
+#endif
+		_online = new AndijonSaltanatlar.Online.OnlineClient();
+		// PROMPT 19B: yagona dizayn tizimi (ThemeManager + Typography/Noto Sans + UiKit komponentlari)
+		_uiKit = new AndijonSaltanatlar.UI.Design.UiKit(_assets.Pixel, new AndijonSaltanatlar.UI.Design.Typography(_font));
+		_perf = new Core.PerformanceMonitor();
+		_onlinePanel = new OnlinePanel(_assets, _font, _online, _uiKit);
+		_renderer = new WorldRenderer(_assets);
+		_glow = BuildGlow();
+		_mainMenu = new MainMenuScreen(_assets, _font) { Ui = _uiKit };
+		_pendingStoryMode = _opt.Story || _opt.SmokeLog != null;
+		NewGame(_currentSeed);
+		Vector2 startWorld = (_opt.CenterTile.HasValue ? IsoMath.TileToWorld(_opt.CenterTile.Value) : IsoMath.TileToWorld(new Vector2(32f, 32f)));
+		_camera = new CameraManager(GraphicsDevice.Viewport, startWorld, _opt.Zoom ?? 0.8f);
+		if (_opt.SmokeLog != null)
+		{
+			RunSmokeTest(_opt.SmokeLog);
+			_exitRequested = true;
+			return;
+		}
+		if (_opt.Time.HasValue)
+		{
+			_state.Clock.Set(1, _opt.Time.Value);
+			_dayNight.Update(_state.Clock.DayFraction);
+		}
+		if (_opt.PopTax.HasValue)
+		{
+			_state.Policy.PopulationTax = _opt.PopTax.Value;
+		}
+		if (_opt.Food.HasValue)
+		{
+			_state.Food = _opt.Food.Value;
+		}
+		if (_opt.Techs.HasValue)
+		{
+			for (int i = 0; i < _opt.Techs.Value && i < TechnologyCatalog.All.Count; i++)
+			{
+				_state.Civ.Player.Researched.Add(TechnologyCatalog.All[i].Id);
+			}
+		}
+		if (_opt.ResearchId != null)
+		{
+			_state.StartResearch(_opt.ResearchId);
+		}
+		if (_opt.SimDays.HasValue)
+		{
+			for (int j = 0; j < _opt.SimDays.Value; j++)
+			{
+				_state.Update(31f, _buildings);
+			}
+		}
+		if (_opt.Tab != null)
+		{
+			_ui.OpenTab(_opt.Tab);
+		}
+		if (_opt.Map)
+		{
+			_strategicMode = true;
+		}
+		if (_opt.Civ)
+		{
+			_civMode = true;
+		}
+		if (_opt.QuestJournal)
+		{
+			_questMode = true;
+		}
+		if (_opt.Advisor)
+		{
+			_ui.AdvisorOpen = true;
+		}
+		if (_opt.Governor)
+		{
+			_ui.GovernorPanel?.Open();
+		}
+		if (_opt.Plan != null && Enum.TryParse<DistrictType>(_opt.Plan, ignoreCase: true, out var result))
+		{
+			_governor.GeneratePlan(result);
+			_ui.GovernorPanel?.ShowPlan();
+		}
+		if (_opt.WeatherName != null && Enum.TryParse<Weather>(_opt.WeatherName, ignoreCase: true, out var result2))
+		{
+			_state.Weather.SetCurrent(result2);
+		}
+		if (_opt.ShowLevels)
+		{
+			foreach (Building building in _buildings.Buildings)
+			{
+				if (building.Type == BuildingType.MainHall)
+				{
+					building.Level = 4;
+				}
+				else if (building.Type == BuildingType.Market)
+				{
+					building.Level = 3;
+				}
+				else if (building.Type == BuildingType.Mosque)
+				{
+					building.Level = 3;
+				}
+				else if (building.Type == BuildingType.Tower)
+				{
+					building.Level = 2;
+				}
+				else if (building.Type == BuildingType.Madrasa)
+				{
+					building.Level = 2;
+				}
+			}
+		}
+		_menuMode = _opt.Menu || (_opt.ScreenshotPath == null && _opt.Tab == null && !_opt.Map && !_opt.Civ && !_opt.Story && !_opt.QuestJournal && !_opt.Online);
+		if (_opt.Online)
+		{
+			_onlinePanel.Prefill(_opt.OnlineServer, _opt.OnlineUser, _opt.OnlinePass);
+			_onlinePanel.Open();
+			if (_opt.OnlineTab != null) _onlinePanel.ShowTab(_opt.OnlineTab);
+			if (!string.IsNullOrEmpty(_opt.OnlineUser) && !string.IsNullOrEmpty(_opt.OnlinePass))
+				_onlinePanel.LoginNow(_opt.OnlineRegister);
+		}
+		if (_opt.AttackRegion.HasValue)
+		{
+			_strategicMode = true;
+			BattleResult battleResult = _state.World.PlayerAttackRegion(_opt.AttackRegion.Value);
+			if (battleResult != null)
+			{
+				_state.Coins += battleResult.CoinChange;
+			}
+		}
+		if (_opt.BuildType != null)
+		{
+			BuildingType? buildingType = ParseBuild(_opt.BuildType);
+			if (buildingType.HasValue)
+			{
+				_state.EnterBuildMode(buildingType.Value);
+			}
+		}
+		if (_opt.SelectTile.HasValue)
+		{
+			Point value = _opt.SelectTile.Value;
+			object occupant = _map.GetOccupant(value.X, value.Y);
+			if (occupant != null)
+			{
+				_state.Select(occupant);
+			}
+		}
+	}
+
+	private void NewGame(int seed, AIGovernorSaveState governorSave = null)
+	{
+		_currentSeed = seed;
+		_map = new MapManager(_assets, 64, 64);
+		_buildings = new BuildingManager(_map, _assets);
+		_units = new UnitManager(_assets);
+		_state = new GameStateManager();
+		CityGenerator.Generate(_map, _buildings, _units, seed);
+		CitizenSpawner.Spawn(_map, _units);
+		PatrolController.RouteAll(_map, _units);
+		_state.IsStoryMode = _pendingStoryMode;
+		_state.PendingCampaignState = _pendingStory;
+		_pendingStory = null;
+		_state.InitPopulation(_buildings);
+		_construction = new ConstructionSystem(_map, _buildings, _units, _state, _assets);
+		_governor = new AIGovernorManager
+		{
+			OnMessage = (string msg) =>
+			{
+				_state.ShowMessage(msg);
+			}
+		};
+		_governor.Initialize(_state, _buildings, _map, _construction, governorSave);
+		_blueprintRenderer = new BlueprintRenderer(_map);
+		_ui = new UIManager(_assets, _font, _state, _buildings, _units, _governor)
+		{
+			OnSave = DoSave,
+			OnLoad = DoLoad
+		};
+		if (_ui.GovernorPanel != null)
+		{
+			_ui.GovernorPanel.FocusLandRequested = (LandParcel parcel) =>
+			{
+				if (_camera != null && parcel != null)
+				{
+					Point center = parcel.GridBounds.Center;
+					_camera.Jump(IsoMath.TileToWorld(new Vector2(center.X, center.Y)), Math.Max(0.8f, _camera.Zoom));
+				}
+			};
+		}
+		_strategic = new StrategicView(_assets, _font, _state);
+		_civ = new CivilizationView(_assets, _font, _state);
+		_quest = new QuestJournalView(_assets, _font, _state);
+		_storyOverlay = new StoryOverlay(_assets, _font, _state);
+	}
+
+	private void RunSmokeTest(string logPath)
+	{
+		StringBuilder sb = new StringBuilder();
+		int pass = 0;
+		int fail = 0;
+		sb.AppendLine("ANDIJON: SALTANATLAR — SMOKE TEST");
+		sb.AppendLine("Vaqt: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+		sb.AppendLine("Seed: " + _currentSeed);
+		sb.AppendLine(new string('-', 60));
+		try
+		{
+			Check("Startup: shahar yuklandi (binolar > 0)", _buildings.Buildings.Count > 0, _buildings.Buildings.Count + " bino");
+			Check("Startup: aholi > 0", _state.Population > 0, _state.Population + " kishi");
+			Building building = BuildingFactory.Create(BuildingType.House, Point.Zero);
+			int x = building.Size.X;
+			int cost = building.Cost;
+			_state.Coins = Math.Max(_state.Coins, 1000);
+			int coins = _state.Coins;
+			int count = _buildings.Buildings.Count;
+			Point? point = FindBuildableTile(x, -1);
+			Check("Qurilish: bo'sh katak topildi", point.HasValue, point.HasValue ? point.Value.ToString() : "topilmadi");
+			bool ok = false;
+			if (point.HasValue)
+			{
+				_state.EnterBuildMode(BuildingType.House);
+				ok = _construction.PlaceAt(point.Value, showErrors: false);
+			}
+			Check("Qurilish: uy joylashtirildi", ok);
+			Check("Qurilish: bino soni +1", _buildings.Buildings.Count == count + 1);
+			Check("Iqtisod: tanga BIR marta ayirildi (-" + cost + ")", _state.Coins == coins - cost, coins + " -> " + _state.Coins);
+			_state.CancelBuild();
+			int day = _state.Day;
+			for (int i = 0; i < 40; i++)
+			{
+				_state.Update(31f, _buildings);
+			}
+			Check("Simulyatsiya: o'yin kuni o'tdi", _state.Day > day, "kun " + day + " -> " + _state.Day);
+			Check("Qurilish: bosqichli qurilish yakunlandi", _buildings.Buildings.TrueForAll((Building b) => b.BuildProgress >= 1f));
+			Check("Iqtisod: resurslar manfiy emas", _state.Coins >= 0 && _state.Food >= 0, "tanga " + _state.Coins + ", oziq " + _state.Food);
+			_state.Coins = Math.Max(_state.Coins, 3000);
+			LandParcel landParcel = _state.Land.Parcels.FirstOrDefault((LandParcel p) => p.State == LandParcelState.Unlockable);
+			string text;
+			if (landParcel != null)
+			{
+				_state.Select(landParcel);
+				_state.UnlockSelectedParcel();
+				text = "gating-path (talablar bajarildi)";
+			}
+			else
+			{
+				landParcel = _state.Land.Parcels.FirstOrDefault((LandParcel p) => p.State == LandParcelState.Locked);
+				if (landParcel != null)
+				{
+					_state.Land.Unlock(landParcel);
+					text = "direct (aholi talabi smoke oynasida yetmadi)";
+				}
+				else
+				{
+					text = "ochiladigan uchastka yo'q";
+				}
+			}
+			bool flag = landParcel != null && landParcel.State == LandParcelState.Open;
+			Check("Yer ochish: uchastka ochildi [" + text + "]", flag, (landParcel != null) ? ("id=" + landParcel.Id) : "yo'q");
+			bool ok2 = false;
+			if (flag)
+			{
+				Point? point2 = FindBuildableTile(x, landParcel.Id);
+				if (point2.HasValue)
+				{
+					_state.EnterBuildMode(BuildingType.House);
+					ok2 = _construction.PlaceAt(point2.Value, showErrors: false);
+					_state.CancelBuild();
+				}
+			}
+			Check("Yer ochish: ochilgan yerda qurilish mumkin", ok2);
+			_state.Advisor.Analyze(_state);
+			Check("Maslahatchi: tavsiya beradi", _state.Advisor.Messages.Count > 0, _state.Advisor.Messages.Count + " ta");
+			_governor.Analyze();
+			Check("Vazir: shahar tahlili", _governor.Report != null && _governor.Report.OverallCityHealthScore >= 0 && _governor.Report.OverallCityHealthScore <= 100, (_governor.Report == null) ? "hisobot yo'q" : ("salomatlik " + _governor.Report.OverallCityHealthScore));
+			Check("Vazir: tavsiyalar beradi", _governor.Recommendations.Count > 0, _governor.Recommendations.Count + " ta");
+			int num = CountClosedParcels();
+			_state.Coins = Math.Max(_state.Coins, 4000);
+			int coins2 = _state.Coins;
+			int count2 = _buildings.Buildings.Count;
+			CityPlan cityPlan = _governor.GeneratePlan(DistrictType.Mixed);
+			bool ok3 = cityPlan != null && cityPlan.HouseCount >= 3 && cityPlan.MarketCount >= 1 && cityPlan.GardenCount >= 1 && cityPlan.RoadCount > 0;
+			Check("Vazir: minimal mahalla rejasi (3 uy + bozor + bog' + yo'l)", ok3, (cityPlan == null) ? "reja null" : (cityPlan.HouseCount + " uy, " + cityPlan.MarketCount + " savdo, " + cityPlan.GardenCount + " bog', " + cityPlan.RoadCount + " yo'l"));
+			Check("Vazir: preview GameState'ni o'zgartirmadi", _buildings.Buildings.Count == count2 && _state.Coins == coins2, "binolar " + count2 + " -> " + _buildings.Buildings.Count + ", tanga " + coins2 + " -> " + _state.Coins);
+			Check("Vazir: blueprint yaroqli va rang holatlari hisoblangan", cityPlan != null && cityPlan.IsValid && cityPlan.BuildableCount > 0, (cityPlan == null) ? "yo'q" : ("yaroqli=" + cityPlan.IsValid + ", yashil=" + cityPlan.BuildableCount));
+			PlanCostEstimate planCostEstimate = ((cityPlan == null) ? null : PlanCostEstimator.Estimate(cityPlan, _state.Coins, 10));
+			Check("Vazir: xarajat smetasi haqiqiy narxlardan", planCostEstimate != null && planCostEstimate.BuildingsCost > 0 && planCostEstimate.RoadsCost > 0 && planCostEstimate.TotalCost == cityPlan.TotalCost, (planCostEstimate == null) ? "smeta yo'q" : (planCostEstimate.TotalCost + " tanga"));
+			Check("Vazir: 3 xil iqtisodiy prognoz", _governor.ForecastCurrent().Count == 3, _governor.ForecastCurrent().Count + " ta");
+			int num2 = cityPlan?.Buildings.Count ?? 0;
+			int num3 = cityPlan?.Roads.Count ?? 0;
+			Point bpTileBeforeSave = ((cityPlan != null && cityPlan.Buildings.Count > 0) ? cityPlan.Buildings[0].Tile : new Point(-1, -1));
+			int num4 = ((cityPlan != null && cityPlan.Buildings.Count > 0) ? cityPlan.Buildings[0].Id : 0);
+			_governor.SelectBlueprintItem(num4);
+			string text2 = _governor.DescribeSelectedBlueprintUz();
+			Check("Vazir: tanlangan bino ma'lumoti (narx, maydon, foyda, talab)", text2.Contains("tanga") && text2.Contains("Foyda") && text2.Contains("Talab"), text2);
+			bool flag2 = SaveManager.Save(SaveManager.DefaultPath, BuildSave());
+			DoLoad();
+			CityPlan blueprint = _governor.Blueprint;
+			Check("Vazir: blueprint va rejalashtirilgan joylar Save/Load'dan tiklandi", flag2 && blueprint != null && blueprint.Buildings.Count == num2 && blueprint.Roads.Count == num3 && blueprint.Buildings.Exists((BlueprintItem b) => b.Tile == bpTileBeforeSave) && _governor.Blueprints.SelectedItemId == num4, (blueprint == null) ? "blueprint yo'q" : (blueprint.Buildings.Count + " bino, " + blueprint.Roads.Count + " yo'l"));
+			cityPlan = blueprint;
+			if (cityPlan != null)
+			{
+				MapPlanningGrid grid = new MapPlanningGrid(_state, _map);
+				CityPlan cityPlan2 = cityPlan.Clone();
+				BlueprintItem blueprintItem = cityPlan2.Buildings.FirstOrDefault((BlueprintItem b) => b.Kind == BuildingType.Garden);
+				Point point3 = blueprintItem?.Tile ?? Point.Zero;
+				bool flag3 = blueprintItem != null && BlueprintEditor.MoveBuilding(cityPlan2, blueprintItem.Id, new Point(-5, -5), grid, _state.IsBuildingUnlocked, _state.Coins, 10);
+				Check("Vazir: muharrir noto'g'ri ko'chirishni rad etadi", blueprintItem != null && !flag3 && blueprintItem.Tile == point3, "eski joy saqlandi");
+				CityPlan cityPlan3 = cityPlan.Clone();
+				BlueprintItem blueprintItem2 = cityPlan3.Buildings.FirstOrDefault((BlueprintItem b) => b.Kind == BuildingType.Garden);
+				bool flag4 = blueprintItem2 != null && BlueprintEditor.RemoveBuilding(cityPlan3, blueprintItem2.Id, grid, _state.IsBuildingUnlocked, _state.Coins, 10);
+				Check("Vazir: muharrir elementni o'chiradi va qayta hisoblaydi", flag4 && cityPlan3.Buildings.Count == cityPlan.Buildings.Count - 1, flag4 ? (cityPlan3.Buildings.Count + " bino qoldi") : "o'chirilmadi");
+			}
+			AutonomyLevel level = _governor.Permissions.Level;
+			_governor.Permissions.Level = AutonomyLevel.Manual;
+			bool ok4 = _governor.GeneratePlan(DistrictType.Garden) == null;
+			_governor.Permissions.Level = level;
+			Check("Vazir: 'faqat maslahat' rejimida reja tuzilmaydi", ok4);
+			Check("Vazir: o'zbekcha buyruq parseri", _governor.HandleCommand("tahlil qil").Length > 10);
+			int num5 = cityPlan?.TotalCost ?? 0;
+			int num6 = ((cityPlan != null) ? (Enumerable.Count(cityPlan.Buildings, (BlueprintItem b) => b.Status != BlueprintStatus.Blocked) + Enumerable.Count(cityPlan.Roads, (BlueprintRoad r) => r.Status != BlueprintStatus.Blocked)) : 0);
+			bool flag5 = _governor.ApprovePlan();
+			Check("Vazir: tasdiqlash qurilish navbatini yaratadi", flag5 && _governor.Queue.Plan != null && _governor.Queue.Plan.State == PlanExecState.InProgress && _governor.Queue.Plan.Steps.Count == num6, num6 + " qadam, budjet " + num5);
+			Check("Vazir: tasdiqlashdan keyin xazina hali sarflanmagan", _state.Coins == coins2, coins2 + " -> " + _state.Coins);
+			Check("Vazir: tasdiqdan keyin preview yopildi", _governor.Blueprint == null);
+			int num7 = _governor.Queue.Plan?.PendingCount ?? 0;
+			bool ok5 = _state.Story != null && _state.Story.Quests.ActiveQuests().Any();
+			Check("Hikoya: faol vazifa mavjud", ok5);
+			int coins3 = _state.Coins;
+			int day2 = _state.Day;
+			int count3 = _buildings.Buildings.Count;
+			int count4 = _state.Land.OpenParcelIds().Count;
+			bool ok6 = SaveManager.Save(SaveManager.DefaultPath, BuildSave());
+			Check("Save: fayl yozildi", ok6);
+			DoLoad();
+			Check("Load: tanga tiklandi", _state.Coins == coins3, coins3 + " -> " + _state.Coins);
+			Check("Load: o'yin kuni tiklandi", _state.Day == day2, day2 + " -> " + _state.Day);
+			Check("Load: ochilgan yerlar tiklandi", _state.Land.OpenParcelIds().Count == count4, count4 + " -> " + _state.Land.OpenParcelIds().Count);
+			Check("Load: binolar tiklandi", _buildings.Buildings.Count == count3, count3 + " -> " + _buildings.Buildings.Count);
+			Check("Load: Vazir navbati tiklandi", _governor.Queue.Plan != null && _governor.Queue.Plan.PendingCount == num7, num7 + " kutilayotgan qadam");
+			int coins4 = _state.Coins;
+			int count5 = _buildings.Buildings.Count;
+			int num8 = CountRoadTiles();
+			int totalPopulation = _buildings.TotalPopulation;
+			int num9 = _buildings.Count(BuildingType.House);
+			int num10 = _buildings.Count(BuildingType.Market);
+			int num11 = _buildings.Count(BuildingType.Garden);
+			int num12 = _governor.Queue.Plan?.DoneCount ?? 0;
+			_governor.OnDayTick();
+			int num13 = _governor.Queue.Plan?.DoneCount ?? 0;
+			int ok7;
+			if (num13 <= num12)
+			{
+				ApprovedConstructionPlan plan = _governor.Queue.Plan;
+				ok7 = ((plan != null && plan.State == PlanExecState.Completed) ? 1 : 0);
+			}
+			else
+			{
+				ok7 = 1;
+			}
+			Check("Vazir: kunlik tick qurilish navbatini suradi", (byte)ok7 != 0, num12 + " -> " + num13);
+			int num14 = 0;
+			while (_governor.Queue.Plan != null && _governor.Queue.Plan.State == PlanExecState.InProgress && num14++ < 300)
+			{
+				_governor.StepQueueOnce();
+			}
+			ApprovedConstructionPlan plan2 = _governor.Queue.Plan;
+			Check("Vazir: navbat yakunlandi", plan2 != null && plan2.State == PlanExecState.Completed, (plan2 == null) ? "navbat yo'q" : plan2.State.ToString());
+			Check("Vazir: yakunlangan reja tarixga yozildi", _governor.History.Count > 0 && _governor.History[_governor.History.Count - 1].State == PlanExecState.Completed && _governor.History[_governor.History.Count - 1].Spent == (plan2?.SpentSoFar ?? (-1)), (_governor.History.Count == 0) ? "tarix bo'sh" : _governor.History[_governor.History.Count - 1].SummaryUz);
+			Check("Vazir: yakunlangach tahlil darhol yangilandi", _governor.Report != null && _governor.Report.HousingCapacity == _buildings.TotalPopulation, "hisobot " + (_governor.Report?.HousingCapacity.ToString() ?? "yo'q") + ", haqiqiy " + _buildings.TotalPopulation);
+			GovernorHistoryEntry governorHistoryEntry = ((_governor.History.Count > 0) ? _governor.History[_governor.History.Count - 1] : null);
+			Check("Vazir: hisobot haqiqiy uy-joy/aholi natijasini ko'rsatadi", governorHistoryEntry != null && governorHistoryEntry.HasImpact && governorHistoryEntry.HousingAfter == _buildings.TotalPopulation && governorHistoryEntry.HousingBefore == (plan2?.HousingCapacityAtApproval ?? (-1)) && governorHistoryEntry.BuiltBuildings >= 5 && governorHistoryEntry.BuiltRoads > 0, (governorHistoryEntry == null) ? "tarix yo'q" : governorHistoryEntry.SummaryUz);
+			int count6 = _governor.History.Count;
+			bool flag6 = SaveManager.Save(SaveManager.DefaultPath, BuildSave());
+			DoLoad();
+			GovernorHistoryEntry governorHistoryEntry2 = ((_governor.History.Count > 0) ? _governor.History[_governor.History.Count - 1] : null);
+			Check("Vazir: reja tarixi Save/Load'dan tiklandi", flag6 && _governor.History.Count == count6 && governorHistoryEntry2 != null && governorHistoryEntry2.State == PlanExecState.Completed, _governor.History.Count + " ta yozuv");
+			Check("Vazir: rivojlanish natijasi Save/Load'dan tiklandi", governorHistoryEntry2 != null && governorHistoryEntry2.HasImpact && governorHistoryEntry != null && governorHistoryEntry2.HousingAfter == governorHistoryEntry.HousingAfter && governorHistoryEntry2.PopulationAfter == governorHistoryEntry.PopulationAfter && governorHistoryEntry2.BuiltBuildings == governorHistoryEntry.BuiltBuildings && governorHistoryEntry2.BuiltRoads == governorHistoryEntry.BuiltRoads, (governorHistoryEntry2 == null) ? "tarix yo'q" : governorHistoryEntry2.SummaryUz);
+			Check("Vazir: 3+ uy, bozor va bog' qurildi", _buildings.Count(BuildingType.House) >= num9 + 3 && _buildings.Count(BuildingType.Market) >= num10 + 1 && _buildings.Count(BuildingType.Garden) >= num11 + 1, "uy " + num9 + "->" + _buildings.Count(BuildingType.House) + ", bozor " + num10 + "->" + _buildings.Count(BuildingType.Market) + ", bog' " + num11 + "->" + _buildings.Count(BuildingType.Garden));
+			Check("Vazir: rejalashtirilgan ko'cha qurildi", CountRoadTiles() > num8, num8 + " -> " + CountRoadTiles() + " yo'l katagi");
+			Check("Vazir: aholi sig'imi oshdi", _buildings.TotalPopulation > totalPopulation, totalPopulation + " -> " + _buildings.TotalPopulation);
+			Check("Vazir: xarajat budjet ichida, bir marta yechildi", plan2 != null && plan2.SpentSoFar > 0 && plan2.SpentSoFar <= plan2.ApprovedBudget && _state.Coins == coins4 - plan2.SpentSoFar, coins4 + " -> " + _state.Coins + " (sarflandi " + (plan2?.SpentSoFar ?? 0) + ")");
+			Check("Vazir: AI tasdiqsiz yer sotib olmadi", CountClosedParcels() == num, "yopiq uchastkalar " + num + " -> " + CountClosedParcels());
+			for (int num15 = 0; num15 < 5; num15++)
+			{
+				_state.Update(31f, _buildings);
+			}
+			Check("Vazir: qurilishdan keyin iqtisod barqaror", _state.Coins >= 0 && _state.Food >= 0, "tanga " + _state.Coins + ", oziq " + _state.Food);
+		}
+		catch (Exception ex)
+		{
+			Check("Smoke test kutilmagan xatosiz ishladi", false, ex.GetType().Name + ": " + ex.Message);
+			sb.AppendLine("STACK: " + (ex.StackTrace ?? "").Replace("\r", "").Replace("\n", " || "));
+		}
+		sb.AppendLine(new string('-', 60));
+		sb.AppendLine("NATIJA: " + pass + " PASS / " + fail + " FAIL");
+		string text3 = sb.ToString();
+		try
+		{
+			File.WriteAllText(logPath, text3);
+		}
+		catch
+		{
+		}
+		Console.WriteLine(text3);
+		void Check(string name, bool flag7, string detail = "")
+		{
+			if (flag7)
+			{
+				pass++;
+			}
+			else
+			{
+				fail++;
+			}
+			sb.AppendLine((flag7 ? "PASS" : "FAIL") + " | " + name + ((detail.Length > 0) ? ("  [" + detail + "]") : ""));
+		}
+	}
+
+	private Point? FindBuildableTile(int size, int parcelId)
+	{
+		int num = 32;
+		for (int i = 0; i <= 40; i++)
+		{
+			for (int j = -i; j <= i; j++)
+			{
+				for (int k = -i; k <= i; k++)
+				{
+					if (Math.Abs(k) != i && Math.Abs(j) != i)
+					{
+						continue;
+					}
+					int num2 = num + k;
+					int num3 = num + j;
+					if (num2 < 1 || num3 < 1 || num2 >= 64 - size || num3 >= 64 - size)
+					{
+						continue;
+					}
+					Point point = new Point(num2, num3);
+					if (parcelId >= 0)
+					{
+						LandParcel landParcel = _state.Land.ParcelAt(num2, num3);
+						if (landParcel == null || landParcel.Id != parcelId)
+						{
+							continue;
+						}
+					}
+					if (!_state.IsLandBuildable(point, size) || !_buildings.CanPlace(point, size) || _units.AnyInArea(point, size))
+					{
+						continue;
+					}
+					return point;
+				}
+			}
+		}
+		return null;
+	}
+
+	private int CountClosedParcels()
+	{
+		int num = 0;
+		foreach (LandParcel parcel in _state.Land.Parcels)
+		{
+			if (parcel.State != LandParcelState.Open)
+			{
+				num++;
+			}
+		}
+		return num;
+	}
+
+	private int CountRoadTiles()
+	{
+		int num = 0;
+		for (int i = 0; i < _map.Height; i++)
+		{
+			for (int j = 0; j < _map.Width; j++)
+			{
+				if (_map.GetTile(j, i) == TileType.Road)
+				{
+					num++;
+				}
+			}
+		}
+		return num;
+	}
+
+	private static BuildingType? ParseBuild(string s)
+	{
+		switch ((s ?? "").Trim().ToLowerInvariant())
+		{
+		case "uy":
+		case "house":
+			return BuildingType.House;
+		case "minora":
+		case "tower":
+			return BuildingType.Tower;
+		case "bozor":
+		case "market":
+			return BuildingType.Market;
+		case "devor":
+		case "wall":
+			return BuildingType.Wall;
+		default:
+			return null;
+		}
+	}
+
+	private SaveGameData BuildSave()
+	{
+		SaveGameData saveGameData = new SaveGameData
+		{
+			Seed = _currentSeed,
+			Coins = _state.Coins,
+			Food = _state.Food,
+			Day = _state.Clock.Day,
+			DayFraction = _state.Clock.DayFraction,
+			CameraX = _camera.Position.X,
+			CameraY = _camera.Position.Y,
+			Zoom = _camera.Zoom,
+			Speed = _state.Speed,
+			PopTax = _state.Policy.PopulationTax,
+			TradeTax = _state.Policy.TradeTax,
+			ProdTax = _state.Policy.ProductionTax,
+			Citizens = _state.Pop.Snapshot(),
+			World = _state.World.Snapshot(),
+			Military = _state.Military.Snapshot(),
+			Civ = _state.Civ.Snapshot(),
+			OpenParcels = _state.Land.OpenParcelIds(),
+			Weather = (int)_state.Weather.Current,
+			Story = _state.Story?.State,
+			Governor = _governor?.GetSaveState()
+		};
+		foreach (Building building in _buildings.Buildings)
+		{
+			if (building.BuiltByPlayer)
+			{
+				saveGameData.PlayerBuildings.Add(new SavedBuilding
+				{
+					Type = (int)building.Type,
+					X = building.Position.X,
+					Y = building.Position.Y,
+					Variant = building.Variant,
+					HitPoints = building.HitPoints,
+					Level = building.Level
+				});
+			}
+		}
+		for (int i = 0; i < _map.Height; i++)
+		{
+			for (int j = 0; j < _map.Width; j++)
+			{
+				if (_map.GetTile(j, i) == TileType.Road)
+				{
+					saveGameData.Roads.Add(new SavedRoad
+					{
+						X = j,
+						Y = i
+					});
+				}
+			}
+		}
+		return saveGameData;
+	}
+
+	private void DoSave()
+	{
+		bool flag = SaveManager.Save(SaveManager.DefaultPath, BuildSave());
+		_state.ShowMessage(flag ? "O'yin saqlandi" : "Saqlab bo'lmadi", !flag);
+	}
+
+	private void DoLoad()
+	{
+		SaveGameData saveGameData = SaveManager.Load(SaveManager.DefaultPath);
+		if (saveGameData == null)
+		{
+			_state.ShowMessage("Saqlangan o'yin topilmadi", isError: true);
+			return;
+		}
+		_pendingStory = saveGameData.Story;
+		_pendingStoryMode = saveGameData.Story != null && saveGameData.Story.StoryModeActive;
+		NewGame(saveGameData.Seed, saveGameData.Governor);
+		_state.Coins = saveGameData.Coins;
+		_state.Food = saveGameData.Food;
+		_state.Clock.Set(saveGameData.Day, saveGameData.DayFraction);
+		_state.SetSpeed(saveGameData.Speed);
+		_state.Policy.PopulationTax = saveGameData.PopTax;
+		_state.Policy.TradeTax = saveGameData.TradeTax;
+		_state.Policy.ProductionTax = saveGameData.ProdTax;
+		_state.Pop.Restore(saveGameData.Citizens, _buildings);
+		if (saveGameData.World != null)
+		{
+			_state.World.Restore(saveGameData.World);
+		}
+		if (saveGameData.Military != null)
+		{
+			_state.Military.Restore(saveGameData.Military);
+		}
+		if (saveGameData.Civ != null)
+		{
+			_state.Civ.Restore(saveGameData.Civ);
+		}
+		if (saveGameData.OpenParcels != null)
+		{
+			_state.Land.ApplyOpen(saveGameData.OpenParcels);
+		}
+		_state.Weather.SetCurrent((Weather)saveGameData.Weather);
+		if (saveGameData.Roads != null)
+		{
+			foreach (SavedRoad road in saveGameData.Roads)
+			{
+				if (_map.InBounds(road.X, road.Y) && _map.GetOccupant(road.X, road.Y) == null)
+				{
+					_map.SetTile(road.X, road.Y, TileType.Road);
+				}
+			}
+		}
+		foreach (SavedBuilding playerBuilding in saveGameData.PlayerBuildings)
+		{
+			BuildingType type = (BuildingType)playerBuilding.Type;
+			Building building = BuildingFactory.Create(type, new Point(playerBuilding.X, playerBuilding.Y), playerBuilding.Variant);
+			building.BuiltByPlayer = true;
+			if (_buildings.Add(building))
+			{
+				if (playerBuilding.HitPoints > 0)
+				{
+					building.HitPoints = playerBuilding.HitPoints;
+				}
+				if (playerBuilding.Level > 1)
+				{
+					building.Level = playerBuilding.Level;
+				}
+			}
+		}
+		_camera.Jump(new Vector2(saveGameData.CameraX, saveGameData.CameraY), saveGameData.Zoom);
+		_governor?.Analyze();
+		_state.ShowMessage("O'yin yuklandi");
+	}
+
+	protected override void Update(GameTime gameTime)
+	{
+		_perf?.BeginFrame();
+		_perf?.BeginUpdate();
+		if (_exitRequested)
+		{
+			_perf?.EndUpdate();
+			_perf?.EndFrame();
+			Exit();
+			return;
+		}
+		float num = (float)gameTime.ElapsedGameTime.TotalSeconds;
+		_input.Update(IsActive);
+		if (_menuMode)
+		{
+			Viewport viewport = GraphicsDevice.Viewport;
+			_mainMenu.SetMouse(_input.MousePosition);
+			switch (_mainMenu.Update(_input, viewport.Width, viewport.Height))
+			{
+			case MainMenuAction.Start:
+				_pendingStoryMode = true;
+				NewGame(_currentSeed);
+				_menuMode = false;
+				break;
+			case MainMenuAction.Continue:
+				DoLoad();
+				_menuMode = false;
+				break;
+			case MainMenuAction.History:
+				_menuMode = false;
+				_civMode = true;
+				break;
+			case MainMenuAction.Exit:
+				_exitRequested = true;
+				break;
+			case MainMenuAction.Online:
+				_menuMode = false;
+				_onlinePanel.Open();
+				break;
+			}
+			_onlinePanel.Update(_input, viewport.Width, viewport.Height, num);
+			_units.Update(num * 0.6f);
+			_map.Update(num);
+			_dayNight.Update(_state.Clock.DayFraction);
+			_frames++;
+			if (_opt.ScreenshotPath != null && _frames >= (_opt.ScreenshotFrames ?? 6))
+			{
+				_captureNextDraw = true;
+			}
+			_perf?.EndUpdate();
+			_perf?.EndFrame();
+			base.Update(gameTime);
+			return;
+		}
+		Viewport viewport2 = GraphicsDevice.Viewport;
+		// Online panel: tarmoq natijalarini qabul qiladi (har kadr); ochiq bo'lsa barcha kiritishni o'zi oladi.
+		bool onlineOpen = _onlinePanel.IsOpen;
+		_onlinePanel.Update(_input, viewport2.Width, viewport2.Height, num);
+		if (!onlineOpen)
+		{
+			HandleHotkeys();
+		}
+		if (onlineOpen)
+		{
+			// O'yin dunyosi orqada yashashda davom etadi (pastdagi simulyatsiya), lekin bosishlar panelga tegishli.
+		}
+		else if (_strategicMode)
+		{
+			_strategic.Update(_input, viewport2.Width, viewport2.Height);
+			if (_strategic.BackRequested)
+			{
+				_strategic.BackRequested = false;
+				_strategicMode = false;
+			}
+			if (_strategic.EnterCityRequested)
+			{
+				_strategic.EnterCityRequested = false;
+				_strategicMode = false;
+			}
+		}
+		else if (_civMode)
+		{
+			_civ.Update(_input, viewport2.Width, viewport2.Height);
+			if (_civ.BackRequested)
+			{
+				_civ.BackRequested = false;
+				_civMode = false;
+			}
+		}
+		else if (_questMode)
+		{
+			_quest.Update(_input, viewport2.Width, viewport2.Height);
+			if (_quest.FocusMapRequested)
+			{
+				_quest.FocusMapRequested = false;
+				_camera.Jump(_quest.FocusTarget, _camera.Zoom);
+			}
+			if (_quest.BackRequested)
+			{
+				_quest.BackRequested = false;
+				_questMode = false;
+			}
+		}
+		else
+		{
+			bool flag = _storyOverlay != null && _storyOverlay.DialogueOpen;
+			_storyOverlay?.Update(_input, num, viewport2.Width, viewport2.Height);
+			_ui.Update(_input, viewport2.Width, viewport2.Height);
+			_onlinePanel.UpdateLauncher(_input, viewport2.Width);
+			if (_ui.OpenCivRequested)
+			{
+				_ui.OpenCivRequested = false;
+				_civMode = true;
+			}
+			_camera.Update(num, _input, viewport2);
+			bool flag2 = _ui.GovernorPanel != null && _ui.GovernorPanel.PickMode != GovernorMapMode.None;
+			if (!flag && !flag2)
+			{
+				_construction.Update(_input, _camera);
+			}
+			if (flag2)
+			{
+				if (!flag && _input.LeftPressed && !_input.MouseOverUI)
+				{
+					Point tile = IsoMath.WorldToTile(_camera.ScreenToWorld(_input.MouseVector));
+					_ui.GovernorPanel.HandleMapClick(tile);
+				}
+			}
+			else if (!flag && _state.Mode == GameMode.Playing && _input.LeftPressed && !_input.MouseOverUI)
+			{
+				Vector2 vector = _camera.ScreenToWorld(_input.MouseVector);
+				object obj = _renderer.PickAt(vector, _map, _buildings, _units);
+				if (obj == null)
+				{
+					Point point = IsoMath.WorldToTile(vector);
+					LandParcel landParcel = _state.Land.ParcelAt(point.X, point.Y);
+					if (landParcel != null && landParcel.State != LandParcelState.Open)
+					{
+						obj = landParcel;
+					}
+				}
+				bool flag3 = false;
+				if (obj == null && _governor?.Blueprint != null)
+				{
+					Point tile2 = IsoMath.WorldToTile(vector);
+					if (_governor.SelectBlueprintAt(tile2))
+					{
+						flag3 = true;
+						_state.ShowMessage(_governor.DescribeSelectedBlueprintUz());
+					}
+				}
+				if (!flag3)
+				{
+					_state.Select(obj);
+				}
+			}
+			if (_opt.HoverTile.HasValue && _state.Mode == GameMode.BuildMode)
+			{
+				_construction.SetHover(_opt.HoverTile.Value);
+			}
+		}
+		float dt = (_state.Paused ? 0f : (num * (float)_state.Speed));
+		float speedScale = 1f - 0.8f * _dayNight.NightAmount;
+		foreach (Unit unit in _units.Units)
+		{
+			if (unit is CitizenUnit)
+			{
+				unit.SpeedScale = speedScale;
+			}
+		}
+		_units.Update(dt);
+		_map.Update(dt);
+		int day = _state.Day;
+		_state.Update(num, _buildings);
+		if (_state.Day != day)
+		{
+			_governor?.OnDayTick();
+		}
+		_time += num;
+		_dayNight.Update(_state.Clock.DayFraction);
+		_ui.PhaseName = _dayNight.PhaseName;
+		_frames++;
+		if (_opt.ScreenshotPath != null && _frames >= (_opt.ScreenshotFrames ?? 6))
+		{
+			_captureNextDraw = true;
+		}
+		_perf?.SetVisibleSprites(_renderer != null ? _renderer.LastDrawnCount : 0);
+		_perf?.SetActiveNpcs(_units != null ? _units.Units.Count : 0);
+		_perf?.EndUpdate();
+		_perf?.EndFrame();
+		base.Update(gameTime);
+	}
+
+	private void HandleHotkeys()
+	{
+		if (_input.KeyPressed(Keys.O))
+		{
+			_onlinePanel.Toggle();
+			return;
+		}
+		if (_input.KeyPressed(Keys.M))
+		{
+			_strategicMode = !_strategicMode;
+			_civMode = false;
+			_questMode = false;
+			return;
+		}
+		if (_input.KeyPressed(Keys.C))
+		{
+			_civMode = !_civMode;
+			_strategicMode = false;
+			_questMode = false;
+			return;
+		}
+		if (_input.KeyPressed(Keys.J))
+		{
+			_questMode = !_questMode;
+			_strategicMode = false;
+			_civMode = false;
+			return;
+		}
+		if (_input.KeyPressed(Keys.Escape))
+		{
+			AIGovernorPanel governorPanel = _ui.GovernorPanel;
+			if (governorPanel != null && governorPanel.IsOpen)
+			{
+				governorPanel.Close();
+			}
+			else if (governorPanel != null && governorPanel.PickMode != GovernorMapMode.None)
+			{
+				governorPanel.CancelMapMode();
+				_state.ShowMessage("Tahrir rejimi bekor qilindi.");
+			}
+			else if (_civMode)
+			{
+				_civMode = false;
+			}
+			else if (_strategicMode)
+			{
+				_strategicMode = false;
+			}
+			else if (_ui.PetitionOpen)
+			{
+				_ui.ClosePetition();
+			}
+			else if (_state.ShowHelp)
+			{
+				_state.ShowHelp = false;
+			}
+			else if (_state.Mode == GameMode.BuildMode)
+			{
+				_state.CancelBuild();
+			}
+			else if (_state.Selected != null)
+			{
+				_state.Select(null);
+			}
+		}
+		if (_input.KeyPressed(Keys.Tab))
+		{
+			_state.CycleSpeed();
+		}
+		if (_input.KeyPressed(Keys.P))
+		{
+			_ui.TogglePetition();
+		}
+		if (_input.KeyPressed(Keys.V))
+		{
+			_ui.ToggleGovernor();
+		}
+		if (_input.KeyPressed(Keys.G))
+		{
+			GraphicsQualityManager.Cycle();
+			_state.ShowMessage("Grafika sifati: " + GraphicsQualityManager.Name());
+		}
+		if (_input.KeyPressed(Keys.Space))
+		{
+			_state.Paused = !_state.Paused;
+		}
+		if (_input.KeyPressed(Keys.H) || _input.KeyPressed(Keys.F1))
+		{
+			_state.ShowHelp = !_state.ShowHelp;
+		}
+		if (_input.KeyPressed(Keys.F3))
+		{
+			_perf.Enabled = !_perf.Enabled;
+			_state.ShowMessage(_perf.Enabled ? "Profiler yoqildi" : "Profiler o'chirildi");
+		}
+		if (_input.KeyPressed(Keys.F5))
+		{
+			DoSave();
+		}
+		if (_input.KeyPressed(Keys.F9))
+		{
+			DoLoad();
+		}
+		if (!_strategicMode)
+		{
+			if (_input.KeyPressed(Keys.D1))
+			{
+				_state.EnterBuildMode(BuildingType.House);
+			}
+			if (_input.KeyPressed(Keys.D2))
+			{
+				_state.EnterBuildMode(BuildingType.Tower);
+			}
+			if (_input.KeyPressed(Keys.D3))
+			{
+				_state.EnterBuildMode(BuildingType.Market);
+			}
+			if (_input.KeyPressed(Keys.D4))
+			{
+				_state.EnterBuildMode(BuildingType.Wall);
+			}
+			if (_input.KeyPressed(Keys.Home))
+			{
+				_camera.Jump(IsoMath.TileToWorld(new Vector2(32f, 32f)), _camera.Zoom);
+			}
+		}
+	}
+
+	protected override void Draw(GameTime gameTime)
+	{
+		if (_opt.ExportSpritesDir != null)
+		{
+			GraphicsDevice.Clear(Color.Black);
+			base.Draw(gameTime);
+			return;
+		}
+		_perf?.BeginDraw();
+		bool flag = _captureNextDraw && _opt.ScreenshotPath != null;
+		RenderTarget2D renderTarget2D = null;
+		if (flag)
+		{
+			renderTarget2D = new RenderTarget2D(GraphicsDevice, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+			GraphicsDevice.SetRenderTarget(renderTarget2D);
+		}
+		if (_strategicMode)
+		{
+			DrawStrategic();
+		}
+		else if (_civMode)
+		{
+			DrawCiv();
+		}
+		else if (_questMode)
+		{
+			DrawQuest();
+		}
+		else
+		{
+			DrawScene();
+			DrawAmbient();
+			DrawGlows();
+			DrawWeather();
+			if (_menuMode)
+			{
+				DrawMenu();
+			}
+			else
+			{
+				DrawUI();
+				DrawStoryOverlay();
+				DrawOnline();
+			}
+		}
+		if (flag)
+		{
+			GraphicsDevice.SetRenderTarget(null);
+			try
+			{
+				string directoryName = Path.GetDirectoryName(Path.GetFullPath(_opt.ScreenshotPath));
+				if (!string.IsNullOrEmpty(directoryName))
+				{
+					Directory.CreateDirectory(directoryName);
+				}
+				using FileStream stream = File.Create(_opt.ScreenshotPath);
+				renderTarget2D.SaveAsPng(stream, renderTarget2D.Width, renderTarget2D.Height);
+			}
+			catch (Exception)
+			{
+			}
+			_sb.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointClamp);
+			_sb.Draw(renderTarget2D, Vector2.Zero, Color.White);
+			_sb.End();
+			renderTarget2D.Dispose();
+			_exitRequested = true;
+		}
+		// Profiler overlay (development-only, F3 bilan).
+		if (_perf != null && _perf.Enabled)
+		{
+			_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+			_sb.Draw(_assets.Pixel, new Rectangle(8, 8, 150, 130), new Color(0, 0, 0, 150));
+			_perf.Draw(_sb, _font, 12, 12);
+			_sb.End();
+		}
+		// Shu kadrda UI chizmagan ekranlarda (xarita, sivilizatsiya...) ushlab qolingan bosish keyingi panelga o'tib ketmasin.
+		_perf?.EndDraw();
+		_input?.TakeClick();
+		base.Draw(gameTime);
+	}
+
+	private void DrawScene()
+	{
+		GraphicsDevice.Clear(new Color(26, 30, 22));
+		Vector4 visibleWorldRect = _camera.VisibleWorldRect;
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, null, _camera.Transform);
+		_map.Draw(_sb, visibleWorldRect);
+		LandExpansionRenderer.Draw(_sb, _map, _state.Land, visibleWorldRect);
+		if (_state.Mode == GameMode.Playing && !_input.MouseOverUI)
+		{
+			Point point = IsoMath.WorldToTile(_camera.ScreenToWorld(_input.MouseVector));
+			if (_map.InBounds(point.X, point.Y))
+			{
+				_map.DrawTileOverlay(_sb, point.X, point.Y, new Color(255, 255, 255, 45), outline: true);
+			}
+		}
+		DrawSelectionHighlight();
+		_blueprintRenderer?.Draw(_sb, _governor?.Blueprint, _governor?.Blueprints.SelectedItemId ?? 0);
+		_renderer.Draw(_sb, visibleWorldRect, _map, _buildings, _units);
+		_construction.Draw(_sb);
+		_sb.End();
+	}
+
+	private void DrawSelectionHighlight()
+	{
+		Color color = new Color(255, 215, 120, 80);
+		object selected = _state.Selected;
+		object obj = selected;
+		if (!(obj is Building building))
+		{
+			if (!(obj is Decoration decoration))
+			{
+				if (obj is Unit unit)
+				{
+					_map.DrawMarker(_sb, IsoMath.TileToWorld(unit.Position), new Color(255, 215, 120, 220));
+				}
+			}
+			else
+			{
+				_map.DrawTileOverlay(_sb, decoration.Position.X, decoration.Position.Y, color, outline: false);
+			}
+			return;
+		}
+		for (int i = building.Position.Y; i < building.Position.Y + building.Size.X; i++)
+		{
+			for (int j = building.Position.X; j < building.Position.X + building.Size.X; j++)
+			{
+				_map.DrawTileOverlay(_sb, j, i, color, outline: false);
+			}
+		}
+	}
+
+	private void DrawAmbient()
+	{
+		Viewport viewport = GraphicsDevice.Viewport;
+		_sb.Begin(SpriteSortMode.Deferred, Multiply, SamplerState.PointClamp);
+		_sb.Draw(_assets.Pixel, new Rectangle(0, 0, viewport.Width, viewport.Height), _dayNight.Ambient);
+		_sb.End();
+	}
+
+	private void DrawGlows()
+	{
+		if (_dayNight.NightAmount < 0.06f || _glow == null)
+		{
+			return;
+		}
+		float num = 0.85f + 0.15f * MathF.Sin(_time * 3.1f);
+		float num2 = _dayNight.NightAmount * num;
+		Color color = new Color(255, 170, 80);
+		Vector2 origin = new Vector2((float)_glow.Width / 2f, (float)_glow.Height / 2f);
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.Additive, SamplerState.PointClamp, null, null, null, _camera.Transform);
+		foreach (Decoration decoration in _map.Decorations)
+		{
+			if (decoration.Type == DecorationType.Brazier)
+			{
+				Vector2 position = IsoMath.TileToWorld(new Vector2((float)decoration.Position.X + 0.5f, (float)decoration.Position.Y + 0.5f));
+				position.Y -= 14f;
+				_sb.Draw(_glow, position, null, color * (num2 * 0.9f), 0f, origin, 1.7f, SpriteEffects.None, 0f);
+			}
+		}
+		_sb.End();
+	}
+
+	private Texture2D BuildGlow()
+	{
+		Canvas canvas = new Canvas(64, 64);
+		float num = 32f;
+		for (int i = 0; i < 64; i++)
+		{
+			for (int j = 0; j < 64; j++)
+			{
+				float num2 = ((float)j + 0.5f - num) / num;
+				float num3 = ((float)i + 0.5f - num) / num;
+				float num4 = MathF.Sqrt(num2 * num2 + num3 * num3);
+				if (!(num4 >= 1f))
+				{
+					float num5 = 1f - num4;
+					num5 *= num5;
+					canvas.Pixels[i * 64 + j] = new Color(255, 255, 255, (int)(num5 * 255f));
+				}
+			}
+		}
+		return canvas.ToTexture(GraphicsDevice);
+	}
+
+	private void DrawUI()
+	{
+		Viewport viewport = GraphicsDevice.Viewport;
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+		_ui.Draw(_sb, viewport.Width, viewport.Height);
+		_sb.End();
+	}
+
+	private void DrawStrategic()
+	{
+		GraphicsDevice.Clear(new Color(18, 22, 30));
+		Viewport viewport = GraphicsDevice.Viewport;
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+		_strategic.Draw(_sb, viewport.Width, viewport.Height);
+		_sb.End();
+	}
+
+	private void DrawCiv()
+	{
+		GraphicsDevice.Clear(new Color(16, 20, 34));
+		Viewport viewport = GraphicsDevice.Viewport;
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+		_civ.Draw(_sb, viewport.Width, viewport.Height);
+		_sb.End();
+	}
+
+	private void DrawQuest()
+	{
+		GraphicsDevice.Clear(new Color(18, 20, 28));
+		Viewport viewport = GraphicsDevice.Viewport;
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+		_quest.Draw(_sb, viewport.Width, viewport.Height);
+		_sb.End();
+	}
+
+	private void DrawStoryOverlay()
+	{
+		if (_storyOverlay != null)
+		{
+			Viewport viewport = GraphicsDevice.Viewport;
+			_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+			_storyOverlay.Draw(_sb, viewport.Width, viewport.Height);
+			_sb.End();
+		}
+	}
+
+	private void DrawOnline()
+	{
+		Viewport viewport = GraphicsDevice.Viewport;
+		// LinearClamp: TTF shrift atlasi silliq (xira emas) chiziladi; piksel-art dunyo alohida PointClamp bilan.
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp);
+		_onlinePanel.DrawLauncher(_sb, viewport.Width);
+		_onlinePanel.Draw(_sb, viewport.Width, viewport.Height, _time);
+		_sb.End();
+	}
+
+	private void DrawMenu()
+	{
+		Viewport viewport = GraphicsDevice.Viewport;
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp);
+		_mainMenu.Draw(_sb, viewport.Width, viewport.Height);
+		_sb.End();
+	}
+
+	private void DrawWeather()
+	{
+		Viewport viewport = GraphicsDevice.Viewport;
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+		EnvironmentRenderer.Draw(_sb, _assets.Pixel, _state.Weather.Current, viewport.Width, viewport.Height, _time);
+		_sb.End();
+	}
+}

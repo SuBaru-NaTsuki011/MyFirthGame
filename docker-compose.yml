@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16
+    container_name: andijon-db
+    environment:
+      POSTGRES_DB: andijon
+      POSTGRES_USER: andijon
+      POSTGRES_PASSWORD: andijon
+    ports:
+      - "5432:5432"
+    volumes:
+      - andijon-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U andijon"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  andijon-pgdata:

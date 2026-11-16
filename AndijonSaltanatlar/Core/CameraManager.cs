@@ -1,0 +1,123 @@
+using System;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
+
+namespace AndijonSaltanatlar.Core
+{
+    /// <summary>
+    /// 2D kamera: pan (WASD / strelkalar / o'ng yoki o'rta tugma bilan sudrash) va
+    /// kursorga qarab silliq zoom (g'ildirak).
+    /// </summary>
+    public sealed class CameraManager
+    {
+        private float _targetZoom;
+        private Viewport _viewport;
+
+        /// <summary>Kamera qarab turgan nuqta (world piksel).</summary>
+        public Vector2 Position;
+        public float Zoom { get; private set; }
+
+        public CameraManager(Viewport viewport, Vector2 startWorld, float zoom)
+        {
+            _viewport = viewport;
+            Position = startWorld;
+            Zoom = _targetZoom = MathHelper.Clamp(zoom, GameConfig.MinZoom, GameConfig.MaxZoom);
+        }
+
+        public Matrix Transform
+        {
+            get
+            {
+                // Pikselga yaxlitlash — sprite'lar "titrab" ko'rinmasligi uchun.
+                float tx = MathF.Round(-Position.X * Zoom + _viewport.Width * 0.5f);
+                float ty = MathF.Round(-Position.Y * Zoom + _viewport.Height * 0.5f);
+                return Matrix.CreateScale(Zoom, Zoom, 1f) * Matrix.CreateTranslation(tx, ty, 0f);
+            }
+        }
+
+        public Vector2 ScreenToWorld(Vector2 screen)
+        {
+            return (screen - new Vector2(_viewport.Width, _viewport.Height) * 0.5f) / Zoom + Position;
+        }
+
+        public Vector2 WorldToScreen(Vector2 world)
+        {
+            return (world - Position) * Zoom + new Vector2(_viewport.Width, _viewport.Height) * 0.5f;
+        }
+
+        /// <summary>Ekranda ko'rinayotgan world to'rtburchagi (chap, yuqori, o'ng, past).</summary>
+        public Vector4 VisibleWorldRect
+        {
+            get
+            {
+                Vector2 half = new Vector2(_viewport.Width, _viewport.Height) * 0.5f / Zoom;
+                return new Vector4(Position.X - half.X, Position.Y - half.Y, Position.X + half.X, Position.Y + half.Y);
+            }
+        }
+
+        public void Update(float dt, InputManager input, Viewport viewport)
+        {
+            _viewport = viewport;
+
+            // --- Klaviatura bilan pan ---
+            Vector2 move = Vector2.Zero;
+            if (input.KeyDown(Keys.A) || input.KeyDown(Keys.Left)) move.X -= 1;
+            if (input.KeyDown(Keys.D) || input.KeyDown(Keys.Right)) move.X += 1;
+            if (input.KeyDown(Keys.W) || input.KeyDown(Keys.Up)) move.Y -= 1;
+            if (input.KeyDown(Keys.S) || input.KeyDown(Keys.Down)) move.Y += 1;
+            if (move != Vector2.Zero)
+            {
+                move.Normalize();
+                float speed = (input.KeyDown(Keys.LeftShift) ? 1500f : 800f) / Zoom;
+                Position += move * speed * dt;
+            }
+
+            // --- Sichqoncha bilan sudrash ---
+            if (input.IsPanDragging)
+            {
+                Point d = input.MouseDelta;
+                Position -= new Vector2(d.X, d.Y) / Zoom;
+            }
+
+            // --- Zoom (kursor ostidagi nuqta joyida qoladi) ---
+            if (input.WheelDelta != 0 && !input.MouseOverUI)
+            {
+                float factor = MathF.Pow(1.15f, input.WheelDelta / 120f);
+                _targetZoom = MathHelper.Clamp(_targetZoom * factor, GameConfig.MinZoom, GameConfig.MaxZoom);
+            }
+            if (input.KeyPressed(Keys.OemPlus) || input.KeyPressed(Keys.Add))
+                _targetZoom = MathHelper.Clamp(_targetZoom * 1.2f, GameConfig.MinZoom, GameConfig.MaxZoom);
+            if (input.KeyPressed(Keys.OemMinus) || input.KeyPressed(Keys.Subtract))
+                _targetZoom = MathHelper.Clamp(_targetZoom / 1.2f, GameConfig.MinZoom, GameConfig.MaxZoom);
+
+            if (MathF.Abs(_targetZoom - Zoom) > 0.0005f)
+            {
+                Vector2 anchor = input.MouseVector;
+                Vector2 before = ScreenToWorld(anchor);
+                Zoom = MathHelper.Lerp(Zoom, _targetZoom, 1f - MathF.Exp(-14f * dt));
+                if (MathF.Abs(_targetZoom - Zoom) < 0.0005f) Zoom = _targetZoom;
+                Vector2 after = ScreenToWorld(anchor);
+                Position += before - after;
+            }
+
+            ClampToMap();
+        }
+
+        /// <summary>Kamerani darhol berilgan nuqta va zoom'ga o'rnatadi (Home tugmasi, Load uchun).</summary>
+        public void Jump(Vector2 position, float zoom)
+        {
+            Position = position;
+            Zoom = _targetZoom = MathHelper.Clamp(zoom, GameConfig.MinZoom, GameConfig.MaxZoom);
+            ClampToMap();
+        }
+
+        private void ClampToMap()
+        {
+            float halfW = GameConfig.MapSize * GameConfig.HalfTileW;
+            float fullH = GameConfig.MapSize * GameConfig.TileHeight;
+            Position.X = MathHelper.Clamp(Position.X, -halfW, halfW);
+            Position.Y = MathHelper.Clamp(Position.Y, 0, fullH);
+        }
+    }
+}

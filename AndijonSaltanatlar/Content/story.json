@@ -1,0 +1,1035 @@
+{
+  "Campaign": {
+    "CampaignId": "asaka_rise",
+    "NameUz": "Bir shahardan buyuk saltanat sari",
+    "HistoricalPeriod": "Muqobil tarixiy badiiy ssenariy",
+    "StartDate": "",
+    "StartingRegionIds": [
+      "asaka"
+    ],
+    "StartingKingdomState": {},
+    "NarrativeChapters": [
+      {
+        "ChapterId": "b1",
+        "TitleUz": "1-bob \u2014 Yangi hukmdor",
+        "IntroDialogueId": "d_b1_intro",
+        "QuestIds": [
+          "q_b1_house",
+          "q_b1_market"
+        ],
+        "OutroDialogueId": ""
+      },
+      {
+        "ChapterId": "b2",
+        "TitleUz": "2-bob \u2014 Rivojlanayotgan shahar",
+        "IntroDialogueId": "d_b2_intro",
+        "QuestIds": [
+          "q_b2_pop",
+          "q_b2_happy",
+          "q_b2_houses"
+        ],
+        "OutroDialogueId": ""
+      },
+      {
+        "ChapterId": "b3",
+        "TitleUz": "3-bob \u2014 Yangi mahallalar",
+        "IntroDialogueId": "d_b3_intro",
+        "QuestIds": [
+          "q_b3_land",
+          "q_b3_three"
+        ],
+        "OutroDialogueId": ""
+      },
+      {
+        "ChapterId": "b4",
+        "TitleUz": "4-bob \u2014 Ilm va madaniyat",
+        "IntroDialogueId": "d_b4_intro",
+        "QuestIds": [
+          "q_b4_madrasa",
+          "q_b4_tech",
+          "q_b4_upgrade"
+        ],
+        "OutroDialogueId": ""
+      },
+      {
+        "ChapterId": "b5",
+        "TitleUz": "5-bob \u2014 Buyuk savdo yo\u0027llari",
+        "IntroDialogueId": "d_b5_intro",
+        "QuestIds": [
+          "q_b5_caravan",
+          "q_b5_agreement",
+          "q_b5_trade"
+        ],
+        "OutroDialogueId": ""
+      },
+      {
+        "ChapterId": "b6",
+        "TitleUz": "6-bob \u2014 Saltanat birligi",
+        "IntroDialogueId": "d_b6_intro",
+        "QuestIds": [
+          "q_b6_relation",
+          "q_b6_alliance"
+        ],
+        "OutroDialogueId": ""
+      },
+      {
+        "ChapterId": "b7",
+        "TitleUz": "7-bob \u2014 Buyuk poytaxt",
+        "IntroDialogueId": "d_b7_intro",
+        "QuestIds": [
+          "q_b7_palace",
+          "q_b7_pop",
+          "q_b7_level"
+        ],
+        "OutroDialogueId": "d_b7_outro"
+      }
+    ],
+    "HistoricalReferenceIds": [],
+    "VerificationStatus": "Fictional",
+    "CompletionConditions": {
+      "chaptersCompleted": 7
+    },
+    "IsAlternateHistory": true
+  },
+  "Quests": [
+    {
+      "QuestId": "q_b1_house",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b1",
+      "TitleUz": "Birinchi turar joyni quring",
+      "DescriptionUz": "Xalqimiz uchun munosib boshpana bilan boshlaymiz. Bitta uy quring.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [],
+      "Objectives": [
+        {
+          "Type": "BuildBuilding",
+          "TargetKey": "House",
+          "TargetAmount": 1,
+          "DescriptionUz": "Uy quring: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 150,
+          "RefKey": ""
+        },
+        {
+          "Kind": "Experience",
+          "Amount": 20,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 100,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": "d_b1_memor"
+    },
+    {
+      "QuestId": "q_b1_market",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b1",
+      "TitleUz": "Birinchi bozorni quring",
+      "DescriptionUz": "Savdo-sotiq shahar hayotining qoni. Bir bozor barpo eting.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b1_house"
+      ],
+      "Objectives": [
+        {
+          "Type": "BuildBuilding",
+          "TargetKey": "Market",
+          "TargetAmount": 1,
+          "DescriptionUz": "Bozor quring: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 100,
+          "RefKey": ""
+        },
+        {
+          "Kind": "Culture",
+          "Amount": 10,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 95,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b2_pop",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b2",
+      "TitleUz": "Aholini ko\u0027paytiring",
+      "DescriptionUz": "Shahar gullab-yashnashi uchun aholi kerak. Aholini 120 nafarga yetkazing.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b1_market"
+      ],
+      "Objectives": [
+        {
+          "Type": "ReachPopulation",
+          "TargetKey": "",
+          "TargetAmount": 120,
+          "DescriptionUz": "Aholi 120 ga yetsin",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Food",
+          "Amount": 100,
+          "RefKey": ""
+        },
+        {
+          "Kind": "Experience",
+          "Amount": 15,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 90,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b2_happy",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b2",
+      "TitleUz": "Fuqarolar baxtini oshiring",
+      "DescriptionUz": "Baxtli xalq \u2014 kuchli saltanat. Baxt ko\u0027rsatkichini 60 ga yetkazing.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b2_pop"
+      ],
+      "Objectives": [
+        {
+          "Type": "ReachHappiness",
+          "TargetKey": "",
+          "TargetAmount": 60,
+          "DescriptionUz": "Baxt 60 ga yetsin",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 50,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 85,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b2_houses",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b2",
+      "TitleUz": "Yangi uylar quring",
+      "DescriptionUz": "Yangi fuqarolar uchun uch-to\u0027rtta uy quring.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b2_happy"
+      ],
+      "Objectives": [
+        {
+          "Type": "BuildBuilding",
+          "TargetKey": "House",
+          "TargetAmount": 3,
+          "DescriptionUz": "Uylar quring: 0/3",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 80,
+          "RefKey": ""
+        },
+        {
+          "Kind": "Experience",
+          "Amount": 15,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 80,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b3_land",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b3",
+      "TitleUz": "Yangi yer oching",
+      "DescriptionUz": "Shahar tor bo\u0027lib qoldi. Qulflangan yer uchastkasini oching.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b2_houses"
+      ],
+      "Objectives": [
+        {
+          "Type": "UnlockLand",
+          "TargetKey": "",
+          "TargetAmount": 1,
+          "DescriptionUz": "Yer oching: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 120,
+          "RefKey": ""
+        },
+        {
+          "Kind": "Experience",
+          "Amount": 25,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 75,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": "d_b3_hint"
+    },
+    {
+      "QuestId": "q_b3_three",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b3",
+      "TitleUz": "Yangi mahallada qurilish",
+      "DescriptionUz": "Ochilgan yangi yerda hayot boshlansin. Uchta bino quring.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b3_land"
+      ],
+      "Objectives": [
+        {
+          "Type": "BuildBuilding",
+          "TargetKey": "",
+          "TargetAmount": 3,
+          "DescriptionUz": "Bino quring: 0/3",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 100,
+          "RefKey": ""
+        },
+        {
+          "Kind": "Culture",
+          "Amount": 15,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 70,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b4_madrasa",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b4",
+      "TitleUz": "Madrasa quring",
+      "DescriptionUz": "Ilm \u2014 taraqqiyot kaliti. Madrasa (maktab) barpo eting.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b3_three"
+      ],
+      "Objectives": [
+        {
+          "Type": "BuildBuilding",
+          "TargetKey": "Madrasa",
+          "TargetAmount": 1,
+          "DescriptionUz": "Madrasa quring: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Science",
+          "Amount": 50,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 65,
+      "EncyclopediaEntryId": "enc_ilm",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b4_tech",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b4",
+      "TitleUz": "Birinchi texnologiyani oching",
+      "DescriptionUz": "Bir texnologiyani tadqiq qilib yakunlang.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b4_madrasa"
+      ],
+      "Objectives": [
+        {
+          "Type": "UnlockTechnology",
+          "TargetKey": "",
+          "TargetAmount": 1,
+          "DescriptionUz": "Texnologiya oching: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Science",
+          "Amount": 30,
+          "RefKey": ""
+        },
+        {
+          "Kind": "Culture",
+          "Amount": 20,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 60,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b4_upgrade",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b4",
+      "TitleUz": "Binoni yangilang",
+      "DescriptionUz": "Mavjud binolardan birini keyingi darajaga ko\u0027taring.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b4_tech"
+      ],
+      "Objectives": [
+        {
+          "Type": "UpgradeBuilding",
+          "TargetKey": "",
+          "TargetAmount": 1,
+          "DescriptionUz": "Bino yangilang: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 60,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 55,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b5_caravan",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b5",
+      "TitleUz": "Karvonsaroy quring",
+      "DescriptionUz": "Savdo yo\u0027llari uchun karvonsaroy zarur.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b4_upgrade"
+      ],
+      "Objectives": [
+        {
+          "Type": "BuildBuilding",
+          "TargetKey": "Caravanserai",
+          "TargetAmount": 1,
+          "DescriptionUz": "Karvonsaroy quring: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 100,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 50,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b5_agreement",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b5",
+      "TitleUz": "Savdo shartnomasi tuzing",
+      "DescriptionUz": "Boshqa hudud bilan savdo shartnomasini taklif qiling.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b5_caravan"
+      ],
+      "Objectives": [
+        {
+          "Type": "CreateTradeAgreement",
+          "TargetKey": "",
+          "TargetAmount": 1,
+          "DescriptionUz": "Shartnoma: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 80,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 45,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b5_trade",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b5",
+      "TitleUz": "Birinchi savdoni yakunlang",
+      "DescriptionUz": "Birinchi savdo operatsiyasini muvaffaqiyatli yakunlang.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b5_agreement"
+      ],
+      "Objectives": [
+        {
+          "Type": "CompleteTrade",
+          "TargetKey": "",
+          "TargetAmount": 1,
+          "DescriptionUz": "Savdo: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 120,
+          "RefKey": ""
+        },
+        {
+          "Kind": "Experience",
+          "Amount": 20,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 40,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b6_relation",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b6",
+      "TitleUz": "Diplomatik aloqani yaxshilang",
+      "DescriptionUz": "Qo\u0027shni davlat bilan munosabatlarni yaxshilang.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b5_trade"
+      ],
+      "Objectives": [
+        {
+          "Type": "ImproveDiplomaticRelation",
+          "TargetKey": "",
+          "TargetAmount": 1,
+          "DescriptionUz": "Munosabat: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 100,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 35,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b6_alliance",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b6",
+      "TitleUz": "Ittifoq tuzing",
+      "DescriptionUz": "Diplomatik yechim bilan ittifoq yoki kelishuvga erishing.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b6_relation"
+      ],
+      "Objectives": [
+        {
+          "Type": "ImproveDiplomaticRelation",
+          "TargetKey": "",
+          "TargetAmount": 2,
+          "DescriptionUz": "Kelishuv: 0/2",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 150,
+          "RefKey": ""
+        },
+        {
+          "Kind": "Culture",
+          "Amount": 20,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 30,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b7_palace",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b7",
+      "TitleUz": "Saroyni rivojlantiring",
+      "DescriptionUz": "Buyuk poytaxt buyuk saroyga muhtoj. Saroyni yangilang.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b6_alliance"
+      ],
+      "Objectives": [
+        {
+          "Type": "UpgradeBuilding",
+          "TargetKey": "MainHall",
+          "TargetAmount": 1,
+          "DescriptionUz": "Saroyni yangilang: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Coin",
+          "Amount": 200,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 25,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b7_pop",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b7",
+      "TitleUz": "Poytaxt aholisi",
+      "DescriptionUz": "Poytaxt gavjum bo\u0027lsin. Aholini 200 ga yetkazing.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b7_palace"
+      ],
+      "Objectives": [
+        {
+          "Type": "ReachPopulation",
+          "TargetKey": "",
+          "TargetAmount": 200,
+          "DescriptionUz": "Aholi 200 ga yetsin",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Culture",
+          "Amount": 100,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 20,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "q_b7_level",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "b7",
+      "TitleUz": "Rivojlangan shahar",
+      "DescriptionUz": "Shaharni 3-darajaga olib chiqing.",
+      "Category": "MainStory",
+      "PrerequisiteQuestIds": [
+        "q_b7_pop"
+      ],
+      "Objectives": [
+        {
+          "Type": "ReachCityLevel",
+          "TargetKey": "",
+          "TargetAmount": 3,
+          "DescriptionUz": "Shahar darajasi 3",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Title",
+          "Amount": 0,
+          "RefKey": "Buyuk Hukmdor"
+        },
+        {
+          "Kind": "Experience",
+          "Amount": 50,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 15,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    },
+    {
+      "QuestId": "s_garden",
+      "CampaignId": "asaka_rise",
+      "ChapterId": "",
+      "TitleUz": "Shaharni ko\u0027kalamzorlashtiring",
+      "DescriptionUz": "Fuqarolar dam olishi uchun bog\u0027 quring.",
+      "Category": "SideQuest",
+      "PrerequisiteQuestIds": [],
+      "Objectives": [
+        {
+          "Type": "BuildBuilding",
+          "TargetKey": "Garden",
+          "TargetAmount": 1,
+          "DescriptionUz": "Bog\u0027 quring: 0/1",
+          "CountExisting": false
+        }
+      ],
+      "Rewards": [
+        {
+          "Kind": "Culture",
+          "Amount": 15,
+          "RefKey": ""
+        }
+      ],
+      "UnlockConditions": {},
+      "IsRepeatable": false,
+      "TimeLimit": 0,
+      "Priority": 10,
+      "EncyclopediaEntryId": "",
+      "IntroDialogueId": ""
+    }
+  ],
+  "Dialogues": [
+    {
+      "DialogueId": "d_b1_intro",
+      "Speaker": "Vazir",
+      "TextUz": "Xush kelibsiz, hukmdorim! Shahrimizning kelajagi sizning qarorlaringizga bog\u0027liq. Avvalo xalqimiz uchun munosib yashash sharoitini yaratamiz.",
+      "Choices": [],
+      "Conditions": {},
+      "Consequences": {},
+      "NextDialogueId": "d_b1_memor"
+    },
+    {
+      "DialogueId": "d_b1_memor",
+      "Speaker": "Memor",
+      "TextUz": "Hazratim, shahrimizda yangi turar joy qurish uchun qulay joy topdik. Nima qilaylik?",
+      "Choices": [
+        {
+          "TextUz": "Qurilishni boshlashga tayyorgarlik ko\u0027ring.",
+          "ConsequenceKey": "choice_build_now",
+          "NextDialogueId": ""
+        },
+        {
+          "TextUz": "Kerakli resurslarni hisoblang.",
+          "ConsequenceKey": "choice_plan",
+          "NextDialogueId": ""
+        },
+        {
+          "TextUz": "Bu taklifni keyinga qoldiramiz.",
+          "ConsequenceKey": "choice_delay",
+          "NextDialogueId": ""
+        }
+      ],
+      "Conditions": {},
+      "Consequences": {},
+      "NextDialogueId": ""
+    },
+    {
+      "DialogueId": "d_b2_intro",
+      "Speaker": "Vazir",
+      "TextUz": "Hazratim, shahrimiz kengaymoqda. Endi aholimizning kundalik ehtiyojlari va savdo imkoniyatlarini yaxshilashimiz zarur.",
+      "Choices": [],
+      "Conditions": {},
+      "Consequences": {},
+      "NextDialogueId": ""
+    },
+    {
+      "DialogueId": "d_b3_intro",
+      "Speaker": "Vazir",
+      "TextUz": "Shahrimiz tor bo\u0027lib qoldi, hukmdorim. Yangi mahallalar ochish vaqti keldi.",
+      "Choices": [],
+      "Conditions": {},
+      "Consequences": {},
+      "NextDialogueId": ""
+    },
+    {
+      "DialogueId": "d_b3_hint",
+      "Speaker": "Vazir",
+      "TextUz": "Yangi yer ochish uchun xazina va aholi talablari bor. \u0027XARITADA KO\u0027RSAT\u0027 tugmasi sizni tegishli uchastkaga olib boradi.",
+      "Choices": [],
+      "Conditions": {},
+      "Consequences": {},
+      "NextDialogueId": ""
+    },
+    {
+      "DialogueId": "d_b4_intro",
+      "Speaker": "Muallim",
+      "TextUz": "Hazratim, ilm va madaniyatni rivojlantirsak, saltanatimiz asrlar osha yashaydi.",
+      "Choices": [],
+      "Conditions": {},
+      "Consequences": {},
+      "NextDialogueId": ""
+    },
+    {
+      "DialogueId": "d_b5_intro",
+      "Speaker": "Savdogar",
+      "TextUz": "Hazratim, rivojlangan shahar boshqa hududlar bilan savdo va hamkorlik orqali yanada yuksaladi.",
+      "Choices": [],
+      "Conditions": {},
+      "Consequences": {},
+      "NextDialogueId": ""
+    },
+    {
+      "DialogueId": "d_b6_intro",
+      "Speaker": "Elchi",
+      "TextUz": "Hazratim, qo\u0027shni davlatlar bilan birlik va ittifoq saltanatimizni mustahkamlaydi.",
+      "Choices": [],
+      "Conditions": {},
+      "Consequences": {},
+      "NextDialogueId": ""
+    },
+    {
+      "DialogueId": "d_b7_intro",
+      "Speaker": "Vazir",
+      "TextUz": "Hukmdorim, biz uzoq yo\u0027l bosib o\u0027tdik. Endi Asakani buyuk poytaxtga aylantirish vaqti!",
+      "Choices": [],
+      "Conditions": {},
+      "Consequences": {},
+      "NextDialogueId": ""
+    },
+    {
+      "DialogueId": "d_b7_outro",
+      "Speaker": "Vazir",
+      "TextUz": "Tabriklayman, hukmdorim! Asaka endi rivojlangan saltanat markazi. Xalqimiz sizdan minnatdor.",
+      "Choices": [],
+      "Conditions": {},
+      "Consequences": {},
+      "NextDialogueId": ""
+    }
+  ],
+  "Achievements": [
+    {
+      "Id": "a_first_step",
+      "TitleUz": "Birinchi qadam",
+      "DescriptionUz": "Birinchi binongizni qurdingiz.",
+      "IconPath": "",
+      "Category": "Construction",
+      "RequirementEvent": "BuildingConstructed",
+      "RequirementKey": "",
+      "RequirementAmount": 1,
+      "IsThreshold": false,
+      "Rewards": [],
+      "IsHidden": false
+    },
+    {
+      "Id": "a_new_quarter",
+      "TitleUz": "Yangi mahalla",
+      "DescriptionUz": "Birinchi yer uchastkasini ochdingiz.",
+      "IconPath": "",
+      "Category": "Construction",
+      "RequirementEvent": "LandUnlocked",
+      "RequirementKey": "",
+      "RequirementAmount": 1,
+      "IsThreshold": false,
+      "Rewards": [],
+      "IsHidden": false
+    },
+    {
+      "Id": "a_builder",
+      "TitleUz": "Bunyodkor",
+      "DescriptionUz": "20 ta bino qurdingiz.",
+      "IconPath": "",
+      "Category": "Construction",
+      "RequirementEvent": "BuildingConstructed",
+      "RequirementKey": "",
+      "RequirementAmount": 20,
+      "IsThreshold": false,
+      "Rewards": [],
+      "IsHidden": false
+    },
+    {
+      "Id": "a_wise_ruler",
+      "TitleUz": "Dono hukmdor",
+      "DescriptionUz": "Birinchi texnologiyani ochdingiz.",
+      "IconPath": "",
+      "Category": "Technology",
+      "RequirementEvent": "TechnologyUnlocked",
+      "RequirementKey": "",
+      "RequirementAmount": 1,
+      "IsThreshold": false,
+      "Rewards": [],
+      "IsHidden": false
+    },
+    {
+      "Id": "a_science_patron",
+      "TitleUz": "Ilm homiysi",
+      "DescriptionUz": "Madrasa qurdingiz.",
+      "IconPath": "",
+      "Category": "Culture",
+      "RequirementEvent": "BuildingConstructed",
+      "RequirementKey": "Madrasa",
+      "RequirementAmount": 1,
+      "IsThreshold": false,
+      "Rewards": [],
+      "IsHidden": false
+    },
+    {
+      "Id": "a_trade_master",
+      "TitleUz": "Savdo ustasi",
+      "DescriptionUz": "10 ta savdo operatsiyasini yakunladingiz.",
+      "IconPath": "",
+      "Category": "Economy",
+      "RequirementEvent": "TradeCompleted",
+      "RequirementKey": "",
+      "RequirementAmount": 10,
+      "IsThreshold": false,
+      "Rewards": [],
+      "IsHidden": false
+    },
+    {
+      "Id": "a_people_lover",
+      "TitleUz": "Xalqparvar",
+      "DescriptionUz": "Aholi baxtini 80 ga yetkazdingiz.",
+      "IconPath": "",
+      "Category": "Population",
+      "RequirementEvent": "PopulationChanged",
+      "RequirementKey": "",
+      "RequirementAmount": 80,
+      "IsThreshold": true,
+      "Rewards": [],
+      "IsHidden": false
+    },
+    {
+      "Id": "a_developed_city",
+      "TitleUz": "Rivojlangan shahar",
+      "DescriptionUz": "Shaharni 3-darajaga olib chiqdingiz.",
+      "IconPath": "",
+      "Category": "Construction",
+      "RequirementEvent": "CityLevelChanged",
+      "RequirementKey": "",
+      "RequirementAmount": 3,
+      "IsThreshold": true,
+      "Rewards": [],
+      "IsHidden": false
+    },
+    {
+      "Id": "a_great_architect",
+      "TitleUz": "Buyuk me\u0027mor",
+      "DescriptionUz": "Saroyni maksimal darajaga yetkazdingiz.",
+      "IconPath": "",
+      "Category": "Construction",
+      "RequirementEvent": "BuildingUpgraded",
+      "RequirementKey": "MainHall",
+      "RequirementAmount": 1,
+      "IsThreshold": false,
+      "Rewards": [],
+      "IsHidden": false
+    },
+    {
+      "Id": "a_diplomacy_master",
+      "TitleUz": "Diplomatiya ustasi",
+      "DescriptionUz": "3 ta diplomatik kelishuv tuzdingiz.",
+      "IconPath": "",
+      "Category": "Diplomacy",
+      "RequirementEvent": "DiplomaticRelationChanged",
+      "RequirementKey": "",
+      "RequirementAmount": 3,
+      "IsThreshold": false,
+      "Rewards": [],
+      "IsHidden": false
+    },
+    {
+      "Id": "a_founder",
+      "TitleUz": "Saltanat asoschisi",
+      "DescriptionUz": "Birinchi saltanatingizni yaratdingiz.",
+      "IconPath": "",
+      "Category": "Special",
+      "RequirementEvent": "TutorialStepCompleted",
+      "RequirementKey": "found_kingdom",
+      "RequirementAmount": 1,
+      "IsThreshold": false,
+      "Rewards": [],
+      "IsHidden": false
+    },
+    {
+      "Id": "a_historian",
+      "TitleUz": "Tarix bilimdoni",
+      "DescriptionUz": "10 ta tasdiqlangan tarixiy yozuvni o\u0027rgandingiz.",
+      "IconPath": "",
+      "Category": "History",
+      "RequirementEvent": "",
+      "RequirementKey": "",
+      "RequirementAmount": 10,
+      "IsThreshold": false,
+      "Rewards": [],
+      "IsHidden": false
+    }
+  ]
+}

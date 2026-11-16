@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>AndijonSaltanatlar</RootNamespace>
+    <AssemblyName>AndijonSaltanatlar</AssemblyName>
+    <TieredPGO>true</TieredPGO>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
+    <!-- PROMPT 19A: online (Windows + Android bir xil server) -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.*" />
+    <!-- PROMPT 19B: TTF shriftlar (Noto Sans) — o'zbekcha belgilar bilan aniq, masshtablanadigan matn -->
+    <PackageReference Include="FontStashSharp.MonoGame" Version="1.3.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AndijonSaltanatlar.Shared\AndijonSaltanatlar.Shared.csproj" />
+  </ItemGroup>
+
+  <!-- Content/ papkasidagi hamma narsa (PNG sprite, TTF shrift) chiqish papkasiga ko'chiriladi.
+       MGCB content pipeline ishlatilmaydi: sprite'lar to'g'ridan-to'g'ri PNG sifatida o'qiladi. -->
+  <ItemGroup>
+    <None Update="Content\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,150 @@
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using AndijonSaltanatlar.Server.Data;
+using AndijonSaltanatlar.Server.Hubs;
+using AndijonSaltanatlar.Server.Services;
+using AndijonSaltanatlar.Shared.DTOs;
+
+namespace AndijonSaltanatlar.Server.Controllers
+{
+    /// <summary>
+    /// PROMPT 19A online API: dunyoga qo'shilish, guruch yetishtirish va Saltanatlar bozori.
+    /// Har bir so'rov JWT bilan; saltanat har doim tokendagi foydalanuvchidan aniqlanadi (clientdan olinmaydi).
+    /// </summary>
+    [ApiController]
+    [Route("api/online")]
+    [Authorize]
+    public class OnlineController : ControllerBase
+    {
+        private readonly OnlineGameService _svc;
+        private readonly IHubContext<GameHub> _hub;
+
+        public OnlineController(OnlineGameService svc, IHubContext<GameHub> hub)
+        {
+            _svc = svc;
+            _hub = hub;
+        }
+
+        private int UserId => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int id) ? id : 0;
+
+        private async Task<Kingdom> MyKingdom() => await _svc.KingdomOfUserAsync(UserId);
+
+        [HttpPost("join")]
+        public async Task<IActionResult> Join([FromBody] JoinWorldRequest req)
+        {
+            Kingdom k = await _svc.JoinAsync(UserId, req ?? new JoinWorldRequest());
+            if (k == null) return Unauthorized(new { messageUz = "Foydalanuvchi topilmadi" });
+            return Ok(await _svc.StateAsync(k));
+        }
+
+        [HttpGet("state")]
+        public async Task<IActionResult> State()
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            await DeliverDue(k.WorldId);
+            return Ok(await _svc.StateAsync(k));
+        }
+
+        /// <summary>Muddati yetgan karvonlar fon xizmatini kutmasdan ham yetkaziladi (har biri faqat bir marta).</summary>
+        private async Task DeliverDue(int worldId)
+        {
+            foreach (CaravanEntity c in await _svc.DeliverDueAsync(worldId))
+                await Simulation.WorldSimulationService.NotifyDeliveryAsync(_svc, c, _hub);
+        }
+
+        [HttpPost("fields/plant-crop")]
+        public Task<IActionResult> PlantCrop([FromBody] PlantCropRequest req) => Act(k => _svc.PlantCropAsync(k, req?.CommandId, req?.FieldId ?? 0, req?.Crop));
+
+        [HttpGet("caravans")]
+        public async Task<IActionResult> Caravans()
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            await DeliverDue(k.WorldId);
+            return Ok(await _svc.CaravansAsync(k));
+        }
+
+        // ---------------- Guruch ----------------
+        [HttpPost("fields/build")]
+        public Task<IActionResult> BuildField([FromBody] FieldActionRequest req) => Act(k => _svc.BuildFieldAsync(k, req?.CommandId));
+
+        [HttpPost("water/build")]
+        public Task<IActionResult> BuildWater([FromBody] FieldActionRequest req) => Act(k => _svc.BuildWaterAsync(k, req?.CommandId));
+
+        [HttpPost("fields/plant")]
+        public Task<IActionResult> Plant([FromBody] FieldActionRequest req) => Act(k => _svc.PlantAsync(k, req?.CommandId, req?.FieldId ?? 0));
+
+        [HttpPost("fields/harvest")]
+        public Task<IActionResult> Harvest([FromBody] FieldActionRequest req) => Act(k => _svc.HarvestAsync(k, req?.CommandId, req?.FieldId ?? 0));
+
+        // ---------------- Bozor ----------------
+        [HttpGet("market")]
+        public async Task<IActionResult> Market()
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            await DeliverDue(k.WorldId);
+            return Ok(await _svc.OffersAsync(k));
+        }
+
+        [HttpGet("market/history")]
+        public async Task<IActionResult> History()
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            return Ok(await _svc.HistoryAsync(k));
+        }
+
+        [HttpPost("market/offers")]
+        public async Task<IActionResult> CreateOffer([FromBody] CreateOfferRequest req)
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            if (req == null) return BadRequest(ActionResultDto.Fail("So'rov bo'sh"));
+            ActionResultDto r = await _svc.CreateOfferAsync(k, req);
+            if (r.Success && !r.Duplicate) await _hub.Clients.Group(GameHub.WorldGroup(k.WorldId)).SendAsync("MarketChanged", k.WorldId);
+            return Ok(r);
+        }
+
+        [HttpPost("market/cancel")]
+        public async Task<IActionResult> Cancel([FromBody] BuyOfferRequest req)
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            ActionResultDto r = await _svc.CancelOfferAsync(k, req?.CommandId, req?.OfferId ?? 0);
+            if (r.Success && !r.Duplicate) await _hub.Clients.Group(GameHub.WorldGroup(k.WorldId)).SendAsync("MarketChanged", k.WorldId);
+            return Ok(r);
+        }
+
+        [HttpPost("market/buy")]
+        public async Task<IActionResult> Buy([FromBody] BuyOfferRequest req)
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            if (req == null) return BadRequest(ActionResultDto.Fail("So'rov bo'sh"));
+            MarketOfferEntity sold = null;
+            ActionResultDto r = await _svc.BuyAsync(k, req, o => sold = o);
+            if (sold != null)
+            {
+                // Ikkala client ham yangilanadi: bozor ro'yxati (hamma) va sotuvchining holati (shaxsan).
+                await _hub.Clients.Group(GameHub.WorldGroup(k.WorldId)).SendAsync("MarketChanged", k.WorldId);
+                int? sellerUser = await _svc.OwnerUserIdAsync(sold.SellerKingdomId);
+                if (sellerUser != null)
+                    await _hub.Clients.User(sellerUser.Value.ToString()).SendAsync("StateChanged", sold.SellerKingdomId,
+                        "Mahsulotingiz sotildi: " + sold.Quantity + " " + AndijonSaltanatlar.Shared.Farming.CropCatalog.NameOf(sold.Product).ToLowerInvariant() + " — karvon yo'lga chiqdi, " + sold.TotalPrice + " tanga yetkazilganda tushadi");
+            }
+            return Ok(r);
+        }
+
+        private async Task<IActionResult> Act(System.Func<Kingdom, Task<ActionResultDto>> action)
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            return Ok(await action(k));
+        }
+    }
+}
