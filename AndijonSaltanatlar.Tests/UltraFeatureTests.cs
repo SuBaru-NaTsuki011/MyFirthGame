@@ -1,0 +1,113 @@
+using System.Linq;
+using AndijonSaltanatlar.Core;
+using AndijonSaltanatlar.Economy;
+using AndijonSaltanatlar.Environment;
+using AndijonSaltanatlar.Military;
+using AndijonSaltanatlar.Shared.War;
+using AndijonSaltanatlar.UI;
+using Xunit;
+
+namespace AndijonSaltanatlar.Tests
+{
+    /// <summary>ULTRA bosqichlari: 10 xil jangchi, xarid tekshiruvi, jang maydoni, fermer so'rovlari.</summary>
+    public class UltraFeatureTests
+    {
+        [Fact]
+        public void UnitCatalog_HasTenDistinctTypes_OldSaveIdsUnchanged()
+        {
+            Assert.Equal(10, UnitCatalog.All.Count);
+            Assert.Equal(10, UnitCatalog.All.Select(d => d.Type).Distinct().Count());
+            Assert.Equal(10, UnitCatalog.All.Select(d => d.NameUz).Distinct().Count());
+            // Eski saqlashlardagi butun son qiymatlari o'zgarmagan
+            Assert.Equal(0, (int)UnitType.Piyoda);
+            Assert.Equal(5, (int)UnitType.Otliq);
+            string[] want = { "Piyoda", "Qilichboz", "Nayzachi", "Kamonchi", "Otliq", "Qalqonchi", "Saroy qo'riqchisi", "Elita otliq", "Harbiy xabarchi", "Ta'minot birligi" };
+            foreach (string n in want) Assert.Contains(UnitCatalog.All, d => d.NameUz == n);
+            Assert.All(UnitCatalog.All, d => Assert.True(d.TrainingCost > 0 && d.Upkeep > 0 && d.Health > 0));
+        }
+
+        [Fact]
+        public void RecruitUnits_ChargesOnce_RejectsWhenPoor_AndRespectsQueueLimit()
+        {
+            var s = new GameStateManager();
+            s.Military.Initialize(1, 1);
+            s.Coins = 1000;
+            Assert.True(s.RecruitUnits(UnitType.Piyoda, 3, null));
+            Assert.Equal(1000 - 3 * 50, s.Coins);
+            Assert.Equal(3, s.Military.QueueCount);
+
+            // Pul yetmasa — hech narsa yechilmaydi, navbat o'zgarmaydi
+            s.Coins = 100;
+            Assert.False(s.RecruitUnits(UnitType.Otliq, 1, null));
+            Assert.Equal(100, s.Coins);
+            Assert.Equal(3, s.Military.QueueCount);
+
+            // Navbat chegarasi
+            s.Coins = 1_000_000;
+            Assert.False(s.RecruitUnits(UnitType.Piyoda, GameStateManager.MaxRecruitQueue, null));
+            Assert.Equal(3, s.Military.QueueCount);
+        }
+
+        [Fact]
+        public void Arena_UsesRealArmy_FinishesAndGivesExperience()
+        {
+            var s = new GameStateManager();
+            s.Military.Initialize(1, 1);
+            int xpBefore = s.Military.Units.Sum(u => u.Experience + u.Level * 1000);
+            var arena = new ArenaController(null, s);
+            Assert.True(arena.Start());
+            Assert.Equal(s.Military.TotalUnits, arena.Battle.AttackerGroups.Sum(g => g.Count));
+            for (int i = 0; i < 10 && arena.Battle.Status != BattleStatus.Completed; i++) arena.Resolve(BattleDecision.Faol);
+            Assert.Equal(BattleStatus.Completed, arena.Battle.Status);
+            Assert.Equal(3, s.Military.TotalUnits); // mashq jangi — jangchilar o'lmaydi
+            Assert.True(s.Military.Units.Sum(u => u.Experience + u.Level * 1000) > xpBefore);
+        }
+
+        [Fact]
+        public void Farming_AsksForSeeds_NeverAutoBuys_AndSnoozes()
+        {
+            var f = new FarmingManager { Seeds = 0 };
+            f.BeginDay();
+            Assert.False(f.TryConsumeSeed());
+            Assert.Equal(1, f.IdleFields);
+            f.EndDay(5, 4, Season.Kuz);
+            Assert.NotNull(f.Active);
+            Assert.Equal("seeds", f.Active.Id);
+            Assert.True(f.PopupPending);
+            Assert.Equal(0, f.Seeds); // avtomatik xarid yo'q
+
+            // Pul yetmasa — so'rov qoladi
+            int coins = 5;
+            Assert.False(f.Buy(ref coins, 5, out _));
+            Assert.Equal(5, coins);
+            Assert.NotNull(f.Active);
+
+            // Keyinroq — 3 kun so'ralmaydi, bitta so'rovdan ortiq yo'q
+            f.Later(5);
+            Assert.Null(f.Active);
+            f.EndDay(6, 4, Season.Kuz); Assert.True(f.Active == null || f.Active.Id != "seeds");
+            if (f.Active != null) f.Later(6);
+            f.EndDay(7, 4, Season.Kuz); Assert.True(f.Active == null || f.Active.Id != "seeds");
+            if (f.Active != null) f.Later(7);
+            f.EndDay(8, 4, Season.Kuz);
+            Assert.NotNull(f.Active);
+            Assert.Equal("seeds", f.Active.Id);
+
+            coins = 10_000;
+            int cost = f.Active.Cost, amount = f.Active.Amount;
+            Assert.True(f.Buy(ref coins, 8, out _));
+            Assert.Equal(10_000 - cost, coins);
+            Assert.Equal(amount, f.Seeds);
+            Assert.Null(f.Active);
+        }
+
+        [Fact]
+        public void Farming_YieldBonus_FromToolsAndFertilizer()
+        {
+            var f = new FarmingManager { ToolsLevel = 2, FertilizerCharges = 1 };
+            Assert.Equal(22, f.ApplyYieldBonus(12));   // 12 * (1 + 2*0.25 + 0.3 o'g'it) = 21.6 -> 22
+            Assert.Equal(0, f.FertilizerCharges);
+            Assert.Equal(18, f.ApplyYieldBonus(12));   // o'g'it tugadi: 12 * 1.5
+        }
+    }
+}

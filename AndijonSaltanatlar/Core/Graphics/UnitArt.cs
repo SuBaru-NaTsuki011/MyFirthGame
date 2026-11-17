@@ -10,6 +10,8 @@ namespace AndijonSaltanatlar.Core.Graphics
     public static class UnitArt
     {
         public const int Swordsman = 0, Spearman = 1, Shield = 2, Patrol = 3, Raider = 4, RaiderChief = 5, Shah = 6;
+        /// <summary>Xos navkar (VIP): oltin sovut, qirmizi to'n va yopinchiq, oq patli oltin dubulg'a, oltin qalqon.</summary>
+        public const int Elite = 7;
 
         private static bool IsRaider(int kind) => kind == Raider || kind == RaiderChief;
         /// <summary>Oyoq tagi sprite pastidan necha piksel yuqorida.</summary>
@@ -199,6 +201,7 @@ namespace AndijonSaltanatlar.Core.Graphics
                 Shield => new Color(48, 116, 74),
                 Raider => new Color(58, 50, 56),
                 RaiderChief => new Color(40, 34, 40),
+                Elite => new Color(150, 26, 34),
                 _ => new Color(164, 124, 76)
             };
             Color trouser = new Color(74, 58, 46), boot = new Color(46, 32, 24);
@@ -232,10 +235,16 @@ namespace AndijonSaltanatlar.Core.Graphics
             // Qurol orqada (ko'tarish bosqichi) — tana ortida chiziladi
             if (pose != null && pose.Behind) DrawArmWeapon(c, kind, cx, fy, pose, tunic, skin);
 
+            if (kind == Elite)
+            {
+                // qirmizi yopinchiq (orqada)
+                c.FillPolygon(new Color(112, 18, 26), 0.04f, new Vector2(cx - 6, fy - 27), new Vector2(cx + 5, fy - 27), new Vector2(cx + 8, fy - 6), new Vector2(cx - 10, fy - 6));
+            }
+
             // --- tana: chopon ---
             c.FillPolygon(tunic, 0.06f, new Vector2(cx - 5, fy - 27), new Vector2(cx + 5, fy - 27), new Vector2(cx + 7, fy - 9), new Vector2(cx - 7, fy - 9));
             c.FillRect(cx - 1, fy - 27, 2, 18, Canvas.Shade(tunic, 0.72f));
-            Color belt = kind == Patrol ? new Color(90, 60, 36)
+            Color belt = kind == Elite ? Pal.Gold : kind == Patrol ? new Color(90, 60, 36)
                        : kind == Raider ? new Color(70, 48, 30)
                        : kind == RaiderChief ? new Color(170, 36, 30)
                        : Pal.Gold;
@@ -253,9 +262,11 @@ namespace AndijonSaltanatlar.Core.Graphics
             }
             if (kind != Patrol && !IsRaider(kind))
             {
-                // sovut (ko'krak zirhi)
-                c.FillRect(cx - 4, fy - 26, 8, 7, Canvas.Shade(Pal.Steel, 0.9f), 0.08f);
-                c.FillRect(cx - 4, fy - 23, 8, 1, Canvas.Shade(Pal.Steel, 0.65f));
+                // sovut (ko'krak zirhi); xos navkarniki — oltin
+                Color armor = kind == Elite ? Pal.Gold : Canvas.Shade(Pal.Steel, 0.9f);
+                c.FillRect(cx - 4, fy - 26, 8, 7, armor, 0.08f);
+                c.FillRect(cx - 4, fy - 23, 8, 1, Canvas.Shade(kind == Elite ? Pal.Gold : Pal.Steel, 0.65f));
+                if (kind == Elite) { c.FillRect(cx - 5, fy - 27, 2, 3, Pal.Gold); c.FillRect(cx + 3, fy - 27, 2, 3, Pal.Gold); } // yelkaliklar
             }
             // qo'llar
             c.FillRect(cx - 8, fy - 26, 3, 10, Canvas.Shade(tunic, 0.82f));
@@ -292,12 +303,19 @@ namespace AndijonSaltanatlar.Core.Graphics
             else
             {
                 // uchli turkiy dubulg'a
-                Color helm = kind == Shield ? Pal.Gold : Pal.Steel;
+                Color helm = kind == Shield || kind == Elite ? Pal.Gold : Pal.Steel;
                 c.FillPolygon(helm, 0.05f, new Vector2(cx - 5, fy - 33), new Vector2(cx + 5, fy - 33), new Vector2(cx + 4, fy - 38), new Vector2(cx, fy - 43), new Vector2(cx - 4, fy - 38));
                 c.FillRect(cx, fy - 46, 1, 4, helm);
                 c.FillRect(cx - 5, fy - 34, 10, 1, Canvas.Shade(helm, 0.7f));
                 c.FillRect(cx - 5, fy - 33, 2, 4, Canvas.Shade(Pal.Steel, 0.75f)); // bo'yin zirhi
                 if (kind == Swordsman) c.FillRect(cx + 1, fy - 49, 2, 4, Pal.Red); // jig'a
+                if (kind == Elite)
+                {
+                    // oq pat va qizil toshli jig'a
+                    c.FillRect(cx, fy - 53, 2, 8, new Color(246, 244, 240));
+                    c.FillRect(cx + 2, fy - 52, 2, 5, new Color(232, 230, 226));
+                    c.FillEllipse(cx + 0.5f, fy - 40, 1.3f, 1.3f, Pal.Red);
+                }
             }
 
             if (pose == null)
@@ -312,6 +330,16 @@ namespace AndijonSaltanatlar.Core.Graphics
                     // kichik qalqon
                     c.FillEllipse(cx - 8, fy - 20, 4.5f, 5, new Color(110, 76, 44));
                     c.FillEllipse(cx - 8, fy - 20, 1.6f, 1.8f, Pal.Gold);
+                }
+                else if (kind == Elite)
+                {
+                    // oltin sopli shamshir va oltin qalqon (qizil markaz)
+                    c.Line(new Vector2(cx + 7, fy - 17), new Vector2(cx + 11, fy - 27), Pal.Steel, 2);
+                    c.Line(new Vector2(cx + 11, fy - 27), new Vector2(cx + 16, fy - 34), Pal.Steel, 2);
+                    c.FillRect(cx + 5, fy - 17, 6, 2, Pal.Gold);
+                    c.FillEllipse(cx - 8, fy - 20, 5.2f, 6, Pal.Gold);
+                    c.FillEllipse(cx - 8, fy - 20, 3.4f, 4, new Color(160, 30, 36));
+                    c.FillEllipse(cx - 8, fy - 20, 1.4f, 1.6f, Pal.Gold);
                 }
                 else if (kind == Shield)
                 {
@@ -352,6 +380,12 @@ namespace AndijonSaltanatlar.Core.Graphics
                 {
                     c.FillEllipse(cx - 8, fy - 20, 4.5f, 5, new Color(110, 76, 44));
                     c.FillEllipse(cx - 8, fy - 20, 1.6f, 1.8f, Pal.Gold);
+                }
+                else if (kind == Elite)
+                {
+                    c.FillEllipse(cx - 8, fy - 20, 5.2f, 6, Pal.Gold);
+                    c.FillEllipse(cx - 8, fy - 20, 3.4f, 4, new Color(160, 30, 36));
+                    c.FillEllipse(cx - 8, fy - 20, 1.4f, 1.6f, Pal.Gold);
                 }
                 else if (kind == Shield)
                 {

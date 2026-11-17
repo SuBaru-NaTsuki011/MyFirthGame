@@ -94,6 +94,39 @@ namespace AndijonSaltanatlar.Buildings
             return true;
         }
 
+        /// <summary>Joy bo'shmi (binoning o'zi egallagan kataklar bo'sh hisoblanadi — ko'chirish uchun).</summary>
+        public bool CanPlaceIgnoring(Point pos, int size, Building self, bool strictTerrain = true)
+        {
+            for (int y = pos.Y; y < pos.Y + size; y++)
+                for (int x = pos.X; x < pos.X + size; x++)
+                {
+                    if (!_map.InBounds(x, y)) return false;
+                    object occ = _map.GetOccupant(x, y);
+                    if (occ is Building && !ReferenceEquals(occ, self)) return false;
+                    if (occ is Decoration d && !d.Removable) return false;
+                    if (strictTerrain && !_map.IsBuildableTerrain(x, y)) return false;
+                }
+            return true;
+        }
+
+        /// <summary>
+        /// Binoni yangi joyga ko'chiradi: Id, daraja, mustahkamlik, qurilish holati va boshqa ma'lumotlar o'zgarmaydi.
+        /// Joy band bo'lsa hech narsa o'zgarmaydi va false qaytadi.
+        /// </summary>
+        public bool Move(Building b, Point pos, bool strictTerrain = true)
+        {
+            int size = b.Size.X;
+            if (!Buildings.Contains(b) || !CanPlaceIgnoring(pos, size, b, strictTerrain)) return false;
+            _map.SetOccupant(b.Position, size, null);
+            for (int y = pos.Y; y < pos.Y + size; y++)
+                for (int x = pos.X; x < pos.X + size; x++)
+                    if (_map.GetOccupant(x, y) is Decoration d) _map.RemoveDecoration(d);
+            b.Position = pos;
+            b.DrawPosition = WorldObjectExtensions.AnchorBottomCenter(b.SpriteTexture, pos, size);
+            _map.SetOccupant(pos, size, b);
+            return true;
+        }
+
         public void Remove(Building b)
         {
             if (!Buildings.Remove(b)) return;

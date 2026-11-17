@@ -26,10 +26,11 @@ namespace AndijonSaltanatlar.Environment
         private Weather Pick(Season s)
         {
             double r = _rng.NextDouble();
-            if (s == Season.Qish) return r < 0.4 ? Weather.Snowy : r < 0.7 ? Weather.Cloudy : Weather.Clear;
-            if (s == Season.Yoz) return r < 0.7 ? Weather.Clear : r < 0.85 ? Weather.Windy : Weather.Cloudy;
-            // Bahor / Kuz
-            return r < 0.45 ? Weather.Clear : r < 0.65 ? Weather.Cloudy : r < 0.85 ? Weather.Rainy : Weather.Windy;
+            if (s == Season.Qish) return r < 0.6 ? Weather.Snowy : r < 0.8 ? Weather.Cloudy : Weather.Clear;
+            if (s == Season.Yoz) return r < 0.8 ? Weather.Clear : r < 0.92 ? Weather.Windy : Weather.Cloudy;
+            if (s == Season.Bahor) return r < 0.35 ? Weather.Clear : r < 0.5 ? Weather.Cloudy : r < 0.88 ? Weather.Rainy : Weather.Windy;
+            // Kuz: bulutli, shamolli, ba'zan yomg'ir
+            return r < 0.35 ? Weather.Clear : r < 0.6 ? Weather.Cloudy : r < 0.8 ? Weather.Windy : Weather.Rainy;
         }
 
         public float ProductionModifier()

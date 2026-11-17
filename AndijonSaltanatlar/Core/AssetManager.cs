@@ -52,6 +52,7 @@ namespace AndijonSaltanatlar.Core
         public const string UnitRaider = "unit_raider";           // bosqinchi
         public const string UnitRaiderChief = "unit_raider_chief"; // bosqinchilar sardori
         public const string UnitShah = "unit_shah";                // shoh (tojli)
+        public const string UnitElite = "unit_elite";              // xos navkar (VIP)
         public const string UnitCitizen = "unit_citizen"; // + <0..5> + _0.._2 (fuqaro turi + kadr)
         public const int CitizenKinds = CitizenArt.Kinds;
         public const int UnitFrames = 3;
@@ -102,12 +103,23 @@ namespace AndijonSaltanatlar.Core
             {
                 int v = i;
                 Register(SpriteKeys.House + "_" + i, () => BuildingArt.House(v));
+                // Darajali ko'rinishlar: key_l2, key_l3 (WorldRenderer bino darajasiga qarab tanlaydi)
+                Register(LevelKey(SpriteKeys.House + "_" + i, 2), () => BuildingArt.House(v, 2));
+                Register(LevelKey(SpriteKeys.House + "_" + i, 3), () => BuildingArt.House(v, 3));
             }
-            Register(SpriteKeys.Tower, BuildingArt.Tower);
-            Register(SpriteKeys.Wall, BuildingArt.Wall);
-            Register(SpriteKeys.Gate, BuildingArt.Gate);
+            Register(SpriteKeys.Tower, () => BuildingArt.Tower());
+            Register(SpriteKeys.Wall, () => BuildingArt.Wall());
+            Register(SpriteKeys.Gate, () => BuildingArt.Gate());
+            for (int lv = 2; lv <= 3; lv++)
+            {
+                int l = lv;
+                Register(LevelKey(SpriteKeys.Tower, l), () => BuildingArt.Tower(l));
+                Register(LevelKey(SpriteKeys.Wall, l), () => BuildingArt.Wall(l));
+                Register(LevelKey(SpriteKeys.Gate, l), () => BuildingArt.Gate(l));
+            }
+            Register(LevelKey(SpriteKeys.MainHall, 3), () => BuildingArt.MainHall(3));
             Register(SpriteKeys.Market, BuildingArt.Market);
-            Register(SpriteKeys.MainHall, BuildingArt.MainHall);
+            Register(SpriteKeys.MainHall, () => BuildingArt.MainHall());
             Register(SpriteKeys.Barracks, BuildingArt.Barracks);
             Register(SpriteKeys.Garden, BuildingArt.Garden);
             Register(SpriteKeys.Farm, BuildingArt.Farm);
@@ -144,6 +156,7 @@ namespace AndijonSaltanatlar.Core
             RegisterUnit(SpriteKeys.UnitRaider, UnitArt.Raider);
             RegisterUnit(SpriteKeys.UnitRaiderChief, UnitArt.RaiderChief);
             RegisterUnit(SpriteKeys.UnitShah, UnitArt.Shah);
+            RegisterUnit(SpriteKeys.UnitElite, UnitArt.Elite);
 
             // Fuqarolar (har turi 3 kadr)
             for (int k = 0; k < SpriteKeys.CitizenKinds; k++)
@@ -174,6 +187,9 @@ namespace AndijonSaltanatlar.Core
                     Register(AttackKey(key, aa, pp), () => UnitArt.AttackFrame(kind, aa, pp));
                 }
         }
+
+        /// <summary>Bino darajasi ko'rinishi kaliti (masalan "house_2_l3").</summary>
+        public static string LevelKey(string key, int level) => key + "_l" + level;
 
         /// <summary>Zarba kadri kaliti (masalan "unit_swordsman_a1_2").</summary>
         public static string AttackKey(string key, int attack, int phase) => key + "_a" + attack + "_" + phase;

@@ -20,7 +20,7 @@ namespace AndijonSaltanatlar.Units
                     RouteUnit(map, pu);
         }
 
-        private static void RouteUnit(MapManager map, PatrolUnit pu)
+        public static void RouteUnit(MapManager map, PatrolUnit pu)
         {
             var src = new List<Vector2>(pu.PatrolPoints);
             // Yopiq halqa qilamiz: oxirgi nuqtadan birinchisiga qaytish ham yo'l bo'yicha bo'lsin.

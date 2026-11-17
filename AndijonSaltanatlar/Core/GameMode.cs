@@ -3,5 +3,7 @@ namespace AndijonSaltanatlar.Core;
 public enum GameMode
 {
 	Playing,
-	BuildMode
+	BuildMode,
+	/// <summary>Qurilgan binoni boshqa joyga ko'chirish (KO'CHIRISH).</summary>
+	MoveMode
 }

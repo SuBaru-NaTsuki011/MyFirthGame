@@ -77,7 +77,7 @@ namespace AndijonSaltanatlar.UI
             if (sel != null)
             {
                 int bx = _rightPanel.X + 16, bw = _rightPanel.Width - 32, bh = 28;
-                int by = _rightPanel.Y + 210;
+                int by = _rightPanel.Y + 250;
                 void Act(string label, int id) { _actions.Add((label, id, new Rectangle(bx, by, bw, bh))); by += bh + 6; }
 
                 if (sel.OwnerKingdomId == W.Kingdoms.PlayerKingdomId) Act("SHAHARGA KIRISH", 7);
@@ -322,12 +322,18 @@ namespace AndijonSaltanatlar.UI
             var box = new Rectangle(16, vh - 140, _mapRect.Width, 128);
             Panel(sb, box, PanelBg, Border, 1);
             _font.Draw(sb, "VOQEALAR", new Vector2(box.X + 10, box.Y + 6), Gold, 2, 1);
-            int shown = Math.Min(5, W.Events.Count);
+            int shown = Math.Min(3, W.Events.Count);
             int y = box.Y + 26;
             for (int i = 0; i < shown; i++)
             {
                 string e = W.Events[W.Events.Count - shown + i];
-                foreach (string line in Wrap(e, box.Width - 24, 2)) { _font.Draw(sb, "- " + line, new Vector2(box.X + 10, y), Cream, 2, 1); y += 16; break; }
+                bool first = true;
+                foreach (string line in Wrap(e, box.Width - 44, 2))
+                {
+                    if (y + 14 > box.Bottom - 6) return;
+                    _font.Draw(sb, (first ? "- " : "  ") + line, new Vector2(box.X + 10, y), Cream, 2, 1);
+                    y += 19; first = false;
+                }
             }
         }
 
@@ -345,12 +351,12 @@ namespace AndijonSaltanatlar.UI
 
             Kingdom owner = sel.OwnerKingdomId == 0 ? null : W.Kingdoms.Get(sel.OwnerKingdomId);
             _font.Draw(sb, sel.Name, new Vector2(x, y), Gold, 3, 1); y += 26;
-            _font.Draw(sb, "Egasi: " + (owner?.Name ?? "Mustaqil hudud"), new Vector2(x, y), Cream, 2, 1); y += 18;
-            if (owner != null) { _font.Draw(sb, "Hukmdor: " + owner.RulerName, new Vector2(x, y), Muted, 2, 1); y += 18; }
-            _font.Draw(sb, "Aholi: " + sel.Population + "   Rivoj: " + sel.Development, new Vector2(x, y), Cream, 2, 1); y += 18;
-            _font.Draw(sb, "Xavfsizlik: " + sel.Security + "   Baxt: " + sel.Happiness, new Vector2(x, y), Cream, 2, 1); y += 18;
-            _font.Draw(sb, "Koord: " + sel.Latitude.ToString("0.00") + ", " + sel.Longitude.ToString("0.00"), new Vector2(x, y), Muted, 2, 1); y += 16;
-            if (!string.IsNullOrEmpty(sel.Source)) { _font.Draw(sb, "Manba: " + sel.Source, new Vector2(x, y), Muted, 2, 1); y += 14; }
+            _font.Draw(sb, "Egasi: " + (owner?.Name ?? "Mustaqil hudud"), new Vector2(x, y), Cream, 2, 1); y += 21;
+            if (owner != null) { _font.Draw(sb, "Hukmdor: " + owner.RulerName, new Vector2(x, y), Muted, 2, 1); y += 21; }
+            _font.Draw(sb, "Aholi: " + sel.Population + "   Rivoj: " + sel.Development, new Vector2(x, y), Cream, 2, 1); y += 21;
+            _font.Draw(sb, "Xavfsizlik: " + sel.Security + "   Baxt: " + sel.Happiness, new Vector2(x, y), Cream, 2, 1); y += 21;
+            _font.Draw(sb, "Koord: " + sel.Latitude.ToString("0.00") + ", " + sel.Longitude.ToString("0.00"), new Vector2(x, y), Muted, 2, 1); y += 19;
+            if (!string.IsNullOrEmpty(sel.Source)) { _font.Draw(sb, "Manba: " + sel.Source, new Vector2(x, y), Muted, 2, 1); y += 21; }
 
             if (owner != null && owner.Id != W.Kingdoms.PlayerKingdomId)
             {
@@ -385,7 +391,7 @@ namespace AndijonSaltanatlar.UI
                 "Obro': " + k.Reputation + "   Texnologiya: " + k.TechnologyLevel,
                 "Faol savdo: " + W.Trade.ActiveCount,
             };
-            foreach (string l in lines) { _font.Draw(sb, l, new Vector2(x, y), Cream, 2, 1); y += 18; }
+            foreach (string l in lines) { _font.Draw(sb, l, new Vector2(x, y), Cream, 2, 1); y += 21; }
 
             y += 10;
             _font.Draw(sb, "DIPLOMATIYA", new Vector2(x, y), Gold, 2, 1); y += 20;
@@ -396,7 +402,7 @@ namespace AndijonSaltanatlar.UI
                 bool ally = W.Diplomacy.AreAllied(k.Id, other.Id);
                 Color rc = rel >= 20 ? Green : rel <= -20 ? Red : Muted;
                 _font.Draw(sb, other.Name + ": " + rel + (ally ? " (Ittifoqchi)" : ""), new Vector2(x, y), rc, 2, 1);
-                y += 18;
+                y += 21;
             }
             y += 6;
             _font.Draw(sb, "Hududni tanlab, diplomatiya qiling.", new Vector2(x, y), Muted, 2, 1);

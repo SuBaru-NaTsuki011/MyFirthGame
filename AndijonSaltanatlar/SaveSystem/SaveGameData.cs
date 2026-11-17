@@ -66,6 +66,17 @@ namespace AndijonSaltanatlar.SaveSystem
         public MilitarySnapshot Military { get; set; }
         public CivSnapshot Civ { get; set; }
         public List<int> OpenParcels { get; set; } = new List<int>();
+        /// <summary>Shahar bilan birga yaratilgan (o'yinchi qurmagan) binolar darajasi: [x, y, daraja] (faqat 1 dan katta).</summary>
+        public List<int[]> BuildingLevels { get; set; } = new List<int[]>();
+        /// <summary>Barcha jangchilar xos navkar (VIP), harbiy binolarda qorovullar bor.</summary>
+        public bool EliteArmy { get; set; }
+        /// <summary>Ko'chirilgan (shahar bilan yaratilgan) binolar: [asl x, asl y, yangi x, yangi y].</summary>
+        public List<int[]> MovedBuildings { get; set; } = new List<int[]>();
+        /// <summary>Dehqonchilik ombori (-1 — eski saqlash, standart qiymat ishlatiladi).</summary>
+        public int FarmSeeds { get; set; } = -1;
+        public int FarmTools { get; set; }
+        public int FarmFertilizer { get; set; }
+        public bool FarmIrrigation { get; set; }
         public int Weather { get; set; }
 
         /// <summary>Story Mode / missiya holati (PROMPT 13). Null bo'lsa — hikoya rejimi ishlatilmagan.</summary>

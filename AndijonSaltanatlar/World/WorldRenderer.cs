@@ -21,6 +21,8 @@ namespace AndijonSaltanatlar.World
 
         public int LastDrawnCount { get; private set; }
 
+        private static readonly Vector2[] RimOffsets = { new Vector2(-1, 0), new Vector2(1, 0), new Vector2(0, -1), new Vector2(0, 1) };
+
         public WorldRenderer(AssetManager assets, PixelFont font)
         {
             _assets = assets;
@@ -59,11 +61,22 @@ namespace AndijonSaltanatlar.World
                 Building bb = o as Building;
                 if (bb != null && bb.BuildProgress < 1f)
                     tint = new Color(150, 180, 255) * (0.45f + 0.55f * bb.BuildProgress); // qurilayotgan bino
+                if (o is Decoration dec && AndijonSaltanatlar.Environment.SeasonVisuals.IsFoliage(dec.Type))
+                {
+                    tint = AndijonSaltanatlar.Environment.SeasonVisuals.FoliageTint(dec.Type, dec.Position.X * 31 + dec.Position.Y);
+                    sb.Draw(o.Texture, o.DrawPosition, null, tint, 0f, Vector2.Zero, 1f, o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
+                    float sn = AndijonSaltanatlar.Environment.SeasonVisuals.Snow;
+                    if (sn > 0f && _assets.FlashOf(o.Texture) is Texture2D dsil)
+                        sb.Draw(dsil, o.DrawPosition, null, new Color(246, 250, 255) * (sn * 0.55f), 0f, Vector2.Zero, 1f, o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
+                    continue;
+                }
 
                 if (o is Unit cu)
                 {
+                    // Fuqarolar havo hissini ko'rsatadi: sovuqda ko'kimtir, issiqda qizargan
+                    if (cu is CitizenUnit) tint = AndijonSaltanatlar.Environment.SeasonVisuals.CitizenTint(AndijonSaltanatlar.Environment.SeasonVisuals.CurrentComfort);
                     // Zarba yegan: qizarish asta so'nadi
-                    if (cu.HurtTimer > 0f) tint = Color.Lerp(Color.White, new Color(255, 116, 104), MathHelper.Clamp(cu.HurtTimer / 0.3f, 0f, 1f));
+                    if (cu.HurtTimer > 0f) tint = Color.Lerp(tint, new Color(255, 116, 104), MathHelper.Clamp(cu.HurtTimer / 0.3f, 0f, 1f));
                     tint *= cu.FadeAlpha;
                     SpriteEffects fx = o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
                     Vector2 feet = IsoMath.TileToWorld(cu.Position);
@@ -99,8 +112,31 @@ namespace AndijonSaltanatlar.World
                     continue;
                 }
 
-                sb.Draw(o.Texture, o.DrawPosition, null, tint, 0f, Vector2.Zero, 1f,
+                // Bino darajasi ko'rinishi (bor bo'lsa): 2/3-darajali uy, minora, devor, darvoza, saroy
+                Texture2D tex = o.Texture;
+                Vector2 pos = o.DrawPosition;
+                if (bb != null && bb.Level >= 2 && bb.BuildProgress >= 1f)
+                {
+                    Texture2D lt = _assets.TryGet(AssetManager.LevelKey(bb.SpriteKey, System.Math.Min(bb.Level, 3)));
+                    if (lt != null) { tex = lt; pos = WorldObjectExtensions.AnchorBottomCenter(lt, bb.Position, bb.Size.X); }
+                }
+
+                // Yuqori darajali bino: shakli bo'ylab yupqa hoshiya (3-daraja — oltin, 2-daraja — kumush)
+                if (bb != null && bb.Level >= 2 && bb.BuildProgress >= 1f && _assets.FlashOf(tex) is Texture2D sil)
+                {
+                    Color rim = bb.Level >= 3 ? new Color(236, 188, 82) * 0.6f : new Color(214, 218, 226) * 0.35f;
+                    SpriteEffects fxb = o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                    foreach (Vector2 d in RimOffsets)
+                        sb.Draw(sil, pos + d, null, rim, 0f, Vector2.Zero, 1f, fxb, 0f);
+                }
+
+                sb.Draw(tex, pos, null, tint, 0f, Vector2.Zero, 1f,
                     o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
+                // Qish: tomlar va devorlar qor bilan oqaradi
+                float bsnow = AndijonSaltanatlar.Environment.SeasonVisuals.Snow;
+                if (bb != null && bsnow > 0f && _assets.FlashOf(tex) is Texture2D bsil)
+                    sb.Draw(bsil, pos, null, new Color(244, 248, 255) * (bsnow * 0.3f), 0f, Vector2.Zero, 1f,
+                        o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
 
                 if (o is Farm farm && farm.BuildProgress >= 1f) DrawFarmStatus(sb, o, farm);
 
@@ -110,8 +146,8 @@ namespace AndijonSaltanatlar.World
                     int pips = System.Math.Min(4, b2.Level - 1);
                     if (pips > 0)
                     {
-                        float cx = o.DrawPosition.X + o.Texture.Width / 2f - pips * 6f / 2f;
-                        float py = o.DrawPosition.Y + 3f;
+                        float cx = pos.X + tex.Width / 2f - pips * 6f / 2f;
+                        float py = pos.Y + 3f;
                         for (int i = 0; i < pips; i++)
                         {
                             var rct = new Rectangle((int)(cx + i * 6), (int)py, 5, 5);
@@ -120,21 +156,6 @@ namespace AndijonSaltanatlar.World
                         }
                     }
 
-                    // Qiyshiq (variant) tint — uy darajasiga mos tablitsa overlay (placeholder)
-                    if (b2.Type == BuildingType.House && b2.Level >= 2 && b2.SpriteTexture != null)
-                    {
-                        int variantIndex = System.Math.Min(3, b2.Level - 1);
-                        Color variantTint = variantIndex switch
-                        {
-                            1 => new Color(255, 180, 100, 60),
-                            2 => new Color(100, 180, 255, 60),
-                            3 => new Color(255, 120, 255, 50),
-                            _ => Color.White
-                        };
-                        var rect = new Rectangle((int)o.DrawPosition.X,
-                                                 (int)o.DrawPosition.Y, o.Texture.Width, o.Texture.Height);
-                        sb.Draw(_assets.Pixel, rect, variantTint);
-                    }
                 }
             }
             LastDrawnCount = _buffer.Count;

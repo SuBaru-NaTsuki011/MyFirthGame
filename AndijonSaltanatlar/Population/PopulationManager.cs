@@ -327,6 +327,43 @@ namespace AndijonSaltanatlar.Population
             if (best != null) AddMember(best, 16 + _rng.Next(30), 60f);
         }
 
+        /// <summary>
+        /// To'liq aholi: har bir tayyor uyda oila yashaydi va uy sig'imigacha to'ladi; kayfiyat yuqori
+        /// (xursand aholi ko'chib ketmaydi). Qo'shilgan fuqarolar sonini qaytaradi.
+        /// </summary>
+        public int FillToCapacity(BuildingManager b)
+        {
+            if (b == null) return 0;
+            ComputeHousing(b);
+            int added = 0;
+            var living = new Dictionary<int, int>();
+            var homeOf = new Dictionary<int, Household>();
+            foreach (Household h in _households)
+            {
+                if (!h.HomeBuildingId.HasValue) continue;
+                int id = h.HomeBuildingId.Value;
+                living[id] = (living.TryGetValue(id, out int n) ? n : 0) + h.MemberIds.Count;
+                if (!homeOf.ContainsKey(id)) homeOf[id] = h;
+            }
+            foreach (Building x in b.Buildings)
+            {
+                if (x.Type != BuildingType.House || x.BuildProgress < 1f) continue;
+                int cap = Math.Max(1, x.PopulationCapacity);
+                int now = living.TryGetValue(x.Id, out int ln) ? ln : 0;
+                if (!homeOf.TryGetValue(x.Id, out Household hh))
+                {
+                    hh = CreateHousehold(x.Id, cap, 1);
+                    homeOf[x.Id] = hh;
+                    now += 1; added++;
+                }
+                while (now < cap) { AddMember(hh, 16 + _rng.Next(48), 82f); now++; added++; }
+            }
+            foreach (Citizen c in _citizens) if (c.Happiness < 85f) c.Happiness = 85f;
+            AssignJobs(b);
+            RecomputeStats(b);
+            return added;
+        }
+
         private void RemoveCitizen(Citizen c)
         {
             _citizens.Remove(c);

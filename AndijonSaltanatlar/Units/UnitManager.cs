@@ -39,6 +39,18 @@ namespace AndijonSaltanatlar.Units
             return unit;
         }
 
+        /// <summary>Jangchini xos navkarga aylantiradi (ko'rinishi va zarba kadrlari bilan).</summary>
+        public void MakeElite(Unit unit)
+        {
+            if (unit == null || unit.IsElite) return;
+            var frames = new Texture2D[SpriteKeys.UnitFrames];
+            for (int i = 0; i < frames.Length; i++) frames[i] = _assets.TryGet(SpriteKeys.UnitElite + "_" + i);
+            var attack = new Texture2D[UnitArt.AttackKinds * UnitArt.AttackPhases];
+            for (int i = 0; i < attack.Length; i++)
+                attack[i] = _assets.TryGet(AssetManager.AttackKey(SpriteKeys.UnitElite, i / UnitArt.AttackPhases, i % UnitArt.AttackPhases));
+            unit.MakeElite(frames, attack);
+        }
+
         /// <summary>Unitni dunyodan olib tashlaydi (faqat vaqtinchalik unitlar — masalan bosqinchilar — uchun).</summary>
         public bool Remove(Unit unit) => Units.Remove(unit);
 

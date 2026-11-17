@@ -91,6 +91,21 @@ public sealed class LaunchOptions
 	/// <summary>Oyna o'lchami (masalan 854x480 — telefon ekranini sinash uchun).</summary>
 	public Point? WindowSize;
 
+	/// <summary>Bir martalik: kirgandan keyin shaharni to'liq kuchaytirish (binolar max, texnologiyalar, yer, resurslar).</summary>
+	public bool FullUpgrade;
+
+	/// <summary>Sinov: jang maydoni (mashq jangi) darhol ochiladi.</summary>
+	public bool Arena;
+
+	/// <summary>Sinov: urug' tugagan, fermer murojaati oynasi ochiq.</summary>
+	public bool FarmRequest;
+
+	/// <summary>Sinov: uy ichida holat (sit, eat, lie) — --enterhouse bilan.</summary>
+	public string HousePose;
+
+	/// <summary>Sinov: ko'rinadigan fasl (0 bahor, 1 yoz, 2 kuz, 3 qish) — saqlanmaydi.</summary>
+	public int? Season;
+
 	/// <summary>Sinov: darhol bosqin (0 shimol, 1 janub, 2 g'arb, 3 sharq).</summary>
 	public int? RaidGate;
 
@@ -250,6 +265,23 @@ public sealed class LaunchOptions
 			case "--frames":
 				launchOptions.ScreenshotFrames = int.Parse(text, CultureInfo.InvariantCulture);
 				i++;
+				break;
+			case "--season":
+				launchOptions.Season = int.Parse(text, CultureInfo.InvariantCulture);
+				i++;
+				break;
+			case "--pose":
+				launchOptions.HousePose = text;
+				i++;
+				break;
+			case "--farm-request":
+				launchOptions.FarmRequest = true;
+				break;
+			case "--arena":
+				launchOptions.Arena = true;
+				break;
+			case "--full-upgrade":
+				launchOptions.FullUpgrade = true;
 				break;
 			case "--battle-demo":
 				AndijonSaltanatlar.UI.BattleScene.ReplayLastRound = true;

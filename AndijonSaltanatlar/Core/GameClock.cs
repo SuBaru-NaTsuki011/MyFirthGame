@@ -33,6 +33,18 @@ namespace AndijonSaltanatlar.Core
             }
         }
 
+        /// <summary>Kun uzunligini o'zgartiradi — kun ichidagi payt (ulush) saqlanadi.</summary>
+        public void SetDayLength(float seconds)
+        {
+            seconds = MathHelper.Clamp(seconds, 5f, 4f * 3600f);
+            float frac = DayFraction;
+            SecondsPerDay = seconds;
+            _elapsed = MathHelper.Clamp(frac, 0f, 0.999f) * seconds;
+        }
+
+        /// <summary>Joriy soat (0..23).</summary>
+        public int Hour => (int)(DayFraction * 24f) % 24;
+
         /// <summary>Saqlangan o'yindan tiklash uchun.</summary>
         public void Set(int day, float fraction)
         {

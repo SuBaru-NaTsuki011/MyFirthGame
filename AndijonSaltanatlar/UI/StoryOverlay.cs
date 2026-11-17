@@ -95,20 +95,27 @@ namespace AndijonSaltanatlar.UI
             if (prog == null) return;
 
             // O'ng tomonda tanlangan obyekt paneli ochiq bo'lsa, vazifa kartasi uning chap tomoniga suriladi (ustma-ust tushmaydi).
-            var box = new Rectangle(vw - 300 - RightInset, 92, 284, 70);
+            // Vazifa nomi ikki qatorgacha o'raladi (so'z o'rtasida kesilmaydi); karta balandligi shunga moslashadi
+            var titleLines = Wrap(q.TitleUz ?? "", 264, 2);
+            if (titleLines.Count > 2) { titleLines = titleLines.GetRange(0, 2); titleLines[1] = Fit(titleLines[1], 20); }
+            int extra = (System.Math.Max(1, titleLines.Count) - 1) * 20;
+            var box = new Rectangle(vw - 300 - RightInset, 92, 284, 84 + extra);
             Panel(sb, box, PanelBg, Border, 1);
             _font.Draw(sb, "JORIY VAZIFA", new Vector2(box.X + 10, box.Y + 8), Gold, 2, 1);
-            _font.Draw(sb, Fit(q.TitleUz, (box.Width - 20) / 12), new Vector2(box.X + 10, box.Y + 26), Cream, 2, 1);
+            for (int li = 0; li < titleLines.Count; li++)
+                _font.Draw(sb, titleLines[li], new Vector2(box.X + 10, box.Y + 28 + li * 20), Cream, 2, 1);
 
             if (q.Objectives.Count > 0)
             {
                 var o0 = q.Objectives[0];
                 int cur = System.Math.Min(prog.GetProgress(0), o0.TargetAmount);
-                var bar = new Rectangle(box.X + 10, box.Y + 46, box.Width - 20, 12);
+                var bar = new Rectangle(box.X + 10, box.Y + 52 + extra, box.Width - 20, 20);
                 Fill(sb, bar, Track);
                 float p = o0.TargetAmount > 0 ? (float)cur / o0.TargetAmount : 1f;
                 Fill(sb, new Rectangle(bar.X, bar.Y, (int)(bar.Width * Clamp01(p)), bar.Height), Green);
-                _font.DrawCentered(sb, cur + " / " + o0.TargetAmount + "  (J — topshiriqlar)", bar.Center.ToVector2(), new Color(20, 24, 20), 2, 1);
+                string bt = cur + " / " + o0.TargetAmount + "  (J — ro'yxat)";
+                if (_font.Measure(bt, 2, 1).X > bar.Width - 8) bt = cur + " / " + o0.TargetAmount;
+                _font.DrawCentered(sb, bt, bar.Center.ToVector2(), new Color(20, 24, 20), 2, 1);
             }
         }
 

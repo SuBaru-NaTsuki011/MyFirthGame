@@ -24,7 +24,7 @@ namespace AndijonSaltanatlar.UI
     /// iqtisod + soliq boshqaruvi, hukmdorga murojaat oynasi, tanlangan obyekt paneli, toast,
     /// pauza va yordam. MouseOverUI ni ham belgilaydi.
     /// </summary>
-    public sealed class UIManager
+    public sealed partial class UIManager
     {
         private static readonly Color PanelBg = new Color(30, 25, 20, 236);
         private static readonly Color PanelBg2 = new Color(50, 42, 33, 242);
@@ -42,7 +42,7 @@ namespace AndijonSaltanatlar.UI
         private int SmallBtn => Touch ? 30 : 22;
         private const int PanelW = 248;
 
-        private enum Tab { None, Build, City, Population, Army, State, Civ, Settings }
+        private enum Tab { None, Build, City, Population, Army, State, Civ, Settings, Diag, Farm, World }
 
         private readonly AssetManager _assets;
         private readonly PixelFont _font;
@@ -63,7 +63,7 @@ namespace AndijonSaltanatlar.UI
         public bool OpenCivRequested;
         public bool AdvisorOpen;
         public AIGovernorPanel GovernorPanel => _governorPanel;
-        private Rectangle _upgradeBtn;
+        private Rectangle _upgradeBtn, _moveBtn;
         private Rectangle _onlineBtn;
         private bool _showTitle = true, _showCity = true;
         private string _dayText = "";
@@ -112,19 +112,20 @@ namespace AndijonSaltanatlar.UI
                 _governorPanel = new AIGovernorPanel(assets, font, state, governor);
                 _governorPanel.OpenStateTab = () =>
                 {
-                    _tab = Tab.State;
+                    OpenDiagnostics(DiagTab.State);
                     _governorPanel.Close();
                 };
             }
 
+            // Yagona navigatsiya: shahar ma'lumotlari bitta DIAGNOSTIKA oynasida (SHAHAR/AHOLI/QO'SHIN/DAVLAT),
+            // TARAQQIYOT va DUNYO — alohida to'liq ekranlar.
             _tabs = new[]
             {
-                (Texts.TabBuild, Tab.Build),
-                (Texts.TabCity, Tab.City),
-                (Texts.TabPopulation, Tab.Population),
-                (Texts.TabArmy, Tab.Army),
-                (Texts.TabState, Tab.State),
+                ("QURILISH", Tab.Build),
+                ("DIAGNOSTIKA", Tab.Diag),
+                ("FERMERLIK", Tab.Farm),
                 (Texts.TabCivilization, Tab.Civ),
+                ("DUNYO", Tab.World),
                 (Texts.TabSettings, Tab.Settings),
             };
             _tabRects = new Rectangle[_tabs.Length];
@@ -148,13 +149,16 @@ namespace AndijonSaltanatlar.UI
             switch ((name ?? "").Trim().ToLowerInvariant())
             {
                 case "build": case "qurish": _tab = Tab.Build; break;
-                case "city": case "shahar": _tab = Tab.City; break;
-                case "pop": case "aholi": _tab = Tab.Population; break;
-                case "army": case "qoshin": _tab = Tab.Army; break;
-                case "state": case "davlat": _tab = Tab.State; break;
+                case "diag": case "city": case "shahar": OpenDiagnostics(DiagTab.City); break;
+                case "pop": case "aholi": OpenDiagnostics(DiagTab.Population); break;
+                case "army": case "qoshin": OpenDiagnostics(DiagTab.Army); break;
+                case "buy": OpenDiagnostics(DiagTab.Army, buy: true); break;
+                case "state": case "davlat": OpenDiagnostics(DiagTab.State); break;
+                case "farm": case "fermerlik": _tab = Tab.Farm; break;
+                case "time": case "vaqt": TimePanelOpen = true; break;
                 case "settings": case "sozlamalar": _tab = Tab.Settings; break;
                 case "vazir": case "governor": case "ai": _governorPanel?.Open(); break;
-                case "petition": case "murojaat": _tab = Tab.State; PetitionOpen = _state.Petitions.HasActive; break;
+                case "petition": case "murojaat": OpenDiagnostics(DiagTab.State); PetitionOpen = _state.Petitions.HasActive; break;
             }
         }
 
@@ -168,9 +172,9 @@ namespace AndijonSaltanatlar.UI
 
             // Pastki tablar ekran eniga moslashadi: hech biri ekrandan chiqib ketmaydi.
             int th = BottomH - 10, gap = 3;
-            int cancelW = _state.Mode == GameMode.BuildMode ? 110 : 0;
+            int cancelW = _state.Mode != GameMode.Playing ? 110 : 0;
             int avail = vw - 16 - (cancelW > 0 ? cancelW + 8 : 0);
-            int tw = Math.Max(60, Math.Min(148, (avail - gap * (_tabs.Length - 1)) / _tabs.Length));
+            int tw = Math.Max(60, Math.Min(180, (avail - gap * (_tabs.Length - 1)) / _tabs.Length));
             int x = 8, y = vh - BottomH + 5;
             for (int i = 0; i < _tabs.Length; i++)
             {
@@ -198,6 +202,14 @@ namespace AndijonSaltanatlar.UI
                     _menuItems.Add((BuildingCatalog.Buildable[i],
                         new Rectangle(sx + c * (bw + gx), sy + r * (bh + gy), bw, bh)));
                 }
+            }
+            else if (_tab == Tab.Diag)
+            {
+                LayoutDiagnostics(vw, vh);
+            }
+            else if (_tab == Tab.Farm)
+            {
+                LayoutFarm(vw, vh);
             }
             else if (_tab == Tab.State)
             {
@@ -254,13 +266,19 @@ namespace AndijonSaltanatlar.UI
                     _petChoiceRects.Add(new Rectangle(_petModal.X + 20, cy + i * 34, w - 40, 28));
             }
 
+            if (FarmRequestOpen) LayoutFarmModal(vw, vh);
+
             _rightVisible = _state.Selected != null;
             _rightPanel = new Rectangle(vw - PanelW, TopH + 8, PanelW - 8, vh - BottomH - TopH - 16);
             _upgradeBtn = Rectangle.Empty;
+            _moveBtn = Rectangle.Empty;
             if (_rightVisible && (_state.Selected is Building || _state.Selected is LandParcel))
                 _upgradeBtn = new Rectangle(_rightPanel.X + 14, _rightPanel.Bottom - 40, _rightPanel.Width - 28, 28);
+            if (_rightVisible && _state.Selected is Building selB && GameStateManager.CanRelocate(selB))
+                _moveBtn = new Rectangle(_rightPanel.X + 14, _rightPanel.Bottom - 76, _rightPanel.Width - 28, 28);
 
             LayoutTopBar(vw);
+            LayoutTimePanel(vw, vh);
             if (AdvisorOpen && _state.Advisor.Current != null)
             {
                 int w = 600, h = 300;
@@ -285,15 +303,16 @@ namespace AndijonSaltanatlar.UI
             Point m = input.MousePosition;
 
             bool overPanel = _tab != Tab.None && _panelRect.Contains(m);
-            bool overCancel = _state.Mode == GameMode.BuildMode && _cancelBtn.Contains(m);
+            bool overCancel = _state.Mode != GameMode.Playing && _cancelBtn.Contains(m);
             bool overModal = PetitionOpen && _state.Petitions.HasActive && _petModal.Contains(m);
             bool overAdvisor = AdvisorOpen && _advBox.Contains(m);
-            input.MouseOverUI = _state.ShowHelp || overModal || overAdvisor || _topBar.Contains(m) || _bottomBar.Contains(m) ||
+            input.MouseOverUI = _state.ShowHelp || overModal || overAdvisor || FarmRequestOpen || TimePanelOpen || _topBar.Contains(m) || _bottomBar.Contains(m) ||
                                 overPanel || (_rightVisible && _rightPanel.Contains(m));
 
             if (!input.LeftPressed) return;
 
             if (_state.ShowHelp) { _state.ShowHelp = false; return; }
+            if (ClickTime(m)) return;
 
             // Murojaat oynasi ochiq bo'lsa — faqat tanlovlar
             if (PetitionOpen && _state.Petitions.HasActive)
@@ -308,6 +327,9 @@ namespace AndijonSaltanatlar.UI
                     }
                 return; // oyna ochiq — tashqarini e'tiborsiz qoldiramiz
             }
+
+            // Fermer murojaati — faqat o'yinchi tasdiqlasa xarid qilinadi
+            if (ClickFarmModal(m)) return;
 
             if (AdvisorOpen && _state.Advisor.Current != null)
             {
@@ -324,6 +346,12 @@ namespace AndijonSaltanatlar.UI
                 return;
             }
 
+            if (_rightVisible && _moveBtn != Rectangle.Empty && _moveBtn.Contains(m) && _state.Selected is Building mvb)
+            {
+                _tab = Tab.None;
+                _state.BeginMove(mvb);
+                return;
+            }
             if (_rightVisible && _upgradeBtn != Rectangle.Empty && _upgradeBtn.Contains(m))
             {
                 if (_state.Selected is Building) _state.UpgradeSelected();
@@ -336,6 +364,7 @@ namespace AndijonSaltanatlar.UI
                 {
                     Tab t = _tabs[i].Item2;
                     if (t == Tab.Civ) { OpenCivRequested = true; return; } // to'liq ekran
+                    if (t == Tab.World) { OpenWorldRequested = true; return; } // saltanat xaritasi (to'liq ekran)
                     if (_tab == t) { _tab = Tab.None; if (t == Tab.Build) _state.CancelBuild(); }
                     else _tab = t;
                     return;
@@ -343,7 +372,15 @@ namespace AndijonSaltanatlar.UI
 
             if (overCancel) { _state.CancelBuild(); return; }
 
-            if (_tab == Tab.Build)
+            if (_tab == Tab.Diag)
+            {
+                if (ClickDiagnostics(m)) return;
+            }
+            else if (_tab == Tab.Farm)
+            {
+                if (ClickFarm(m)) return;
+            }
+            else if (_tab == Tab.Build)
             {
                 foreach (var (entry, rect) in _menuItems)
                     if (rect.Contains(m))
@@ -396,13 +433,17 @@ namespace AndijonSaltanatlar.UI
             if (_tab == Tab.Build) DrawBuildMenu(sb);
             else if (_tab == Tab.State) DrawStatePanel(sb);
             else if (_tab == Tab.Army) DrawArmyPanel(sb);
-            else if (_tab != Tab.None) DrawInfoPanel(sb);
+            else if (_tab == Tab.Farm) DrawFarmPanel(sb);
+            else if (_tab != Tab.None && _tab != Tab.Diag) DrawInfoPanel(sb);
             if (_rightVisible) DrawSelectedPanel(sb);
+            if (_tab == Tab.Diag) DrawDiagnostics(sb);
             DrawToast(sb, vw, vh);
             if (_state.Paused) DrawCenterBadge(sb, vw, vh, Texts.Paused, Gold);
             if (PetitionOpen && _state.Petitions.HasActive) DrawPetitionModal(sb, vw, vh);
+            else if (FarmRequestOpen) DrawFarmModal(sb, vw, vh);
             bool govOpen = _governorPanel != null && _governorPanel.IsOpen;
             if (!govOpen && AdvisorOpen && _state.Advisor.Current != null) DrawAdvisorModal(sb, vw, vh);
+            DrawTimePanel(sb, vw, vh);
             if (_state.ShowHelp) DrawHelp(sb, vw, vh);
             if (govOpen) _governorPanel.Draw(sb, vw, vh);
         }
@@ -421,11 +462,11 @@ namespace AndijonSaltanatlar.UI
             float titleW = _font.Measure(Texts.Title, 3, 1).X;
             float cityW = _font.Measure(GameConfig.CityName, 2, 1).X;
 
-            string full = Texts.Day + " " + _state.Day + (string.IsNullOrEmpty(PhaseName) ? "" : " - " + PhaseName)
-                          + "  " + _state.Speed + "x" + (_state.Paused ? " ||" : "")
-                          + "  " + SeasonManager.Name(_state.Season) + "/" + _state.Weather.Name();
-            string mid = Texts.Day + " " + _state.Day + "  " + _state.Speed + "x" + (_state.Paused ? " ||" : "");
-            string tiny = Texts.Day + " " + _state.Day;
+            // Soat: "08:30 | BAHOR | 3-KUN" (bosilsa VAQT VA MUHIT oynasi ochiladi)
+            string spd = "  " + _state.Speed + "x" + (_state.Paused ? " ||" : "");
+            string full = ClockLabel(true) + spd;
+            string mid = ClockLabel(true);
+            string tiny = ClockLabel(false);
 
             float LeftWidth(bool title, bool city) => 14 + (title ? titleW + pad : 0) + (city ? cityW + pad : 0) + 2 * btnW + 8;
             float Room(string d) => _chipsLeft - 18 - _font.Measure(d, 2, 1).X;
@@ -440,6 +481,8 @@ namespace AndijonSaltanatlar.UI
                 if (left <= Room(tiny)) { _dayText = tiny; break; }
             }
 
+            float dw = _dayText.Length > 0 ? _font.Measure(_dayText, 2, 1).X : 0f;
+            _clockRect = dw > 0 ? new Rectangle((int)(_chipsLeft - 6 - dw - 8), 2, (int)dw + 16, TopH - 4) : Rectangle.Empty;
             float bx = 14 + (_showTitle ? titleW + pad : 0) + (_showCity ? cityW + pad : 0);
             int by = (TopH - btnH) / 2;
             _onlineBtn = new Rectangle((int)bx, by, btnW, btnH);
@@ -471,7 +514,10 @@ namespace AndijonSaltanatlar.UI
             rx = DrawChip(sb, rx, SpriteKeys.IconFood, _state.Food.ToString(), Cream);
             rx = DrawChip(sb, rx, SpriteKeys.IconCoin, _state.Coins.ToString(), Gold);
             if (_dayText.Length > 0)
-                _font.DrawRight(sb, _dayText, new Vector2(rx - 6, (TopH - 14) / 2f), Muted, 2, 1);
+            {
+                Panel(sb, _clockRect, TimePanelOpen ? PanelBg2 : new Color(40, 33, 26, 236), TimePanelOpen ? Gold : new Color(96, 78, 52), 1);
+                _font.DrawRight(sb, _dayText, new Vector2(rx - 6, (TopH - 14) / 2f), TimePrefs.Current.Lock != TimeLock.Auto ? Gold : Cream, 2, 1);
+            }
         }
 
         private float DrawChip(SpriteBatch sb, float right, string iconKey, string value, Color valueColor)
@@ -496,11 +542,11 @@ namespace AndijonSaltanatlar.UI
                 Panel(sb, _tabRects[i], active ? PanelBg2 : PanelBg, active ? Gold : Border, active ? 2 : 1);
                 DrawButtonText(sb, _tabs[i].Item1, _tabRects[i], active ? Gold : Cream);
                 // DAVLAT tabida murojaat belgisi
-                if (_tabs[i].Item2 == Tab.State && _state.Petitions.HasActive)
+                if ((_tabs[i].Item2 == Tab.Diag && _state.Petitions.HasActive) || (_tabs[i].Item2 == Tab.Farm && _state.Farming.Active != null))
                     Fill(sb, new Rectangle(_tabRects[i].Right - 12, _tabRects[i].Y + 4, 8, 8), Gold);
             }
 
-            if (_state.Mode == GameMode.BuildMode)
+            if (_state.Mode != GameMode.Playing)
             {
                 Panel(sb, _cancelBtn, PanelBg2, Red, 1);
                 DrawButtonText(sb, Texts.Cancel, _cancelBtn, Cream);
@@ -672,7 +718,7 @@ namespace AndijonSaltanatlar.UI
 
             _font.Draw(sb, header, new Vector2(x, y), Gold, 3, 1);
             y += 28;
-            foreach (string line in lines) { _font.Draw(sb, FitText(line, _panelRect.Width - 32), new Vector2(x, y), Cream, 2, 1); y += 18; }
+            foreach (string line in lines) { _font.Draw(sb, FitText(line, _panelRect.Width - 32), new Vector2(x, y), Cream, 2, 1); y += 21; }
 
             if (_tab == Tab.Settings)
             {
@@ -769,17 +815,22 @@ namespace AndijonSaltanatlar.UI
             if (_font.Measure(title, 3, 1).X <= maxW) { _font.Draw(sb, title, new Vector2(x, y), Gold, 3, 1); y += 26; }
             else
             {
-                foreach (string line in Wrap(title, maxW, 2)) { _font.Draw(sb, line, new Vector2(x, y), Gold, 2, 1); y += 17; }
+                foreach (string line in Wrap(title, maxW, 2)) { _font.Draw(sb, line, new Vector2(x, y), Gold, 2, 1); y += 19; }
                 y += 6;
             }
-            foreach (string line in Wrap(subtitle, maxW, 2)) { _font.Draw(sb, line, new Vector2(x, y), Muted, 2, 1); y += 17; }
+            foreach (string line in Wrap(subtitle, maxW, 2)) { _font.Draw(sb, line, new Vector2(x, y), Muted, 2, 1); y += 19; }
             y += 1;
             Fill(sb, new Rectangle(x, y, maxW, 1), Border); y += 10;
-            foreach (string line in Wrap(desc, maxW, 2)) { _font.Draw(sb, line, new Vector2(x, y), Cream, 2, 1); y += 16; }
+            foreach (string line in Wrap(desc, maxW, 2)) { if (y > _rightPanel.Bottom - 96) break; _font.Draw(sb, line, new Vector2(x, y), Cream, 2, 1); y += 19; }
             y += 8;
             foreach (var (text, color) in rows)
-                foreach (string line in Wrap(text, maxW, 2)) { _font.Draw(sb, line, new Vector2(x, y), color, 2, 1); y += 16; }
+                foreach (string line in Wrap(text, maxW, 2)) { if (y > _rightPanel.Bottom - 96) break; _font.Draw(sb, line, new Vector2(x, y), color, 2, 1); y += 19; }
 
+            if (_moveBtn != Rectangle.Empty)
+            {
+                Panel(sb, _moveBtn, PanelBg2, Border, 1);
+                DrawButtonText(sb, "KO'CHIRISH", _moveBtn, Cream);
+            }
             if (_state.Selected is Building bld && BuildingUpgradeSystem.CanUpgrade(bld))
             {
                 Panel(sb, _upgradeBtn, PanelBg2, Gold, 1);

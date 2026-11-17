@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -53,11 +54,43 @@ namespace AndijonSaltanatlar.Core.Graphics
             return new Vector2(w, GH * scale);
         }
 
+        /// <summary>
+        /// O'ng chegara (piksel). 0 dan katta bo'lsa Draw shu chiziqdan o'ngga chiqadigan matnni ".." bilan qisqartiradi —
+        /// eski panellarda matn o'z ustunidan/panelidan chiqib ketmaydi. Clip(...) bilan vaqtincha o'rnatiladi.
+        /// </summary>
+        public static float ClipRight;
+
+        public readonly struct ClipScope : IDisposable
+        {
+            private readonly float _prev;
+            public ClipScope(float prev) { _prev = prev; }
+            public void Dispose() => ClipRight = _prev;
+        }
+
+        /// <summary>using (PixelFont.Clip(panel.Right - 12)) { ... } — blok tugagach oldingi chegara tiklanadi.</summary>
+        public static ClipScope Clip(float right)
+        {
+            var scope = new ClipScope(ClipRight);
+            ClipRight = right;
+            return scope;
+        }
+
         /// <summary>Matnni chap-yuqori nuqtadan chizadi. Chizilgan kenglikni qaytaradi.</summary>
         public float Draw(SpriteBatch sb, string text, Vector2 pos, Color color, int scale = 2, int tracking = 1)
         {
             if (string.IsNullOrEmpty(text)) return 0f;
             text = Prepare(text);
+            if (ClipRight > 0f)
+            {
+                int a = (GW + tracking) * scale;
+                float room = ClipRight - pos.X;
+                if (room < a) return 0f;
+                if (text.Length * a - tracking * scale > room)
+                {
+                    int keep = Math.Max(0, (int)((room + tracking * scale) / a) - 2);
+                    text = text.Substring(0, Math.Min(keep, text.Length)).TrimEnd() + "..";
+                }
+            }
             float x = pos.X;
             int adv = (GW + tracking) * scale;
             foreach (char ch in text)

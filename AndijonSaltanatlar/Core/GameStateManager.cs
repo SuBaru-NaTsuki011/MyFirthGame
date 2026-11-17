@@ -55,6 +55,14 @@ public sealed class GameStateManager
 
 	public CityLandExpansionManager Land { get; } = new CityLandExpansionManager();
 
+	/// <summary>Aholini uy sig'imigacha to'ldiradi (to'liq kuchaytirish). Qo'shilganlar soni.</summary>
+	public int FillPopulation(AndijonSaltanatlar.Buildings.BuildingManager buildings)
+	{
+		int n = Pop.FillToCapacity(buildings);
+		Population = Pop.Count;
+		return n;
+	}
+
 	/// <summary>Yer ochildi — bulutga darhol saqlash kerak (Game1 tekshiradi va tushiradi).</summary>
 	public bool LandChanged { get; set; }
 
@@ -126,6 +134,22 @@ public sealed class GameStateManager
 	public void CancelBuild()
 	{
 		Mode = GameMode.Playing;
+		MovingBuilding = null;
+	}
+
+	/// <summary>Ko'chirilayotgan bino (MoveMode).</summary>
+	public Building MovingBuilding { get; private set; }
+
+	/// <summary>Bino ko'chirilishi mumkinmi (saroy shahar markazi — ko'chirilmaydi).</summary>
+	public static bool CanRelocate(Building b) => b != null && b.Type != BuildingType.MainHall;
+
+	public void BeginMove(Building b)
+	{
+		if (!CanRelocate(b)) { ShowMessage("Saroy shahar markazi — uni ko'chirib bo'lmaydi", isError: true); return; }
+		MovingBuilding = b;
+		Mode = GameMode.MoveMode;
+		Selected = null;
+		ShowMessage(b.Name + ": yangi joyni tanlang (yashil — mumkin). O'ng tugma / Esc — bekor");
 	}
 
 	public void Select(object obj)
@@ -285,17 +309,50 @@ public sealed class GameStateManager
 		}
 	}
 
-	public bool RecruitUnit(UnitType type)
+	/// <summary>Dehqonchilik ombori va fermerlar so'rovlari.</summary>
+	public FarmingManager Farming { get; } = new FarmingManager();
+
+	public bool RecruitUnit(UnitType type) => RecruitUnits(type, 1, null);
+
+	/// <summary>Navbatdagi (tayyorlanayotgan) jangchilar soni chegarasi — bir bosishda ko'p xarid xatosidan himoya.</summary>
+	public const int MaxRecruitQueue = 60;
+
+	/// <summary>Jangchi turi uchun bino talabi bajarilganmi (buildings null bo'lsa — tekshirilmaydi).</summary>
+	public static bool UnitRequirementMet(UnitDef d, BuildingManager buildings)
+	{
+		if (d.RequiredBuilding == null || buildings == null) return true;
+		foreach (Building b in buildings.Buildings)
+			if (b.Type == d.RequiredBuilding.Value && b.BuildProgress >= 1f && b.Level >= d.RequiredLevel) return true;
+		return false;
+	}
+
+	/// <summary>
+	/// Jangchilarni sotib olish (yollash navbatiga qo'yish). Hammasi bir tranzaksiyada tekshiriladi:
+	/// bino talabi, tanga (narx × soni) va navbat chegarasi — biror shart bajarilmasa hech narsa yechilmaydi.
+	/// </summary>
+	public bool RecruitUnits(UnitType type, int count, BuildingManager buildings)
 	{
 		UnitDef unitDef = UnitCatalog.Get(type);
-		if (!_resources.CanAfford(ResourceType.Coin, unitDef.TrainingCost))
+		count = Math.Max(1, count);
+		if (!UnitRequirementMet(unitDef, buildings))
 		{
-			ShowMessage("Tanga yetarli emas", isError: true);
+			ShowMessage(unitDef.NameUz + " uchun kerak: " + UnitCatalog.RequirementText(unitDef), isError: true);
 			return false;
 		}
-		Coins -= unitDef.TrainingCost;
-		Military.Enqueue(type);
-		ShowMessage(unitDef.NameUz + " tayyorlashga berildi");
+		if (Military.QueueCount + count > MaxRecruitQueue)
+		{
+			ShowMessage("Navbat to'la (" + Military.QueueCount + " / " + MaxRecruitQueue + ")", isError: true);
+			return false;
+		}
+		int total = unitDef.TrainingCost * count;
+		if (!_resources.CanAfford(ResourceType.Coin, total))
+		{
+			ShowMessage("Tanga yetarli emas: " + total + " kerak", isError: true);
+			return false;
+		}
+		Coins -= total;
+		for (int i = 0; i < count; i++) Military.Enqueue(type);
+		ShowMessage(count + " ta " + unitDef.NameUz + " tayyorlashga berildi (-" + total + ")");
 		return true;
 	}
 
@@ -311,6 +368,47 @@ public sealed class GameStateManager
 		ShowMessage("Mashg'ulot o'tkazildi" + ((num > 0) ? (" (" + num + " daraja oshdi)") : ""));
 	}
 
+	// ---------- Mashg'ulot maydoni (vaqtli sessiya) ----------
+	/// <summary>Mashg'ulot sessiyasi davomiyligi (o'yin soniyalari, tezlik bilan ko'payadi).</summary>
+	public const float TrainingSessionLength = 30f;
+	/// <summary>Qolgan vaqt; 0 — mashg'ulot yo'q.</summary>
+	public float TrainingLeft { get; private set; }
+	public bool TrainingActive => TrainingLeft > 0f;
+	public float TrainingProgress => TrainingActive ? 1f - TrainingLeft / TrainingSessionLength : 0f;
+	public int TrainingCost => 20 + 2 * Military.TotalUnits;
+
+	/// <summary>Mashg'ulot maydoni bormi (Qo'shinxona yoki Jang maydoni).</summary>
+	public static bool HasTrainingGround(BuildingManager buildings)
+	{
+		if (buildings == null) return true;
+		foreach (Building b in buildings.Buildings)
+			if ((b.Type == BuildingType.Barracks || b.Type == BuildingType.GladiatorArena) && b.BuildProgress >= 1f) return true;
+		return false;
+	}
+
+	public bool StartTrainingSession(BuildingManager buildings)
+	{
+		if (TrainingActive) { ShowMessage("Mashg'ulot allaqachon davom etmoqda", isError: true); return false; }
+		if (Military.TotalUnits == 0) { ShowMessage("Avval jangchi sotib oling", isError: true); return false; }
+		if (!HasTrainingGround(buildings)) { ShowMessage("Mashg'ulot uchun Qo'shinxona yoki Jang maydoni kerak", isError: true); return false; }
+		int cost = TrainingCost;
+		if (!_resources.CanAfford(ResourceType.Coin, cost)) { ShowMessage("Mashg'ulot uchun " + cost + " tanga kerak", isError: true); return false; }
+		Coins -= cost;
+		TrainingLeft = TrainingSessionLength;
+		ShowMessage("Mashg'ulot boshlandi (-" + cost + ")");
+		return true;
+	}
+
+	private void UpdateTraining(float gameDt)
+	{
+		if (!TrainingActive) return;
+		TrainingLeft -= gameDt;
+		if (TrainingLeft > 0f) return;
+		TrainingLeft = 0f;
+		int up = Military.TrainAll(60);
+		ShowMessage("Mashg'ulot yakunlandi" + (up > 0 ? ": " + up + " jangchi darajasi oshdi" : ": tajriba oshdi"));
+	}
+
 	public void Update(float dt, BuildingManager buildings)
 	{
 		if (MessageTimer > 0f)
@@ -320,13 +418,17 @@ public sealed class GameStateManager
 		Population = (Pop.Initialized ? Pop.Count : buildings.TotalPopulation);
 		_resources.Set(ResourceType.Population, Population);
 		float num = (Paused ? 0f : (dt * (float)Speed));
+		UpdateTraining(num);
 		if (num <= 0f)
 		{
 			return;
 		}
 		int day = Clock.Day;
 		int month = Clock.Month;
+		int hour = Clock.Hour;
 		Clock.Update(num);
+		// Jangchilar har o'yin SOATida tayyorlanadi (kun uzun — 60 daqiqa; TrainingDays = soat)
+		if (Clock.Hour != hour || Clock.Day != day) Military.DailyTick();
 		foreach (Building building in buildings.Buildings)
 		{
 			if (building.BuildProgress < 1f)
@@ -346,14 +448,21 @@ public sealed class GameStateManager
 		Weather.Update(Clock.Day, Season);
 		Pop.AssignJobs(buildings);
 		bool hasFarmers = Pop.CountProfession(CitizenProfession.Dehqon) > 0;
+		Farming.BeginDay();
+		int farmCount = 0;
 		foreach (Building building in buildings.Buildings)
 		{
 			if (!(building is Farm farm)) continue;
+			farmCount++;
+			// Ekish urug' sarflaydi: urug' tugasa dala bo'sh qoladi (fermerlar sotib olishni so'raydi)
+			if (hasFarmers && farm.CropStage == FarmCropStage.Empty && !farm.IsPlayerControlled && !Farming.TryConsumeSeed()) continue;
 			int harvest = farm.WorkAutonomously(hasFarmers);
 			if (harvest <= 0) continue;
-			if (buildings.Count(BuildingType.Market) > 0) Coins += farm.SellStoredProduce() * 2;
-			else Food += harvest;
+			int bonus = Farming.ApplyYieldBonus(harvest) - harvest;
+			if (buildings.Count(BuildingType.Market) > 0) Coins += (farm.SellStoredProduce() + bonus) * 2;
+			else Food += harvest + bonus;
 		}
+		Farming.EndDay(Clock.Day, farmCount, Season);
 		CivilizationModifiers civilizationModifiers = Civ.PlayerModifiers();
 		float num2 = SeasonManager.FoodModifier(Season) + Weather.ProductionModifier();
 		_economy.DailyTick(buildings, Pop, Policy, civilizationModifiers.Get(TechEffectType.FoodProductionBonus) + num2, civilizationModifiers.Get(TechEffectType.TradeIncomeBonus) + Weather.ProductionModifier() * 0.5f, civilizationModifiers.Get(TechEffectType.TaxEfficiencyBonus));
@@ -372,7 +481,8 @@ public sealed class GameStateManager
 		}
 		Population = Pop.Count;
 		Military.MaxConcurrent = Math.Max(2, buildings.Count(BuildingType.Barracks) * 2);
-		Military.DailyTick();
+		// Havo hissi (qish sovug'i, yoz issig'i) aholining kayfiyatiga ta'sir qiladi
+		Pop.AdjustHappiness(SeasonVisuals.HappinessDelta(SeasonVisuals.ComfortOf(Season, Weather.Current, 0.5f)));
 		int num3 = buildings.Count(BuildingType.Barracks) * 6;
 		if (num3 > 0)
 		{

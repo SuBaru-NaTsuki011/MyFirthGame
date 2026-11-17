@@ -42,6 +42,11 @@ namespace AndijonSaltanatlar.Buildings
 
         public void Update(InputManager input, CameraManager camera)
         {
+            if (_state.Mode == GameMode.MoveMode)
+            {
+                UpdateMove(input, camera);
+                return;
+            }
             if (_state.Mode != GameMode.BuildMode)
             {
                 _ghost = null;
@@ -67,6 +72,50 @@ namespace AndijonSaltanatlar.Buildings
             // Devorni sudrab ketma-ket qurish
             bool drag = _ghost.Type == BuildingType.Wall && input.LeftDown && Origin != _lastPlaced && IsValid;
             if (click || drag) TryPlace(click);
+        }
+
+        // ------------------------------------------------------------------ KO'CHIRISH
+        private void UpdateMove(InputManager input, CameraManager camera)
+        {
+            Building b = _state.MovingBuilding;
+            if (b == null || !_buildings.Buildings.Contains(b)) { _state.CancelBuild(); return; }
+            if (input.RightClicked) { _state.CancelBuild(); _state.ShowMessage("Ko'chirish bekor qilindi"); return; }
+            HasHover = !input.MouseOverUI;
+            if (!HasHover) return;
+            SetMoveHover(IsoMath.WorldToTile(camera.ScreenToWorld(input.MouseVector)));
+            if (input.LeftPressed) TryMove(true);
+        }
+
+        /// <summary>Ko'chirish sharpasini berilgan katakka qo'yadi (bino kursorga markazlanadi).</summary>
+        public void SetMoveHover(Point tile)
+        {
+            Building b = _state.MovingBuilding;
+            if (b == null) return;
+            int size = b.Size.X;
+            Origin = new Point(tile.X - (size - 1) / 2, tile.Y - (size - 1) / 2);
+            IsValid = Origin != b.Position && _buildings.CanPlaceIgnoring(Origin, size, b) &&
+                      !_units.AnyInArea(Origin, size) && _state.IsLandBuildable(Origin, size);
+            HasHover = true;
+        }
+
+        /// <summary>Ko'chirishni bajaradi (test uchun ham ommaviy). Joy noto'g'ri bo'lsa hech narsa o'zgarmaydi.</summary>
+        public bool TryMove(bool showErrors)
+        {
+            Building b = _state.MovingBuilding;
+            if (b == null) return false;
+            if (!IsValid)
+            {
+                if (showErrors) _state.ShowMessage(_state.IsLandBuildable(Origin, b.Size.X) ? Texts.CannotBuildHere : "Bu yer hali ochilmagan", true);
+                return false;
+            }
+            Point from = b.Position;
+            if (!_buildings.Move(b, Origin)) return false;
+            if (!b.BuiltByPlayer && b.GeneratedOrigin == null) b.GeneratedOrigin = from;
+            _state.CancelBuild();
+            _state.Select(b);
+            _state.ShowMessage(b.Name + " ko'chirildi");
+            IsValid = false;
+            return true;
         }
 
         /// <summary>Kursor ostidagi tile bo'yicha ghost o'rnini hisoblaydi (bino kursorga markazlanadi).</summary>
@@ -151,6 +200,11 @@ namespace AndijonSaltanatlar.Buildings
         /// <summary>Ghost: iz tile'lari (yashil/qizil) va yarim shaffof bino sprite'i.</summary>
         public void Draw(SpriteBatch sb)
         {
+            if (_state.Mode == GameMode.MoveMode)
+            {
+                DrawMoveGhost(sb);
+                return;
+            }
             if (_state.Mode != GameMode.BuildMode || _ghost == null || !HasHover) return;
 
             int size = _ghost.Size.X;
@@ -167,6 +221,32 @@ namespace AndijonSaltanatlar.Buildings
             Vector2 pos = WorldObjectExtensions.AnchorBottomCenter(_ghost.SpriteTexture, Origin, size);
             Color tint = IsValid ? new Color(190, 255, 200) * 0.72f : new Color(255, 130, 120) * 0.62f;
             sb.Draw(_ghost.SpriteTexture, pos, tint);
+        }
+
+        private void DrawMoveGhost(SpriteBatch sb)
+        {
+            Building b = _state.MovingBuilding;
+            if (b == null) return;
+            int size = b.Size.X;
+            // Hozirgi joy — sariq ramka (qayerdan ko'chayotgani ko'rinadi)
+            for (int y = b.Position.Y; y < b.Position.Y + size; y++)
+                for (int x = b.Position.X; x < b.Position.X + size; x++)
+                    if (_map.InBounds(x, y)) _map.DrawTileOverlay(sb, x, y, new Color(240, 200, 90) * 0.8f, true);
+            if (!HasHover) return;
+            Color fill = IsValid ? new Color(70, 220, 100) * 0.42f : new Color(235, 60, 50) * 0.48f;
+            Color line = IsValid ? new Color(150, 255, 170) * 0.9f : new Color(255, 120, 110) * 0.9f;
+            for (int y = Origin.Y; y < Origin.Y + size; y++)
+                for (int x = Origin.X; x < Origin.X + size; x++)
+                {
+                    if (!_map.InBounds(x, y)) continue;
+                    _map.DrawTileOverlay(sb, x, y, fill, false);
+                    _map.DrawTileOverlay(sb, x, y, line, true);
+                }
+            Texture2D tex = b.SpriteTexture;
+            if (tex == null) return;
+            Vector2 pos = WorldObjectExtensions.AnchorBottomCenter(tex, Origin, size);
+            Color tint = IsValid ? new Color(190, 255, 200) * 0.72f : new Color(255, 130, 120) * 0.62f;
+            sb.Draw(tex, pos, tint);
         }
     }
 }

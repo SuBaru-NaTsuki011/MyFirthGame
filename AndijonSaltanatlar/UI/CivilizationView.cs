@@ -34,6 +34,8 @@ namespace AndijonSaltanatlar.UI
 
         public bool BackRequested;
         private bool _showHistory;
+        /// <summary>Tarix xazinasi bo'limini ochish (sinov: --civ --tab history).</summary>
+        public void ShowHistory() => _showHistory = true;
 
         private Rectangle _backBtn, _techTabBtn, _histTabBtn;
         private readonly List<(TechnologyDefinition tech, Rectangle rect)> _cards = new List<(TechnologyDefinition, Rectangle)>();
@@ -114,13 +116,13 @@ namespace AndijonSaltanatlar.UI
                 "Ilm ballari: " + Civ.Science,
                 "Kunlik ilm: " + _state.Civ.LastSciencePerDay,
                 "Madaniyat: " + Civ.Culture + " (+" + _state.Civ.LastCulturePerDay + "/kun)",
-                "Ochilgan texnologiya: " + Civ.Researched.Count + " / " + TechnologyCatalog.All.Count,
+                "Texnologiyalar: " + Civ.Researched.Count + " / " + TechnologyCatalog.All.Count,
                 "",
                 "Hozirgi tadqiqot:",
                 "  " + current,
             };
             foreach (string l in lines)
-                foreach (string w in l.Length == 0 ? new List<string> { "" } : Wrap(l, box.Width - 28, 2)) { _font.Draw(sb, w, new Vector2(x, y), Cream, 2, 1); y += 18; }
+                foreach (string w in l.Length == 0 ? new List<string> { "" } : Wrap(l, box.Width - 28, 2)) { _font.Draw(sb, w, new Vector2(x, y), Cream, 2, 1); y += 21; }
 
             if (Civ.IsResearching)
             {
@@ -136,7 +138,7 @@ namespace AndijonSaltanatlar.UI
 
             y += 10;
             foreach (string w in Wrap("Texnologiya yangi binolarni va iqtisodiy bonuslarni ochadi.", box.Width - 28, 2))
-            { _font.Draw(sb, w, new Vector2(x, y), Muted, 2, 1); y += 16; }
+            { _font.Draw(sb, w, new Vector2(x, y), Muted, 2, 1); y += 21; }
         }
 
         private void DrawTechTree(SpriteBatch sb)
@@ -172,9 +174,9 @@ namespace AndijonSaltanatlar.UI
                 _font.Draw(sb, e.TitleUz + "  (" + e.HistoricalPeriod + ")", new Vector2(x, y), Gold, 2, 1);
                 Color sc = e.Status == VerificationStatus.Tasdiqlangan ? Green : e.Status == VerificationStatus.Tekshirilmagan ? Muted : Teal;
                 _font.DrawRight(sb, VerificationStatusText.Name(e.Status), new Vector2(box.Right - 16, y), sc, 2, 1);
-                y += 18;
-                foreach (string line in Wrap(e.DescriptionUz, box.Width - 32, 2)) { _font.Draw(sb, line, new Vector2(x, y), Cream, 2, 1); y += 15; }
-                if (e.SourceReferences.Count > 0) { _font.Draw(sb, "Manba: " + string.Join(", ", e.SourceReferences), new Vector2(x, y), Muted, 2, 1); y += 15; }
+                y += 21;
+                foreach (string line in Wrap(e.DescriptionUz, box.Width - 32, 2)) { _font.Draw(sb, line, new Vector2(x, y), Cream, 2, 1); y += 21; }
+                if (e.SourceReferences.Count > 0) { _font.Draw(sb, "Manba: " + string.Join(", ", e.SourceReferences), new Vector2(x, y), Muted, 2, 1); y += 21; }
                 y += 10;
             }
         }

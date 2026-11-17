@@ -73,6 +73,19 @@ namespace AndijonSaltanatlar.Interiors
         private bool _palace;
         private int _doorX0, _doorX1;
 
+        // ---- Uy ichidagi harakatlar: dasturxon atrofida o'tirish / ovqatlanish, to'shakda yotish ----
+        public enum Pose { Stand, Sit, Eat, Lie }
+        public Pose CurrentPose { get; private set; } = Pose.Stand;
+        public const int MealFood = 5;
+        public const float EatTime = 3f;
+        private Vector2 _standPos;          // o'tirish/yotishdan oldingi joy (turganda qaytadi)
+        private Vector2 _tableCenter = new Vector2(6f, 5f);
+        private Vector2 _bedPos = new Vector2(1.0f, 6.0f);
+        private float _poseTime;
+        private Rectangle _act1, _act2;     // ekrandagi harakat tugmalari (sensorli ekran uchun ham)
+        private string _act1Label = "", _act2Label = "";
+        private static readonly Vector2[] Seats = { new Vector2(5.5f, 6.4f), new Vector2(6.5f, 6.4f), new Vector2(7.45f, 4.5f), new Vector2(7.45f, 5.5f) };
+
         public bool Active { get; private set; }
         public Building House { get; private set; }
         public bool IsPalace => _palace;
@@ -157,6 +170,7 @@ namespace AndijonSaltanatlar.Interiors
                 _pos = new Vector2(6.5f, 7.4f);
             }
             _leftDoor = false;
+            CurrentPose = Pose.Stand;
             avatar.DriveIdle();
             avatar.SetFacing(new Vector2(-1, -1));
             Active = true;
@@ -168,6 +182,7 @@ namespace AndijonSaltanatlar.Interiors
         {
             if (!Active) return;
             Active = false;
+            CurrentPose = Pose.Stand;
             if (newAvatar != null) _avatar = newAvatar;
             if (_avatar != null)
             {
@@ -469,6 +484,8 @@ namespace AndijonSaltanatlar.Interiors
                 return;
             }
 
+            if (UpdatePose(dt, input)) return;
+
             Vector2 screen = Vector2.Zero;
             if (input.KeyDown(Keys.A) || input.KeyDown(Keys.Left)) screen.X -= 1;
             if (input.KeyDown(Keys.D) || input.KeyDown(Keys.Right)) screen.X += 1;
@@ -494,6 +511,128 @@ namespace AndijonSaltanatlar.Interiors
             bool inDoorTile = tile.Y == N - 1 && tile.X >= _doorX0 && tile.X <= _doorX1;
             if (!inDoorTile) _leftDoor = true;
             else if (_leftDoor && _pos.Y > N - 0.45f) Exit();
+        }
+
+        // ------------------------------------------------------------------ harakatlar
+        private bool IsHouse => House != null && House.Type == BuildingType.House && !_palace;
+        private bool NearTable => IsHouse && Vector2.Distance(_pos, _tableCenter) < 1.9f;
+        private bool NearBed => IsHouse && Vector2.Distance(_pos, _bedPos) < 1.8f;
+
+        /// <summary>Hozir bajarsa bo'ladigan harakatlar (ekrandagi tugmalar va klaviatura ko'rsatmasi).</summary>
+        private void ActionLabels(out string a1, out string a2)
+        {
+            a1 = a2 = "";
+            switch (CurrentPose)
+            {
+                case Pose.Sit: a1 = "[E] OVQATLANISH"; a2 = "[Q] TURISH"; break;
+                case Pose.Eat: a1 = "OVQATLANMOQDA..."; break;
+                case Pose.Lie: a1 = "DAM OLMOQDA..."; a2 = "[Q] TURISH"; break;
+                default:
+                    if (NearTable) a1 = "[E] DASTURXONGA O'TIRISH";
+                    else if (NearBed) a1 = "[E] YOTISH";
+                    break;
+            }
+        }
+
+        /// <summary>Sinov: avatarni dasturxon yoki to'shak yoniga qo'yib, holatni o'rnatadi.</summary>
+        public void TestPose(string pose)
+        {
+            if (!IsHouse) return;
+            switch ((pose ?? "").ToLowerInvariant())
+            {
+                case "sit": _pos = new Vector2(6.4f, 6.6f); SitDown(); break;
+                case "eat": _pos = new Vector2(6.4f, 6.6f); SitDown(); _state.Food = Math.Max(_state.Food, MealFood); Eat(); _poseTime = 0.5f; break;
+                case "lie": _pos = new Vector2(2.4f, 6.2f); LieDown(); _poseTime = 0.4f; break;
+                case "table": _pos = new Vector2(6.4f, 6.8f); break;
+            }
+        }
+
+        /// <summary>Asosiy harakat (E yoki 1-tugma).</summary>
+        public void DoPrimary()
+        {
+            switch (CurrentPose)
+            {
+                case Pose.Stand:
+                    if (NearTable) SitDown();
+                    else if (NearBed) LieDown();
+                    break;
+                case Pose.Sit:
+                    Eat();
+                    break;
+            }
+        }
+
+        /// <summary>O'rnidan turish (Q yoki 2-tugma).</summary>
+        public void StandUp()
+        {
+            if (CurrentPose == Pose.Stand || CurrentPose == Pose.Eat) return;
+            CurrentPose = Pose.Stand;
+            _pos = _standPos;
+            _avatar.DriveIdle();
+        }
+
+        private void SitDown()
+        {
+            _standPos = _pos;
+            Vector2 best = Seats[0];
+            foreach (Vector2 s in Seats) if (Vector2.Distance(s, _pos) < Vector2.Distance(best, _pos)) best = s;
+            _pos = best;
+            CurrentPose = Pose.Sit;
+            _poseTime = 0f;
+            _avatar.DriveIdle();
+            _avatar.SetFacing(_tableCenter - _pos);
+            _state.ShowMessage("Dasturxon atrofida o'tirdingiz. E — ovqatlanish, Q — turish");
+        }
+
+        private void Eat()
+        {
+            if (_state.Food < MealFood)
+            {
+                _state.ShowMessage("Uyda ovqat yo'q — omborda oziq-ovqat tugagan", true);
+                return;
+            }
+            _state.Food -= MealFood;
+            CurrentPose = Pose.Eat;
+            _poseTime = 0f;
+            _state.ShowMessage("Bismillah! Osh tortildi (-" + MealFood + " oziq-ovqat)");
+        }
+
+        private void LieDown()
+        {
+            _standPos = _pos;
+            _pos = _bedPos;
+            CurrentPose = Pose.Lie;
+            _poseTime = 0f;
+            _avatar.DriveIdle();
+            _state.ShowMessage("To'shakda dam olyapsiz. Q — turish");
+        }
+
+        /// <summary>O'tirgan/yotgan holat. true — bu kadrda yurish yo'q.</summary>
+        private bool UpdatePose(float dt, InputManager input)
+        {
+            ActionLabels(out _act1Label, out _act2Label);
+            bool click1 = input.LeftPressed && _act1 != Rectangle.Empty && _act1.Contains(input.MousePosition);
+            bool click2 = input.LeftPressed && _act2 != Rectangle.Empty && _act2.Contains(input.MousePosition);
+            if (input.KeyPressed(Keys.E) || click1) DoPrimary();
+            else if (input.KeyPressed(Keys.Q) || click2) StandUp();
+
+            if (CurrentPose == Pose.Stand) return false;
+            _poseTime += dt;
+            _avatar.DriveIdle();
+            if (CurrentPose == Pose.Eat && _poseTime >= EatTime)
+            {
+                CurrentPose = Pose.Sit;
+                _poseTime = 0f;
+                _avatar.HitPoints = Math.Min(_avatar.MaxHitPoints, _avatar.HitPoints + 40);
+                _state.ShowMessage("Osh juda mazali bo'ldi! Kuch qaytdi.");
+            }
+            if (CurrentPose == Pose.Lie && _avatar.HitPoints < _avatar.MaxHitPoints && (int)(_poseTime * 2f) != (int)((_poseTime - dt) * 2f))
+                _avatar.HitPoints = Math.Min(_avatar.MaxHitPoints, _avatar.HitPoints + 2);
+            // Yurish tugmasi bosilsa — o'rnidan turadi (ovqat tugamaguncha emas)
+            bool moveKey = input.KeyDown(Keys.W) || input.KeyDown(Keys.A) || input.KeyDown(Keys.S) || input.KeyDown(Keys.D) ||
+                           input.KeyDown(Keys.Up) || input.KeyDown(Keys.Down) || input.KeyDown(Keys.Left) || input.KeyDown(Keys.Right);
+            if (moveKey && CurrentPose != Pose.Eat) { StandUp(); return false; }
+            return true;
         }
 
         private bool TryMove(Vector2 p)
@@ -545,14 +684,31 @@ namespace AndijonSaltanatlar.Interiors
                 bool left = rr.FixedFacing ? false : FacesLeft(rr.Pos, _pos);
                 items.Add((rr.Pos.X + rr.Pos.Y, 1, () => DrawPerson(sb, rr.Tex, rr.Pos, left, rr.Scale, rr.Lift)));
             }
-            items.Add((_pos.X + _pos.Y, 1, () =>
+            float avatarDepth = CurrentPose == Pose.Lie ? _bedPos.X + _bedPos.Y + 1.2f : _pos.X + _pos.Y;
+            items.Add((avatarDepth, 1, () =>
             {
                 Texture2D tex = _avatar.Texture;
                 if (tex == null) return;
                 Vector2 feet = IsoMath.TileToWorld(_pos);
-                sb.Draw(tex, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)), null, Color.White, 0f,
-                    new Vector2(tex.Width / 2f, tex.Height - UnitArt.FootOffset), 1f,
-                    _avatar.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
+                var origin = new Vector2(tex.Width / 2f, tex.Height - UnitArt.FootOffset);
+                SpriteEffects fx = _avatar.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                switch (CurrentPose)
+                {
+                    case Pose.Sit:
+                    case Pose.Eat:
+                        // O'tirgan: gavda pastroq (bukilgan), ovqatlanayotganda qo'l/bosh biroz qimirlaydi
+                        float bob = CurrentPose == Pose.Eat ? MathF.Abs(MathF.Sin(_poseTime * 7f)) * 1.5f : 0f;
+                        sb.Draw(tex, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y + 3 + bob)), null, Color.White, 0f, origin, new Vector2(1f, 0.78f), fx, 0f);
+                        break;
+                    case Pose.Lie:
+                        // Yotgan: to'shak ustida, yonboshlab
+                        Vector2 bed = IsoMath.TileToWorld(_bedPos) + new Vector2(0, -10);
+                        sb.Draw(tex, new Vector2(MathF.Round(bed.X), MathF.Round(bed.Y)), null, Color.White, -MathHelper.PiOver2 * 0.92f, origin, 0.95f, SpriteEffects.None, 0f);
+                        break;
+                    default:
+                        sb.Draw(tex, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)), null, Color.White, 0f, origin, 1f, fx, 0f);
+                        break;
+                }
             }));
             items.Sort((a, b) => a.depth != b.depth ? a.depth.CompareTo(b.depth) : a.layer.CompareTo(b.layer));
             foreach (var it in items) it.draw();
@@ -632,6 +788,45 @@ namespace AndijonSaltanatlar.Interiors
             font.DrawCentered(sb, _title, new Vector2(head.Center.X, head.Y + 19), new Color(255, 214, 90), 3);
             font.DrawCentered(sb, _subtitle, new Vector2(head.Center.X, head.Y + 44), new Color(210, 196, 170), 2);
 
+            // Ovqat bug'i va uyqu "Zzz"
+            if (CurrentPose == Pose.Eat)
+                for (int i = 0; i < 3; i++)
+                {
+                    float u = (_poseTime * 0.8f + i / 3f) % 1f;
+                    Vector2 sp = ToScreen(_tableCenter, 18 + u * 30) + new Vector2((i - 1) * 8 + MathF.Sin(_poseTime * 3f + i) * 3f, 0);
+                    sb.Draw(px, new Rectangle((int)sp.X, (int)sp.Y, 4, 4), new Color(255, 255, 255) * (0.6f * (1f - u)));
+                }
+            if (CurrentPose == Pose.Lie)
+            {
+                float u = _poseTime * 0.6f % 1f;
+                Vector2 zp = ToScreen(_bedPos, 40 + u * 26) + new Vector2(10 + u * 12, 0);
+                font.Draw(sb, "Z", zp, new Color(230, 236, 255) * (1f - u), 2);
+                font.Draw(sb, "z", zp + new Vector2(-12, 14), new Color(230, 236, 255) * (0.7f * (1f - u)), 2);
+            }
+
+            // Harakat tugmalari (klaviatura: E / Q; sensorli ekranda bosiladi)
+            _act1 = _act2 = Rectangle.Empty;
+            ActionLabels(out _act1Label, out _act2Label);
+            int abh = 34, ay = vh - 92;
+            int w1 = _act1Label.Length > 0 ? (int)font.Measure(_act1Label, 2).X + 28 : 0;
+            int w2 = _act2Label.Length > 0 ? (int)font.Measure(_act2Label, 2).X + 28 : 0;
+            int ax = vw / 2 - (w1 + w2 + (w1 > 0 && w2 > 0 ? 10 : 0)) / 2;
+            if (w1 > 0)
+            {
+                _act1 = new Rectangle(ax, ay, w1, abh);
+                sb.Draw(px, new Rectangle(_act1.X - 2, _act1.Y - 2, _act1.Width + 4, _act1.Height + 4), new Color(216, 167, 83, 240));
+                sb.Draw(px, _act1, new Color(56, 42, 22, 245));
+                font.DrawCentered(sb, _act1Label, _act1.Center.ToVector2(), new Color(255, 214, 90), 2);
+                ax += w1 + 10;
+            }
+            if (w2 > 0)
+            {
+                _act2 = new Rectangle(ax, ay, w2, abh);
+                sb.Draw(px, new Rectangle(_act2.X - 2, _act2.Y - 2, _act2.Width + 4, _act2.Height + 4), new Color(150, 116, 66, 240));
+                sb.Draw(px, _act2, new Color(36, 28, 22, 245));
+                font.DrawCentered(sb, _act2Label, _act2.Center.ToVector2(), new Color(234, 224, 202), 2);
+            }
+
             string hint = "WASD yurish | SHIFT yugurish | ENTER / ESC yoki eshik - tashqariga chiqish";
             Vector2 hs = font.Measure(hint, 2);
             var hr = new Rectangle(vw / 2 - (int)hs.X / 2 - 16, vh - 40, (int)hs.X + 32, 28);
@@ -639,7 +834,7 @@ namespace AndijonSaltanatlar.Interiors
             font.DrawCentered(sb, hint, hr.Center.ToVector2(), new Color(220, 205, 175), 2);
 
             if (_state.MessageTimer > 0f && !string.IsNullOrEmpty(_state.Message))
-                Label(sb, px, font, new Vector2(vw / 2f, vh - 64), _state.Message, new Color(150, 230, 150), new Color(0, 0, 0, 170));
+                Label(sb, px, font, new Vector2(vw / 2f, 90), _state.Message, _state.MessageIsError ? new Color(255, 140, 120) : new Color(150, 230, 150), new Color(0, 0, 0, 170));
             sb.End();
         }
 

@@ -32,6 +32,8 @@ namespace AndijonSaltanatlar.Buildings
         public string Description { get; protected set; } = "";
         /// <summary>Izning shimoliy (eng yuqori) tile'i.</summary>
         public Point Position { get; set; }
+        /// <summary>Shahar bilan yaratilgan bino ko'chirilgan bo'lsa — asl joyi (saqlashda kerak). null — ko'chirilmagan.</summary>
+        public Point? GeneratedOrigin { get; set; }
         /// <summary>Iz o'lchami tile'larda.</summary>
         public Point Size { get; protected set; } = new Point(1, 1);
         public Point FrontEntranceTile => new Point(Position.X + Size.X / 2, Position.Y + Size.Y);

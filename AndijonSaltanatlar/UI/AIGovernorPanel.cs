@@ -583,6 +583,8 @@ namespace AndijonSaltanatlar.UI
         {
             CityAnalysisReport r = _governor.Report;
             int x = _panel.X + 22, y = _panel.Y + 120, cx = _panel.X + 560;
+            float prevClip = PixelFont.ClipRight;
+            PixelFont.ClipRight = cx - 18;   // chap ustun matni o'ng ustunga o'tmaydi
             _font.Draw(sb, "SHAHAR TAHLILI", new Vector2(x, y), Gold, 2, 1); y += 26;
             if (r == null) { _font.Draw(sb, "Tahlil hali tayyor emas.", new Vector2(x, y), Muted, 2, 1); return; }
 
@@ -590,12 +592,14 @@ namespace AndijonSaltanatlar.UI
             y = DrawLine(sb, r.HousingShortage > 0 ? "Turar joy tanqisligi: " + r.HousingShortage
                                                    : "Turar joy zaxirasi: " + (-r.HousingShortage), x, y,
                           r.HousingShortage > 0 ? Red : Green);
-            y = DrawLine(sb, "Xazina: " + r.Treasury + " tanga   Oziq: " + r.Food, x, y, Gold);
-            y = DrawLine(sb, "Baxt: " + r.Happiness + "   Sog'liq: " + r.Health + "   Ta'lim: " + r.Education, x, y, Cream);
-            y = DrawLine(sb, "Xavfsizlik: " + r.Security + "   Ishchilar: " + r.Workers + "   Ishsiz: " + r.Unemployed, x, y, Cream);
-            y = DrawLine(sb, "Kunlik: +" + r.DailyIncome + " / -" + r.DailyExpense + "  (sof " + r.DailyNet + ")", x, y,
+            y = DrawLine(sb, "Xazina: " + r.Treasury + " tanga", x, y, Gold);
+            y = DrawLine(sb, "Oziq-ovqat: " + r.Food, x, y, Gold);
+            y = DrawLine(sb, "Baxt: " + r.Happiness + "  Sog'liq: " + r.Health + "  Ta'lim: " + r.Education, x, y, Cream);
+            y = DrawLine(sb, "Xavfsizlik: " + r.Security + "  Ishchilar: " + r.Workers, x, y, Cream);
+            y = DrawLine(sb, "Ishsizlar: " + r.Unemployed, x, y, r.Unemployed > 0 ? Yellow : Cream);
+            y = DrawLine(sb, "Kunlik: +" + r.DailyIncome + " / -" + r.DailyExpense + " (sof " + r.DailyNet + ")", x, y,
                           r.DailyNet >= 0 ? Green : Red);
-            y = DrawLine(sb, "Binolar: " + r.TotalBuildings + "   Yo'llar: " + r.RoadTiles + " katak", x, y, Cream);
+            y = DrawLine(sb, "Binolar: " + r.TotalBuildings + "  Yo'llar: " + r.RoadTiles, x, y, Cream);
             y = DrawLine(sb, "Bo'sh quriladigan katak: " + r.BuildableTiles, x, y,
                           r.BuildableTiles >= 20 ? Green : Yellow);
             y = DrawLine(sb, "Yer: " + r.OpenParcels + " ochiq, " + r.LockedParcels + " yopiq uchastka", x, y, Cream);
@@ -607,8 +611,9 @@ namespace AndijonSaltanatlar.UI
             foreach (string p in r.DetectedProblems)
             {
                 if (shown++ >= 4) break;
-                foreach (string line in Wrap("- " + p, 500, 2)) { _font.Draw(sb, line, new Vector2(x, y), Red, 2, 1); y += 16; }
+                foreach (string line in Wrap("- " + p, cx - x - 30, 2)) { _font.Draw(sb, line, new Vector2(x, y), Red, 2, 1); y += 21; }
             }
+            PixelFont.ClipRight = prevClip;
             if (shown == 0) _font.Draw(sb, "Jiddiy muammo topilmadi.", new Vector2(x, y), Green, 2, 1);
 
             int ry = _panel.Y + 120;
@@ -620,21 +625,21 @@ namespace AndijonSaltanatlar.UI
                 foreach (string w in Wrap("- " + line, 350, 2))
                 {
                     if (opLines++ >= 5) break;
-                    _font.Draw(sb, w, new Vector2(cx, ry), Cream, 2, 1); ry += 16;
+                    _font.Draw(sb, w, new Vector2(cx, ry), Cream, 2, 1); ry += 21;
                 }
             }
             if (op == 0) _font.Draw(sb, "Hozircha qo'shimcha imkoniyat yo'q.", new Vector2(cx, ry), Muted, 2, 1);
 
-            ry += 16;
+            ry += 21;
             _font.Draw(sb, "YER BO'YICHA MASLAHAT", new Vector2(cx, ry), Gold, 2, 1); ry += 24;
             int landLines = 0;
             foreach (string line in Wrap(_governor.LandAdviceUz(), 350, 2))
             {
                 if (landLines++ >= 3) break;
-                _font.Draw(sb, line, new Vector2(cx, ry), Cream, 2, 1); ry += 16;
+                _font.Draw(sb, line, new Vector2(cx, ry), Cream, 2, 1); ry += 21;
             }
 
-            ry += 16;
+            ry += 21;
             _font.Draw(sb, "INFRASTRUKTURA BO'SHLIQLARI", new Vector2(cx, ry), Gold, 2, 1); ry += 24;
             int gaps = 0, gapLines = 0;
             foreach (string g in r.InfrastructureGaps)
@@ -643,7 +648,7 @@ namespace AndijonSaltanatlar.UI
                 foreach (string line in Wrap("- " + g, 350, 2))
                 {
                     if (gapLines++ >= 4) break;
-                    _font.Draw(sb, line, new Vector2(cx, ry), Yellow, 2, 1); ry += 16;
+                    _font.Draw(sb, line, new Vector2(cx, ry), Yellow, 2, 1); ry += 21;
                 }
             }
             if (gaps == 0) _font.Draw(sb, "Asosiy infratuzilma joyida.", new Vector2(cx, ry), Green, 2, 1);
@@ -675,7 +680,7 @@ namespace AndijonSaltanatlar.UI
                 foreach (string line in Wrap(rec.ReasonUz, 430, 2))
                 {
                     if (lines++ >= 3) break;
-                    _font.Draw(sb, line, new Vector2(card.X + 12, ly), Cream, 2, 1); ly += 16;
+                    _font.Draw(sb, line, new Vector2(card.X + 12, ly), Cream, 2, 1); ly += 21;
                 }
             }
 
@@ -685,7 +690,7 @@ namespace AndijonSaltanatlar.UI
             foreach (AdvisorMessage m in _state.Advisor.Messages)
             {
                 if (count++ >= 2) break;
-                _font.Draw(sb, "- " + m.Title, new Vector2(x, my), Muted, 2, 1); my += 16;
+                _font.Draw(sb, "- " + m.Title, new Vector2(x, my), Muted, 2, 1); my += 21;
             }
             if (count == 0) _font.Draw(sb, "Qo'shimcha eski maslahat yo'q.", new Vector2(x, my), Muted, 2, 1);
         }
@@ -716,8 +721,8 @@ namespace AndijonSaltanatlar.UI
             int ry = y + 30;
             string counts1 = $"{p.HouseCount} uy / {p.MarketCount} savdo / {p.GardenCount} bog' / {p.ExpectedHousing} joy";
             string counts2 = $"{p.RoadCount} yo'l katagi / {p.BuildableCount} bino quriladi";
-            _font.Draw(sb, counts1, new Vector2(x, ry), Cream, 2, 1); ry += 16;
-            _font.Draw(sb, counts2, new Vector2(x, ry), Cream, 2, 1); ry += 16;
+            _font.Draw(sb, counts1, new Vector2(x, ry), Cream, 2, 1); ry += 21;
+            _font.Draw(sb, counts2, new Vector2(x, ry), Cream, 2, 1); ry += 21;
             ry += 6;
             List<string> rationale = Wrap(p.RationaleUz, 435, 2);
             int shownRationale = Math.Min(4, rationale.Count);
@@ -726,7 +731,7 @@ namespace AndijonSaltanatlar.UI
                 string line = rationale[i];
                 if (i == shownRationale - 1 && rationale.Count > shownRationale)
                     line = Ellipsize(line + "...", 435, 2);
-                _font.Draw(sb, line, new Vector2(x, ry), Muted, 2, 1); ry += 16;
+                _font.Draw(sb, line, new Vector2(x, ry), Muted, 2, 1); ry += 21;
             }
 
             int listY = y + 176;
@@ -800,7 +805,7 @@ namespace AndijonSaltanatlar.UI
                          ? "Navbat kutilmoqda." : _governor.Queue.LastMessageUz, _panel.Width - 44, 2))
             {
                 _font.Draw(sb, line, new Vector2(x, my), p.NeedsReapproval ? Yellow : Cream, 2, 1);
-                my += 16;
+                my += 21;
             }
 
             my += 8;
@@ -817,7 +822,7 @@ namespace AndijonSaltanatlar.UI
                           step.Status == StepStatus.Skipped ? Muted : Cream;
                 _font.Draw(sb, mark + step.LabelUz + (step.Kind == StepKind.Road ? "  yo'l" : "") +
                                "  " + step.Cost + " tanga", new Vector2(x, my), c, 2, 1);
-                my += 17;
+                my += 21;
             }
             if (p.Steps.Count > 12)
                 _font.Draw(sb, "... yana " + (p.Steps.Count - 12) + " qadam", new Vector2(x, my), Muted, 2, 1);
@@ -845,13 +850,13 @@ namespace AndijonSaltanatlar.UI
             foreach (string line in Wrap("Foyda: " + item.BenefitUz, 425, 2))
             {
                 if (lines++ >= 2) break;
-                _font.Draw(sb, line, new Vector2(ex, ey), Cream, 2, 1); ey += 16;
+                _font.Draw(sb, line, new Vector2(ex, ey), Cream, 2, 1); ey += 21;
             }
             lines = 0;
             foreach (string line in Wrap("Talab: " + item.RequirementUz, 425, 2))
             {
                 if (lines++ >= 2) break;
-                _font.Draw(sb, line, new Vector2(ex, ey), Muted, 2, 1); ey += 16;
+                _font.Draw(sb, line, new Vector2(ex, ey), Muted, 2, 1); ey += 21;
             }
             if (!string.IsNullOrEmpty(item.StatusReasonUz))
             {
@@ -859,7 +864,7 @@ namespace AndijonSaltanatlar.UI
                 foreach (string line in Wrap(item.StatusReasonUz, 425, 2))
                 {
                     if (lines++ >= 2) break;
-                    _font.Draw(sb, line, new Vector2(ex, ey), statusColor, 2, 1); ey += 16;
+                    _font.Draw(sb, line, new Vector2(ex, ey), statusColor, 2, 1); ey += 21;
                 }
             }
         }
@@ -916,7 +921,7 @@ namespace AndijonSaltanatlar.UI
                 foreach (string line in Wrap(f.SummaryUz, _panel.Width - 190, 2))
                 {
                     if (lines++ >= 2) break;
-                    _font.Draw(sb, line, new Vector2(x + 130, ly), Cream, 2, 1); ly += 16;
+                    _font.Draw(sb, line, new Vector2(x + 130, ly), Cream, 2, 1); ly += 21;
                 }
                 ly += 4;
             }
@@ -946,7 +951,7 @@ namespace AndijonSaltanatlar.UI
         private int DrawLine(SpriteBatch sb, string text, int x, int y, Color c)
         {
             _font.Draw(sb, text, new Vector2(x, y), c, 2, 1);
-            return y + 18;
+            return y + 21;
         }
 
         private int DrawWrapped(SpriteBatch sb, string text, int x, int y, int width, Color c)
@@ -954,7 +959,7 @@ namespace AndijonSaltanatlar.UI
             foreach (string line in Wrap(text, width, 2))
             {
                 _font.Draw(sb, line, new Vector2(x, y), c, 2, 1);
-                y += 16;
+                y += 21;
             }
             return y;
         }

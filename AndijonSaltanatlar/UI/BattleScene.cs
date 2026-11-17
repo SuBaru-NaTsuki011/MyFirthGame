@@ -108,7 +108,7 @@ namespace AndijonSaltanatlar.UI
             BattleSceneAction act = BattleSceneAction.None;
             float s = Math.Max(1f, vh / 720f);         // sahna masshtabi (telefon/PC)
             int topH = (int)(ui.Type.LineHeight(TextStyle.PanelTitle) * 2.6f + 24);
-            int panelH = b.Status == BattleStatus.Completed ? 0 : (int)(ui.ControlH * 2.2f + ui.Gap * 3 + ui.Type.LineHeight(TextStyle.Secondary) + 10);
+            int panelH = b.Status == BattleStatus.Completed ? 0 : (int)(ui.ControlH * 2.7f + ui.Gap * 3 + ui.Type.LineHeight(TextStyle.Secondary) + 10);
             var field = new Rectangle(0, topH, vw, vh - topH - panelH);
 
             // ---- Fon: osmon, uzoq tog'lar, shahar siluetlari ----
@@ -597,13 +597,16 @@ namespace AndijonSaltanatlar.UI
             for (int i = 0; i < decisions.Length; i++)
             {
                 BattleDecision d = decisions[i];
-                var br = new Rectangle(x + i * (bw + gap), y, bw, (int)(h * 1.5f));
+                var br = new Rectangle(x + i * (bw + gap), y, bw, (int)(h * 2f));
                 bool sel = _selected == d;
                 if (ui.Card(br, sel, !locked) && !locked) _selected = d;
-                ui.Type.DrawCentered(ui.Batch, ui.Type.Fit(WarRules.DecisionName(d), br.Width - 12, TextStyle.Button), new Rectangle(br.X, br.Y + 4, br.Width, (int)(br.Height * 0.55f)), TextStyle.Button, sel ? T.Primary : T.TextPrimary);
-                ui.Type.DrawCentered(ui.Batch, ui.Type.Fit(WarRules.DecisionHint(d), br.Width - 12, TextStyle.Caption), new Rectangle(br.X, br.Y + (int)(br.Height * 0.5f), br.Width, (int)(br.Height * 0.45f)), TextStyle.Caption, T.TextSecondary);
+                // Nom sig'masa qisqa shakli (MUVOZANATLI, FAOL...), izoh ikki qatorga o'raladi — matn kesilmaydi
+                string dn = WarRules.DecisionName(d);
+                if (ui.Type.Measure(dn, TextStyle.Button).X > br.Width - 12) dn = d == BattleDecision.QaytaTashkil ? "Qayta tashkil" : dn.Split(' ')[0];
+                ui.Type.DrawCentered(ui.Batch, ui.Type.Fit(dn, br.Width - 12, TextStyle.Button), new Rectangle(br.X, br.Y + 4, br.Width, (int)(br.Height * 0.4f)), TextStyle.Button, sel ? T.Primary : T.TextPrimary);
+                ui.Paragraph(WarRules.DecisionHint(d), new Rectangle(br.X + 8, br.Y + (int)(br.Height * 0.44f), br.Width - 16, (int)(br.Height * 0.54f)), TextStyle.Caption, T.TextSecondary, 2);
             }
-            var cr = new Rectangle(x + w - confirmW, y, confirmW, (int)(h * 1.5f));
+            var cr = new Rectangle(x + w - confirmW, y, confirmW, (int)(h * 2f));
             if (ui.Button(cr, locked ? "Kutilmoqda…" : "TASDIQLASH", ButtonKind.Primary, !locked && _selected != null, "Qarorni serverga yuborish"))
                 return BattleSceneAction.Decide;
             return BattleSceneAction.None;

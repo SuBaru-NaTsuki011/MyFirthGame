@@ -1,11 +1,13 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using AndijonSaltanatlar.AIGovernor;
 using AndijonSaltanatlar.Battles;
 using AndijonSaltanatlar.Blueprints;
 using AndijonSaltanatlar.Buildings;
+using AndijonSaltanatlar.Progression;
 using AndijonSaltanatlar.Campaigns;
 using AndijonSaltanatlar.CityPlanning;
 using AndijonSaltanatlar.Core;
@@ -85,6 +87,8 @@ public sealed class Game1 : Game
 	private UIManager _ui;
 
 	private StrategicView _strategic;
+	private ArenaController _arena;
+	private readonly FarmWorkController _farmWork = new FarmWorkController();
 
 	private bool _strategicMode;
 
@@ -202,6 +206,9 @@ public sealed class Game1 : Game
 		}
 		_input = new InputManager { ForceTouchUi = _opt.Phone };
 		if (_opt.DataDir != null) AppPaths.Root = _opt.DataDir;
+		TimePrefs.Load();
+		if (_opt.Season.HasValue) TimePrefs.Current.SeasonView = Math.Clamp(_opt.Season.Value, -1, 3);
+		GraphicsQualityManager.Current = (GraphicsQuality)TimePrefs.Current.Quality;
 #if !ANDROID
 		// PC: klaviaturadan matn (login maydonlari uchun). Android'da ekran klaviaturasi ishlatiladi.
 		Window.TextInput += (object s, TextInputEventArgs e) => _input.PushText(e.Character);
@@ -232,7 +239,7 @@ public sealed class Game1 : Game
 		if (_opt.Time.HasValue)
 		{
 			_state.Clock.Set(1, _opt.Time.Value);
-			_dayNight.Update(_state.Clock.DayFraction);
+			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction));
 		}
 		if (_opt.PopTax.HasValue)
 		{
@@ -260,6 +267,16 @@ public sealed class Game1 : Game
 				_state.Update(31f, _buildings);
 			}
 		}
+		if (_opt.FarmRequest)
+		{
+			_state.Farming.Seeds = 0;
+			_state.Farming.EndDay(_state.Day, Math.Max(1, _buildings.Count(BuildingType.Farm)), _state.Season);
+		}
+		if (_opt.Arena)
+		{
+
+			_arena.Start();
+		}
 		if (_opt.Tab != null)
 		{
 			_ui.OpenTab(_opt.Tab);
@@ -271,6 +288,7 @@ public sealed class Game1 : Game
 		if (_opt.Civ)
 		{
 			_civMode = true;
+			if (_opt.Tab == "history") _civ.ShowHistory();
 		}
 		if (_opt.QuestJournal)
 		{
@@ -345,6 +363,8 @@ public sealed class Game1 : Game
 				_state.Coins += battleResult.CoinChange;
 			}
 		}
+		// Sinov: kirishsiz rejimda ham to'liq kuchaytirish (suratga olish uchun)
+		if (_opt.FullUpgrade && !_loginMode && !_fullUpgradeDone) { _fullUpgradeDone = true; ApplyFullUpgrade(); }
 		if (_opt.RaidGate.HasValue)
 		{
 			_combat.StartRaidNow(_opt.RaidGate.Value);
@@ -366,6 +386,7 @@ public sealed class Game1 : Game
 				}
 				_lastPossessed = _combat.Possessed;
 				_interior.Enter(house, _combat.Possessed);
+				if (_opt.HousePose != null) _interior.TestPose(_opt.HousePose);
 				if (_opt.EnterHouse.Value == -2)
 				{
 					ShahUnit shah = _combat.SpawnShahAndPossess(_interior.OutsideDoor(house));
@@ -396,6 +417,7 @@ public sealed class Game1 : Game
 
 	private void NewGame(int seed, AIGovernorSaveState governorSave = null)
 	{
+		_garrisoned.Clear();
 		_currentSeed = seed;
 		_map = new MapManager(_assets, GameConfig.MapSize, GameConfig.MapSize);
 		_buildings = new BuildingManager(_map, _assets);
@@ -444,6 +466,7 @@ public sealed class Game1 : Game
 			};
 		}
 		_strategic = new StrategicView(_assets, _font, _state);
+		_arena = new ArenaController(_assets, _state);
 		_civ = new CivilizationView(_assets, _font, _state);
 		_quest = new QuestJournalView(_assets, _font, _state);
 		_storyOverlay = new StoryOverlay(_assets, _font, _state);
@@ -786,10 +809,19 @@ public sealed class Game1 : Game
 			OpenParcels = _state.Land.OpenParcelIds(),
 			Weather = (int)_state.Weather.Current,
 			Story = _state.Story?.State,
-			Governor = _governor?.GetSaveState()
+			Governor = _governor?.GetSaveState(),
+			EliteArmy = _eliteArmy,
+			FarmSeeds = _state.Farming.Seeds,
+			FarmTools = _state.Farming.ToolsLevel,
+			FarmFertilizer = _state.Farming.FertilizerCharges,
+			FarmIrrigation = _state.Farming.Irrigation
 		};
 		foreach (Building building in _buildings.Buildings)
 		{
+			if (!building.BuiltByPlayer && building.GeneratedOrigin.HasValue)
+				saveGameData.MovedBuildings.Add(new[] { building.GeneratedOrigin.Value.X, building.GeneratedOrigin.Value.Y, building.Position.X, building.Position.Y });
+			if (!building.BuiltByPlayer && building.Level > 1)
+				saveGameData.BuildingLevels.Add(new[] { building.Position.X, building.Position.Y, building.Level });
 			if (building.BuiltByPlayer)
 			{
 				saveGameData.PlayerBuildings.Add(new SavedBuilding
@@ -864,6 +896,186 @@ public sealed class Game1 : Game
 		ApplySave(saveGameData, "O'yin yuklandi");
 	}
 
+	private bool _fullUpgradeDone;
+	private bool _eliteArmy;
+	private readonly HashSet<int> _garrisoned = new HashSet<int>();
+
+	private static readonly BuildingType[] OnceTypes = { BuildingType.GladiatorArena, BuildingType.Madrasa, BuildingType.Mosque };
+	private readonly Dictionary<BuildingType, int> _sizeCache = new Dictionary<BuildingType, int>();
+
+	private int SizeOf(BuildingType t)
+	{
+		if (!_sizeCache.TryGetValue(t, out int s)) _sizeCache[t] = s = BuildingFactory.Create(t, Point.Zero).Size.X;
+		return s;
+	}
+
+	/// <summary>
+	/// Ochiq yerlarning bo'sh joylarini eng yuqori darajali binolar bilan to'ldiradi. Shimol — harbiy hudud
+	/// (kazarma, gladiator arenasi, minoralar), sharq — bozor (bozorlar, karvonsaroy, bog'), janub — dehqonchilik (fermalar),
+	/// g'arb — bog'lar va uylar, 1-halqa mahallalari — uylar. Binolar orasida yo'llar qoladi. Qo'shilgan binolar soni.
+	/// </summary>
+	private int FillEmptyLand()
+	{
+		int placed = 0;
+		foreach (var p in _state.Land.Parcels)
+		{
+			if (p.State != AndijonSaltanatlar.LandExpansion.LandParcelState.Open) continue;
+			placed += FillParcel(p.GridBounds, ZonePlan(p), new Random(p.Id * 7919));
+		}
+		_state.Land.RefreshStates(_state.Population);
+		return placed;
+	}
+
+	private static BuildingType[] ZonePlan(AndijonSaltanatlar.LandExpansion.LandParcel p)
+	{
+		var side = p.Side;
+		if (side == AndijonSaltanatlar.LandExpansion.LandSide.East)
+			return new[] { BuildingType.Market, BuildingType.Caravanserai, BuildingType.Market, BuildingType.Garden };
+		if (p.Ring >= 2 && side == AndijonSaltanatlar.LandExpansion.LandSide.North)
+			return new[] { BuildingType.GladiatorArena, BuildingType.Barracks, BuildingType.Tower, BuildingType.Barracks, BuildingType.Tower, BuildingType.Barracks };
+		if (p.Ring >= 2 && side == AndijonSaltanatlar.LandExpansion.LandSide.South)
+			return new[] { BuildingType.Farm, BuildingType.Farm, BuildingType.Garden, BuildingType.House };
+		if (p.Ring >= 2 && side == AndijonSaltanatlar.LandExpansion.LandSide.West)
+			return new[] { BuildingType.Garden, BuildingType.House, BuildingType.House, BuildingType.Madrasa, BuildingType.House };
+		return new[] { BuildingType.House, BuildingType.House, BuildingType.House, BuildingType.Garden };
+	}
+
+	private int FillParcel(Rectangle r, BuildingType[] plan, Random rnd)
+	{
+		int placed = 0, idx = 0;
+		var once = new HashSet<BuildingType>();
+		for (int y = r.Y + 1; y < r.Bottom - 1; y++)
+			for (int x = r.X + 1; x < r.Right - 1; x++)
+			{
+				for (int k = 0; k < plan.Length; k++)
+				{
+					BuildingType t = plan[(idx + k) % plan.Length];
+					if (Array.IndexOf(OnceTypes, t) >= 0 && once.Contains(t)) continue;
+					int size = SizeOf(t);
+					if (x + size + 1 > r.Right || y + size + 1 > r.Bottom) continue;
+					// atrofida bir katak bo'sh joy (yo'l) qoladi
+					if (!_buildings.CanPlace(new Point(x - 1, y - 1), size + 2)) continue;
+					Building b = BuildingFactory.Create(t, new Point(x, y), t == BuildingType.House ? rnd.Next(4) : 0);
+					b.BuiltByPlayer = true;
+					if (!_buildings.Add(b)) continue;
+					while (BuildingUpgradeSystem.CanUpgrade(b)) b.Upgrade();
+					PaveAround(b);
+					if (Array.IndexOf(OnceTypes, t) >= 0) once.Add(t);
+					idx = (idx + k + 1) % plan.Length;
+					placed++;
+					break;
+				}
+			}
+		return placed;
+	}
+
+	/// <summary>Bino atrofidagi bo'sh kataklar — yo'l.</summary>
+	private void PaveAround(Building b)
+	{
+		int s = b.Size.X;
+		for (int y = b.Position.Y - 1; y <= b.Position.Y + s; y++)
+			for (int x = b.Position.X - 1; x <= b.Position.X + s; x++)
+			{
+				bool edge = x == b.Position.X - 1 || y == b.Position.Y - 1 || x == b.Position.X + s || y == b.Position.Y + s;
+				if (!edge || !_map.InBounds(x, y) || _map.GetOccupant(x, y) != null || !_map.IsBuildableTerrain(x, y)) continue;
+				_map.SetTile(x, y, TileType.Road);
+			}
+	}
+
+	/// <summary>
+	/// Barcha jangchilar (soqchi, nayzachi, qilichboz, patrul) — xos navkar; o'yinchi qurgan kazarma, minora va arena
+	/// oldida xos navkar qorovullar turadi. Xos navkarlar soni.
+	/// </summary>
+	private int ApplyEliteArmy()
+	{
+		foreach (Unit u in _units.Units.ToList())
+		{
+			if (u.Team != UnitTeam.Player || u is CitizenUnit || u is ShahUnit || u is GladiatorUnit || u is RaiderUnit) continue;
+			_units.MakeElite(u);
+		}
+		foreach (Building b in _buildings.Buildings.ToList())
+		{
+			if (!b.BuiltByPlayer || _garrisoned.Contains(b.Id)) continue;
+			int n = b.Type == BuildingType.Barracks || b.Type == BuildingType.GladiatorArena ? 2 : 0;
+			if (n == 0) continue;
+			_garrisoned.Add(b.Id);
+			int s = b.Size.X;
+			for (int i = 0; i < n; i++)
+			{
+				var pos = new Vector2(b.Position.X + s + 0.45f, b.Position.Y + 0.5f + i * Math.Max(1f, (s - 1f) / Math.Max(1, n - 1)));
+				var g = _units.Add(new GuardUnit(pos, Direction.East));
+				_units.MakeElite(g);
+			}
+		}
+		return _units.Units.Count(u => u.IsElite);
+	}
+
+	/// <summary>
+	/// "To'liq kuchaytirish" (faqat shahar, onlayn qo'shin va urushga tegmaydi): barcha binolar oxirgi darajada va
+	/// to'liq qurilgan, barcha texnologiyalar o'rganilgan, sotib olinadigan barcha yer halqalari ochiq, xazina va ombor to'la.
+	/// Boshqa saltanatlarga tegishli yerlar (faqat urush bilan olinadi) o'zgarmaydi. Natija darhol serverga saqlanadi.
+	/// </summary>
+	private void ApplyFullUpgrade()
+	{
+		int levels = 0;
+		foreach (Building b in _buildings.Buildings)
+		{
+			if (b.BuildProgress < 1f) b.BuildProgress = 1f;
+			while (BuildingUpgradeSystem.CanUpgrade(b)) { b.Upgrade(); levels++; }
+			b.HitPoints = b.MaxHitPoints;
+		}
+		var civ = _state.Civ.Player;
+		int techs = 0;
+		foreach (var t in AndijonSaltanatlar.Technology.TechnologyCatalog.All)
+			if (civ.Researched.Add(t.Id)) techs++;
+		civ.CurrentResearch = "";
+		civ.CurrentProgress = 0;
+		// Butun yer (barcha halqalar, chegaradagi yerlar ham) ochiq va bo'sh joylar to'ldiriladi
+		_state.Land.ApplyOpen(_state.Land.Parcels.Select(p => p.Id).ToList());
+		int built = FillEmptyLand();
+		// Barcha jangchilar — xos navkar, harbiy binolarda qorovullar
+		_eliteArmy = true;
+		int elite = ApplyEliteArmy();
+		_state.Coins = Math.Max(_state.Coins, 50000);
+		_state.Food = Math.Max(_state.Food, 20000);
+		// Dehqonchilik ombori to'la: urug', eng yaxshi asboblar, tozalangan ariqlar
+		_state.Farming.Seeds = Math.Max(_state.Farming.Seeds, 500);
+		_state.Farming.ToolsLevel = AndijonSaltanatlar.Economy.FarmingManager.MaxToolsLevel;
+		_state.Farming.Irrigation = true;
+		// Aholi: har uy sig'imigacha to'la, xursand
+		int people = _state.FillPopulation(_buildings);
+		_state.Land.RefreshStates(_state.Population);
+		_governor?.Analyze();
+		_state.ShowMessage("To'liq kuchaytirildi: +" + built + " bino, " + elite + " xos navkar, aholi " + _state.Population);
+		UploadNow(showMessage: false);
+	}
+
+	private float _comfortTalkTimer = 6f;
+	private readonly Random _comfortRng = new Random();
+	private static readonly string[] ColdLines = { "Brr... sovuq!", "Qo'llarim muzlab qoldi", "Uyga kirib isinay", "Sandal yoqish kerak", "Qor yog'yapti!" };
+	private static readonly string[] VeryColdLines = { "Brrr! Juda sovuq!", "Muzlab qolyapman!", "Tezroq olovga!" };
+	private static readonly string[] HotLines = { "Juda issiq!", "Soya qayerda?", "Bir piyola choy ichsam", "Hovuzga borsam..." };
+	private static readonly string[] NiceLines = { "Ajoyib havo!", "Bahor keldi!", "Yomg'irdan keyin havo toza", "Barglar to'kilyapti..." };
+
+	/// <summary>Vaqti-vaqti bilan fuqarolardan biri havo haqida gapiradi (sovuq/issiq/qulay).</summary>
+	private void UpdateComfortTalk(float dt)
+	{
+		_comfortTalkTimer -= dt;
+		if (_comfortTalkTimer > 0f || _units == null) return;
+		_comfortTalkTimer = 7f + (float)_comfortRng.NextDouble() * 6f;
+		var list = _units.Units.OfType<CitizenUnit>().Where(c => !c.IsDown && !c.IsInsideBuilding && string.IsNullOrEmpty(c.SpeechText)).ToList();
+		if (list.Count == 0) return;
+		string[] lines = SeasonVisuals.CurrentComfort switch
+		{
+			Comfort.JudaSovuq => VeryColdLines,
+			Comfort.Sovuq => ColdLines,
+			Comfort.Issiq => HotLines,
+			_ => NiceLines,
+		};
+		if (lines == NiceLines && _comfortRng.NextDouble() < 0.6) return; // qulay havoda kamroq gapiradi
+		list[_comfortRng.Next(list.Count)].Say(lines[_comfortRng.Next(lines.Length)], 3.5f);
+	}
+
 	/// <summary>O'yin holatini serverga yuboradi (fonda). Zaxira nusxa qurilmada ham qoladi.</summary>
 	private void UploadNow(bool showMessage)
 	{
@@ -935,6 +1147,7 @@ public sealed class Game1 : Game
 			_menuMode = false;
 			_frames = 0;
 			_autosaveTimer = 0f;
+			if (_opt.FullUpgrade && !_fullUpgradeDone) { _fullUpgradeDone = true; ApplyFullUpgrade(); }
 			ConnectOnlineWorld();
 			if (_opt.OnlineTab != null) { _onlinePanel.ShowTab(_opt.OnlineTab); _onlinePanel.Open(); }
 			if (_opt.UnlockParcelAfterLogin.HasValue) RunUnlockParcelTest(_opt.UnlockParcelAfterLogin.Value);
@@ -1037,6 +1250,17 @@ public sealed class Game1 : Game
 				}
 			}
 		}
+		// Ko'chirilgan yaratilgan binolar — o'yinchi binolaridan OLDIN (bo'shagan joyga o'yinchi qurgan bo'lishi mumkin)
+		if (saveGameData.MovedBuildings != null)
+		{
+			foreach (int[] mv in saveGameData.MovedBuildings)
+			{
+				if (mv == null || mv.Length < 4) continue;
+				Building gb = _buildings.Buildings.FirstOrDefault(b => !b.BuiltByPlayer && b.GeneratedOrigin == null && b.Position.X == mv[0] && b.Position.Y == mv[1]);
+				if (gb == null) continue;
+				if (_buildings.Move(gb, new Point(mv[2], mv[3]), strictTerrain: false)) gb.GeneratedOrigin = new Point(mv[0], mv[1]);
+			}
+		}
 		foreach (SavedBuilding playerBuilding in saveGameData.PlayerBuildings)
 		{
 			BuildingType type = (BuildingType)playerBuilding.Type;
@@ -1044,13 +1268,11 @@ public sealed class Game1 : Game
 			building.BuiltByPlayer = true;
 			if (_buildings.Add(building))
 			{
+				// Daraja Upgrade() orqali tiklanadi — mustahkamlik va sig'im ham darajaga mos bo'ladi
+				while (building.Level < Math.Min(playerBuilding.Level, BuildingUpgradeSystem.MaxLevel)) building.Upgrade();
 				if (playerBuilding.HitPoints > 0)
 				{
-					building.HitPoints = playerBuilding.HitPoints;
-				}
-				if (playerBuilding.Level > 1)
-				{
-					building.Level = playerBuilding.Level;
+					building.HitPoints = Math.Min(playerBuilding.HitPoints, building.MaxHitPoints);
 				}
 				if (building is Farm farm)
 				{
@@ -1058,6 +1280,22 @@ public sealed class Game1 : Game
 				}
 			}
 		}
+		if (saveGameData.BuildingLevels != null)
+		{
+			foreach (int[] lv in saveGameData.BuildingLevels)
+			{
+				if (lv == null || lv.Length < 3) continue;
+				Building gb = _buildings.Buildings.FirstOrDefault(b => !b.BuiltByPlayer && b.Position.X == lv[0] && b.Position.Y == lv[1]);
+				if (gb == null) continue;
+				while (gb.Level < Math.Min(lv[2], BuildingUpgradeSystem.MaxLevel)) gb.Upgrade();
+			}
+		}
+		_eliteArmy = saveGameData.EliteArmy;
+		if (_eliteArmy) ApplyEliteArmy();
+		if (saveGameData.FarmSeeds >= 0) _state.Farming.Seeds = saveGameData.FarmSeeds;
+		_state.Farming.ToolsLevel = saveGameData.FarmTools;
+		_state.Farming.FertilizerCharges = saveGameData.FarmFertilizer;
+		_state.Farming.Irrigation = saveGameData.FarmIrrigation;
 		_state.Land.RefreshStates(_state.Population);
 		_camera.Jump(new Vector2(saveGameData.CameraX, saveGameData.CameraY), saveGameData.Zoom);
 		_governor?.Analyze();
@@ -1068,6 +1306,17 @@ public sealed class Game1 : Game
 	{
 		_perf?.BeginFrame();
 		_perf?.BeginUpdate();
+		if (TimePrefs.Dirty && _state != null)
+		{
+			_state.Clock.SetDayLength(TimePrefs.Current.DayMinutes * 60f);
+			TimePrefs.Dirty = false;
+		}
+		if (_state != null)
+		{
+			float vf = TimePrefs.VisualFraction(_state.Clock.DayFraction);
+			SeasonVisuals.CurrentComfort = SeasonVisuals.ComfortOf(TimePrefs.VisualSeason(_state.Season), _state.Weather.Current, vf);
+			UpdateComfortTalk((float)gameTime.ElapsedGameTime.TotalSeconds);
+		}
 		if (_exitRequested)
 		{
 			_perf?.EndUpdate();
@@ -1090,7 +1339,7 @@ public sealed class Game1 : Game
 			_onlinePanel.Update(_input, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height, num);
 			_units.Update(num * 0.6f);
 			_map.Update(num);
-			_dayNight.Update(_state.Clock.DayFraction);
+			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction));
 			_time += num;
 			_frames++;
 			if (_opt.ScreenshotPath != null && !_opt.ScreenshotAfterLogin && _frames >= (_opt.ScreenshotFrames ?? 6))
@@ -1133,7 +1382,7 @@ public sealed class Game1 : Game
 			_units.Update(num * 0.6f);
 			_birds?.Update(num * 0.6f, _dayNight.NightAmount, null);
 			_map.Update(num);
-			_dayNight.Update(_state.Clock.DayFraction);
+			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction));
 			_frames++;
 			if (_opt.ScreenshotPath != null && _frames >= (_opt.ScreenshotFrames ?? 6))
 			{
@@ -1155,6 +1404,11 @@ public sealed class Game1 : Game
 		if (onlineOpen)
 		{
 			// O'yin dunyosi orqada yashashda davom etadi (pastdagi simulyatsiya), lekin bosishlar panelga tegishli.
+		}
+		else if (_arena.Active)
+		{
+			// Jang maydoni: tugmalar sahnaning o'zida (UiKit, Draw paytida) — bu yerda faqat Esc
+			if (_input.KeyPressed(Keys.Escape)) _arena.Close();
 		}
 		else if (_strategicMode)
 		{
@@ -1224,6 +1478,16 @@ public sealed class Game1 : Game
 			{
 				_ui.OpenCivRequested = false;
 				_civMode = true;
+			}
+			if (_ui.OpenWorldRequested)
+			{
+				_ui.OpenWorldRequested = false;
+				_strategicMode = true;
+			}
+			if (_ui.OpenArenaRequested)
+			{
+				_ui.OpenArenaRequested = false;
+				_arena.Start();
 			}
 			bool possessing = _combat.Possessed != null;
 			_camera.KeyboardPanEnabled = !possessing;
@@ -1343,6 +1607,7 @@ public sealed class Game1 : Game
 			}
 		}
 		_units.Update(dt * (_combat?.TimeScale ?? 1f));
+		_farmWork.Update(dt, _map, _buildings, _units, _state);
 		_birds?.Update(dt, _dayNight.NightAmount, _combat.Possessed);
 		_citizenSocial.Update(_units, dt);
 		UpdateFarmControl();
@@ -1356,7 +1621,7 @@ public sealed class Game1 : Game
 			_governor?.OnDayTick();
 		}
 		_time += num;
-		_dayNight.Update(_state.Clock.DayFraction);
+		_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction));
 		_ui.PhaseName = _dayNight.PhaseName;
 		// Avtomatik saqlash: har 30 soniyada va yer ochilganda darhol (o'yin doim serverda).
 		if (CloudSignedIn)
@@ -1472,6 +1737,11 @@ public sealed class Game1 : Game
 			{
 				if (farm.CropStage == FarmCropStage.Empty)
 				{
+					if (!_state.Farming.TryConsumeSeed())
+					{
+						_state.ShowMessage("Urug' yo'q. FERMERLIK bo'limida urug' sotib oling.", true);
+						return;
+					}
 					farm.PlantCrop();
 					_state.ShowMessage("Dehqon urug' sepdi. Hosil 3 o'yin kunida yetiladi.");
 				}
@@ -1622,6 +1892,10 @@ public sealed class Game1 : Game
 			{
 				_ui.ClosePetition();
 			}
+			else if (_ui.TimePanelOpen)
+			{
+				_ui.ToggleTimePanel();
+			}
 			else if (_ui.CloseOpenPanel())
 			{
 			}
@@ -1629,7 +1903,7 @@ public sealed class Game1 : Game
 			{
 				_state.ShowHelp = false;
 			}
-			else if (_state.Mode == GameMode.BuildMode)
+			else if (_state.Mode != GameMode.Playing)
 			{
 				_state.CancelBuild();
 			}
@@ -1653,6 +1927,8 @@ public sealed class Game1 : Game
 		if (_input.KeyPressed(Keys.G))
 		{
 			GraphicsQualityManager.Cycle();
+			TimePrefs.Current.Quality = (int)GraphicsQualityManager.Current;
+			TimePrefs.Save();
 			_state.ShowMessage("Grafika sifati: " + GraphicsQualityManager.Name());
 		}
 		if (_input.KeyPressed(Keys.Space))
@@ -1710,6 +1986,8 @@ public sealed class Game1 : Game
 			return;
 		}
 		_perf?.BeginDraw();
+		SeasonVisuals.Current = TimePrefs.VisualSeason(_state.Season);
+		SeasonVisuals.Weather = _state.Weather.Current;
 		bool flag = _captureNextDraw && _opt.ScreenshotPath != null;
 		RenderTarget2D renderTarget2D = null;
 		if (flag)
@@ -1717,7 +1995,15 @@ public sealed class Game1 : Game
 			renderTarget2D = new RenderTarget2D(GraphicsDevice, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
 			GraphicsDevice.SetRenderTarget(renderTarget2D);
 		}
-		if (_strategicMode)
+		if (_arena.Active)
+		{
+			GraphicsDevice.Clear(new Color(18, 20, 28));
+			Viewport vpA = GraphicsDevice.Viewport;
+			_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+			_arena.Draw(_uiKit, _sb, _input, vpA.Width, vpA.Height, _time);
+			_sb.End();
+		}
+		else if (_strategicMode)
 		{
 			DrawStrategic();
 		}
@@ -2015,6 +2301,7 @@ public sealed class Game1 : Game
 		Viewport viewport = GraphicsDevice.Viewport;
 		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
 		EnvironmentRenderer.Draw(_sb, _assets.Pixel, _state.Weather.Current, viewport.Width, viewport.Height, _time);
+		SeasonVisuals.DrawParticles(_sb, _assets.Pixel, viewport.Width, viewport.Height, _time, GraphicsQualityManager.ParticleCount, _dayNight.NightAmount);
 		_sb.End();
 	}
 }

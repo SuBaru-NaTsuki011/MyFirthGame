@@ -294,6 +294,26 @@ namespace AndijonSaltanatlar.Units
             HitPoints = hp;
         }
 
+        /// <summary>Xos navkar (VIP) — eng kuchli jangchi.</summary>
+        public bool IsElite { get; private set; }
+
+        /// <summary>Jangchini xos navkarga aylantiradi: oltin sovutli ko'rinish, eng yuqori kuch va mustahkamlik.</summary>
+        public void MakeElite(Texture2D[] frames, Texture2D[] attackFrames)
+        {
+            if (frames == null || frames.Length == 0 || frames[0] == null) return;
+            SpriteKey = SpriteKeys.UnitElite;
+            SetFrames(frames);
+            AttackFrames = attackFrames;
+            Name = "Xos navkar";
+            Description = "Saltanatning eng kuchli, oltin sovutli xos navkari.";
+            Attack = Math.Max(Attack, 32);
+            float hp = MaxHitPoints > 0 ? HitPoints / (float)MaxHitPoints : 1f;
+            MaxHitPoints = Math.Max(MaxHitPoints, 360);
+            HitPoints = Math.Max(1, (int)(MaxHitPoints * Math.Max(hp, 0.05f)));
+            if (HitPoints <= 0) HitPoints = MaxHitPoints;
+            IsElite = true;
+        }
+
         public void SetFrames(Texture2D[] frames)
         {
             Frames = frames;

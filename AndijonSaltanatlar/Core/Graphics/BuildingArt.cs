@@ -16,9 +16,13 @@ namespace AndijonSaltanatlar.Core.Graphics
         // =====================================================================
         //  UY (2x2) — hovlili loy-g'isht uy, 4 xil ko'rinish
         // =====================================================================
-        public static Canvas House(int v)
+        /// <summary>
+        /// Uy. Daraja ko'rinishi: 2 — koshin belbog', ko'k bo'yalgan ayvon ustunlari, oltin hoshiya, gul tuvaklar;
+        /// 3 — bularning ustiga ikkinchi qavat (bolaxona), feruza qirrali gumbaz, bayroq va koshinli darvoza peshtoqi.
+        /// </summary>
+        public static Canvas House(int v, int level = 1)
         {
-            var ic = new IsoCanvas(2, 56);
+            var ic = new IsoCanvas(2, level >= 3 ? 78 : 56);
             Color wall = v switch { 0 => Pal.Mud, 1 => Pal.BrickPale, 2 => Pal.Plaster, _ => Pal.MudDark };
             Color roof = Canvas.Shade(wall, 0.92f);
             float mh = v == 1 ? 32 : (v == 3 ? 26 : 29);
@@ -38,15 +42,35 @@ namespace AndijonSaltanatlar.Core.Graphics
             ic.Arch(true, 1.25f, 1.0f, 0.09f, mh - 17, mh - 7, Pal.Door);
             ic.Arch(true, 1.58f, 1.0f, 0.09f, mh - 17, mh - 7, Pal.Door);
             ic.QuadSE(1.8f, 0.45f, 0.75f, mh - 16, mh - 8, Canvas.Shade(Pal.Door, 0.9f));
+            if (level >= 2)
+            {
+                // feruza koshin belbog' va oltin hoshiya
+                ic.QuadSW(0.2f, 1.8f, 1.0f, mh - 5, mh - 2, Pal.Turquoise);
+                ic.QuadSE(1.8f, 0.2f, 1.0f, mh - 5, mh - 2, Canvas.Shade(Pal.Turquoise, 0.74f));
+                ic.QuadSW(0.2f, 1.8f, 1.0f, mh - 2, mh - 1, Pal.Gold);
+            }
 
-            if (v == 1 || v == 2)
+            if (v == 1 || v == 2 || level >= 3)
             {
                 // bolaxona (ikkinchi qavat)
                 ic.Box(0.2f, 0.2f, 1.0f, 0.9f, mh, mh + 15, wall, 7, roof);
                 ic.Parapet(0.2f, 0.2f, 1.0f, 0.9f, mh + 15, roof, 0.07f);
-                ic.Arch(true, 0.6f, 0.9f, 0.1f, mh + 3, mh + 12, Pal.Door);
+                if (level >= 3)
+                {
+                    ic.FramedArch(true, 0.6f, 0.9f, 0.13f, mh + 2, mh + 13, Pal.Blue, Pal.Door);
+                    ic.QuadSW(0.2f, 1.0f, 0.9f, mh + 13, mh + 15, Pal.Gold);
+                    ic.Pole(0.45f, 0.5f, mh + 15, mh + 29, Pal.Wood, 1);
+                    ic.Flag(0.45f, 0.5f, mh + 29, Pal.Red, 10, 7);
+                }
+                else ic.Arch(true, 0.6f, 0.9f, 0.1f, mh + 3, mh + 12, Pal.Door);
             }
-            if (v == 3)
+            if (level >= 3)
+            {
+                // feruza qirrali gumbaz (oltin uchli)
+                ic.Cylinder(1.4f, 0.6f, mh, mh + 4, 10, Pal.Plaster);
+                ic.Dome(1.4f, 0.6f, mh + 4, 10, 12, Pal.Turquoise, 6, true);
+            }
+            else if (v == 3)
             {
                 // kichik gumbazcha
                 ic.Dome(1.3f, 0.6f, mh, 12, 11, Pal.BrickPale, 0, false);
@@ -59,20 +83,38 @@ namespace AndijonSaltanatlar.Core.Graphics
             ic.QuadSW(0.47f, 0.69f, 1.8f, 15, 17, Pal.Wood);
             ic.QuadSE(0.95f, 1.25f, 1.5f, 8, 15, Canvas.Shade(Pal.Door, 0.9f));
 
-            // ayvon: yog'och ustunlar va tom
-            ic.Pole(1.1f, 1.38f, 0, 19, Pal.Wood);
-            ic.Pole(1.72f, 1.38f, 0, 19, Pal.Wood);
+            // ayvon: yog'och ustunlar va tom (yuqori darajada — o'ymakor, ko'k bo'yalgan, oltin hoshiyali)
+            Color post = level >= 2 ? Pal.Blue : Pal.Wood;
+            ic.Pole(1.1f, 1.38f, 0, 19, post);
+            ic.Pole(1.72f, 1.38f, 0, 19, post);
             ic.Box(1.0f, 1.0f, 1.8f, 1.42f, 19, 22, Pal.Wood, 0, Canvas.Shade(roof, 0.95f));
+            if (level >= 2) ic.QuadSW(1.0f, 1.8f, 1.42f, 19, 20, Pal.Gold);
 
             // hovlidagi daraxt
             Vector2 t = ic.P(1.42f, 1.62f, 0);
             DecorArt.DrawTree(ic.C, t.X, t.Y, v % 2 == 0 ? 2 : 1, 0.55f);
+            if (level >= 2)
+            {
+                // gul tuvaklar
+                ic.Box(1.12f, 1.62f, 1.22f, 1.72f, 0, 4, Pal.Red);
+                ic.Box(1.64f, 1.58f, 1.74f, 1.68f, 0, 4, Pal.Red);
+                ic.Box(1.13f, 1.63f, 1.21f, 1.71f, 4, 6, Pal.LeafLight);
+                ic.Box(1.65f, 1.59f, 1.73f, 1.67f, 4, 6, Pal.LeafLight);
+            }
 
             // old hovli devori va darvozacha
             ic.Box(1.8f, 0.2f, 1.92f, 1.8f, 0, 10, wall);
             ic.Box(0.95f, 1.8f, 1.3f, 1.92f, 0, 10, wall);
             ic.Box(1.55f, 1.8f, 1.92f, 1.92f, 0, 10, wall);
             ic.QuadSW(1.3f, 1.55f, 1.86f, 0, 9, Pal.Wood);
+            if (level >= 3)
+            {
+                // koshinli darvoza peshtoqi
+                ic.Box(1.24f, 1.8f, 1.31f, 1.92f, 0, 15, Pal.Plaster, 0, Pal.Turquoise);
+                ic.Box(1.54f, 1.8f, 1.61f, 1.92f, 0, 15, Pal.Plaster, 0, Pal.Turquoise);
+                ic.Box(1.24f, 1.8f, 1.61f, 1.92f, 12, 16, Pal.Plaster, 0, Pal.Turquoise);
+                ic.QuadSW(1.27f, 1.58f, 1.92f, 13, 15, Pal.Blue);
+            }
 
             ic.C.Outline(Outline);
             return ic.C;
@@ -81,7 +123,8 @@ namespace AndijonSaltanatlar.Core.Graphics
         // =====================================================================
         //  QO'RIQLASH MINORASI (2x2)
         // =====================================================================
-        public static Canvas Tower()
+        /// <summary>Qal'a minorasi. Daraja: 2 — ikkinchi koshin belbog'; 3 — oltin gumbaz va katta bayroq.</summary>
+        public static Canvas Tower(int level = 1)
         {
             var ic = new IsoCanvas(2, 104);
             Color w = Pal.Brick;
@@ -96,6 +139,12 @@ namespace AndijonSaltanatlar.Core.Graphics
             // feruza koshin belbog'
             ic.QuadSW(0.2f, 1.8f, 1.8f, 53, 57, Pal.Turquoise);
             ic.QuadSE(1.8f, 0.2f, 1.8f, 53, 57, Canvas.Shade(Pal.Turquoise, 0.74f));
+            if (level >= 2)
+            {
+                ic.QuadSW(0.2f, 1.8f, 1.8f, 32, 35, Pal.Turquoise);
+                ic.QuadSE(1.8f, 0.2f, 1.8f, 32, 35, Canvas.Shade(Pal.Turquoise, 0.74f));
+                ic.QuadSW(0.2f, 1.8f, 1.8f, 57, 58, Pal.Gold);
+            }
             // kengaygan maydoncha
             ic.Box(0.08f, 0.08f, 1.92f, 1.92f, 60, 68, w, 4, Pal.BrickPale);
 
@@ -109,9 +158,9 @@ namespace AndijonSaltanatlar.Core.Graphics
                     if (edge && mx + my < 1.7f) ic.Merlon(mx, my, s, 68, 77, w);
                 }
             ic.Cylinder(1f, 1f, 68, 74, 13, Pal.Plaster);
-            ic.Dome(1f, 1f, 74, 13, 14, Pal.Turquoise, 8);
+            ic.Dome(1f, 1f, 74, 13, 14, level >= 3 ? Pal.Gold : Pal.Turquoise, 8);
             ic.Pole(1f, 1f, 90, 102, Pal.Wood, 1);
-            ic.Flag(1f, 1f, 102, Pal.Red);
+            if (level >= 3) ic.Flag(1f, 1f, 102, Pal.Red, 16, 10); else ic.Flag(1f, 1f, 102, Pal.Red);
             foreach (float mx in a)
                 foreach (float my in a)
                 {
@@ -126,13 +175,15 @@ namespace AndijonSaltanatlar.Core.Graphics
         // =====================================================================
         //  DEVOR BO'LAGI (1x1) — istalgan yo'nalishda ulanadi
         // =====================================================================
-        public static Canvas Wall()
+        /// <summary>Devor bo'lagi. Daraja: 2 — feruza koshin belbog'; 3 — oltin hoshiya ham.</summary>
+        public static Canvas Wall(int level = 1)
         {
             var ic = new IsoCanvas(1, 42);
             Color w = Pal.Brick;
             ic.Box(0, 0, 1, 1, 0, 30, w, 5, Pal.BrickPale);
-            ic.QuadSW(0, 1, 1, 24, 26, Canvas.Shade(w, 0.74f));
-            ic.QuadSE(1, 0, 1, 24, 26, Canvas.Shade(w, 0.56f));
+            ic.QuadSW(0, 1, 1, 24, 26, level >= 2 ? Pal.Turquoise : Canvas.Shade(w, 0.74f));
+            ic.QuadSE(1, 0, 1, 24, 26, level >= 2 ? Canvas.Shade(Pal.Turquoise, 0.74f) : Canvas.Shade(w, 0.56f));
+            if (level >= 3) ic.QuadSW(0, 1, 1, 26, 27, Pal.Gold);
             const float s = 0.3f;
             ic.Merlon(0, 0, s, 30, 38, w);
             ic.Merlon(1 - s, 0, s, 30, 38, w);
@@ -147,13 +198,19 @@ namespace AndijonSaltanatlar.Core.Graphics
         //  Boshqa yo'nalish uchun sprite gorizontal aylantiriladi.
         //  O'rtasi shaffof: jangchi ravoq ostidan o'tayotgani ko'rinadi.
         // =====================================================================
-        public static Canvas Gate()
+        /// <summary>Darvoza. Daraja: 2 — koshinli ustunlar; 3 — tepasida feruza gumbazcha.</summary>
+        public static Canvas Gate(int level = 1)
         {
-            var ic = new IsoCanvas(1, 66);
+            var ic = new IsoCanvas(1, level >= 3 ? 82 : 66);
             Color w = Pal.BrickPale;
             // ustunlar
             ic.Box(0f, 0f, 0.16f, 1f, 0, 40, w, 5);
             ic.Box(0.84f, 0f, 1f, 1f, 0, 40, w, 5);
+            if (level >= 2)
+            {
+                ic.QuadSW(0.03f, 0.13f, 1f, 6, 36, Pal.Turquoise);
+                ic.QuadSW(0.87f, 0.97f, 1f, 6, 36, Pal.Turquoise);
+            }
             // ravoq burchaklari
             ic.C.FillPolygon(Canvas.Shade(w, 0.93f), 0.04f, ic.P(0.16f, 1, 40), ic.P(0.16f, 1, 24), ic.P(0.3f, 1, 34), ic.P(0.5f, 1, 40));
             ic.C.FillPolygon(Canvas.Shade(w, 0.93f), 0.04f, ic.P(0.84f, 1, 40), ic.P(0.84f, 1, 24), ic.P(0.7f, 1, 34), ic.P(0.5f, 1, 40));
@@ -167,6 +224,7 @@ namespace AndijonSaltanatlar.Core.Graphics
             ic.Merlon(1 - s, 0, s, 54, 62, w);
             ic.Merlon(0, 1 - s, s, 54, 62, w);
             ic.Merlon(1 - s, 1 - s, s, 54, 62, w);
+            if (level >= 3) ic.Dome(0.5f, 0.5f, 54, 8, 10, Pal.Turquoise, 4, true);
             ic.C.Outline(Outline, 0.45f);
             return ic.C;
         }
@@ -252,7 +310,8 @@ namespace AndijonSaltanatlar.Core.Graphics
         // =====================================================================
         //  SAROY / O'RDA (6x6) — markaziy boshqaruv binosi
         // =====================================================================
-        public static Canvas MainHall()
+        /// <summary>Shoh saroyi. 3-daraja — bosh gumbaz zarhal (oltin).</summary>
+        public static Canvas MainHall(int level = 1)
         {
             var ic = new IsoCanvas(6, 150);
             Color w = Pal.Plaster, pw = Pal.Brick;
@@ -288,7 +347,7 @@ namespace AndijonSaltanatlar.Core.Graphics
             ic.Cylinder(3f, 2.05f, 48, 66, 40, Pal.Plaster);
             ic.Band(3f, 2.05f, 54, 62, 40, Pal.Blue);
             ic.Band(3f, 2.05f, 57, 59, 40, Pal.Gold);
-            ic.Dome(3f, 2.05f, 66, 42, 56, Pal.Turquoise, 14);
+            ic.Dome(3f, 2.05f, 66, 42, 56, level >= 3 ? Pal.Gold : Pal.Turquoise, 14);
             ic.Pole(3f, 2.05f, 128, 142, Pal.Wood, 1);
             ic.Flag(3f, 2.05f, 142, new Color(40, 130, 80), 14, 9);
             // tom gumbazchalari (old)

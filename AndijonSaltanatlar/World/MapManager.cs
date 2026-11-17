@@ -164,7 +164,14 @@ namespace AndijonSaltanatlar.World
                     TileType t = _tiles[x, y];
                     int row = t == TileType.Water ? waterRow : (int)t;
                     var pos = new Vector2(wx + TileArt.DrawOffsetX, wy + TileArt.DrawOffsetY);
-                    sb.Draw(_atlas, pos, TileArt.Cell(row, _variant[x, y]), Color.White);
+                    sb.Draw(_atlas, pos, TileArt.Cell(row, _variant[x, y]), AndijonSaltanatlar.Environment.SeasonVisuals.TileTint(t));
+                    float snow = AndijonSaltanatlar.Environment.SeasonVisuals.TileSnow(t);
+                    if (snow > 0f)
+                    {
+                        // Qor: kataklar har xil oqlikda (tekis emas, tabiiy ko'rinadi)
+                        float k = 0.85f + 0.15f * ((_variant[x, y] * 37 + x * 13 + y * 7) % 10) / 10f;
+                        sb.Draw(_atlas, pos, TileArt.Cell(TileArt.RowOverlay, 0), new Color(244, 248, 255) * (snow * k));
+                    }
 
                     if (t == TileType.Water)
                     {
