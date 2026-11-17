@@ -174,7 +174,7 @@ namespace AndijonSaltanatlar.Dialogue
         {
             if (s.Profile.Merchant != null) return s.Profile.Merchant.Market.BuildingId;
             DistrictStats d = life.Districts.Get(s.Profile.DistrictId);
-            MarketState m = life.Economy.Merchants.Nearest(d != null ? d.CenterX : 32, d != null ? d.CenterY : 32);
+            MarketState m = life.Economy.Merchants.Nearest(d != null ? d.CenterX : GameConfig.CityCenter, d != null ? d.CenterY : GameConfig.CityCenter);
             return m != null ? m.BuildingId : 0;
         }
     }

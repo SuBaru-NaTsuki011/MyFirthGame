@@ -17,6 +17,9 @@ namespace AndijonSaltanatlar.UI
     /// </summary>
     public sealed class StoryOverlay
     {
+        /// <summary>O'ng paneldan qoldiriladigan joy (Game1 tanlov paneli ochiq bo'lsa o'rnatadi).</summary>
+        public int RightInset { get; set; }
+
         private static readonly Color PanelBg = new Color(26, 22, 16, 245);
         private static readonly Color Border = new Color(150, 116, 66);
         private static readonly Color Gold = new Color(235, 200, 120);
@@ -91,10 +94,11 @@ namespace AndijonSaltanatlar.UI
             var prog = Story.Quests.ProgressOf(q.QuestId);
             if (prog == null) return;
 
-            var box = new Rectangle(vw - 300, 92, 284, 70);
+            // O'ng tomonda tanlangan obyekt paneli ochiq bo'lsa, vazifa kartasi uning chap tomoniga suriladi (ustma-ust tushmaydi).
+            var box = new Rectangle(vw - 300 - RightInset, 92, 284, 70);
             Panel(sb, box, PanelBg, Border, 1);
             _font.Draw(sb, "JORIY VAZIFA", new Vector2(box.X + 10, box.Y + 8), Gold, 2, 1);
-            _font.Draw(sb, Fit(q.TitleUz, 34), new Vector2(box.X + 10, box.Y + 26), Cream, 2, 1);
+            _font.Draw(sb, Fit(q.TitleUz, (box.Width - 20) / 12), new Vector2(box.X + 10, box.Y + 26), Cream, 2, 1);
 
             if (q.Objectives.Count > 0)
             {

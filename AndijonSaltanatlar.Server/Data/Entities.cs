@@ -13,6 +13,25 @@ namespace AndijonSaltanatlar.Server.Data
         public DateTime? LastLoginAt { get; set; }
         public int? KingdomId { get; set; }
         public string PreferredLanguage { get; set; } = "uz";
+        /// <summary>Google hisobining doimiy identifikatori ("sub"). Kirish faqat Google orqali.</summary>
+        public string GoogleSub { get; set; }
+        /// <summary>Google'dagi ism (o'yinda ko'rsatiladi).</summary>
+        public string DisplayName { get; set; }
+    }
+
+    /// <summary>
+    /// O'yinchining shahar holati (bulutdagi saqlash). Har foydalanuvchida bitta qator — o'yin istalgan
+    /// qurilmada (Windows yoki Android) shu yerdan davom etadi. Json — client SaveGameData'si.
+    /// </summary>
+    public class CloudSaveEntity
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string Json { get; set; } = "";
+        /// <summary>Har saqlashda oshadi (eski qurilma yangi saqlash ustidan yozmasligi uchun).</summary>
+        public long Version { get; set; }
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public string Device { get; set; } = "";
     }
 
     public class World
@@ -24,6 +43,8 @@ namespace AndijonSaltanatlar.Server.Data
         public DateTime LastTickAt { get; set; } = DateTime.UtcNow;
         /// <summary>Dunyo o'yin vaqtining boshlanishi (server o'yin soati shundan hisoblanadi).</summary>
         public DateTime EpochUtc { get; set; } = DateTime.UtcNow;
+        /// <summary>Xarita versiyasi (UzMap.Version): eskirgan bo'lsa dunyo yangi xaritaga ko'chiriladi.</summary>
+        public int MapVersion { get; set; }
     }
 
     public class Kingdom
@@ -41,6 +62,8 @@ namespace AndijonSaltanatlar.Server.Data
         public long StateVersion { get; set; }
         public string AiStrategy { get; set; } = "balanced";
         public DateTime NextDecisionAt { get; set; } = DateTime.UtcNow;
+        /// <summary>Saltanat bayrog'i (FlagSpec matni). Bo'sh bo'lsa — rangi asosidagi standart bayroq.</summary>
+        public string Flag { get; set; } = "";
     }
 
     public class KingdomResource
@@ -121,6 +144,8 @@ namespace AndijonSaltanatlar.Server.Data
         public int WorldId { get; set; }
         public string Name { get; set; }
         public int OwnerKingdomId { get; set; }  // 0 = neytral
+        /// <summary>Viloyat kaliti (UzMap.Provinces: "an", "fg", "tv", ...).</summary>
+        public string Province { get; set; } = "";
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public int Development { get; set; } = 30;

@@ -3838,3 +3838,3677 @@ Ish yakunida:
 haqida aniq hisobot ber.
 
 **ANDIJON: SALTANATLAR — HAR BIR SHAHRI, HAR BIR MAHALLASI VA HAR BIR FUQAROSI RIVOJLANADIGAN TIRIK SALTANAT!**
+
+# PROMPT 23 — ANDIJON: SALTANATLAR
+## Advanced Agriculture, Production Chains, Historical Workshops, Supply & Demand, Caravan Logistics and Global Multiplayer Trade
+### C# + MonoGame + ASP.NET Core + PostgreSQL
+### Windows PC + Android — Persistent Shared World
+
+---
+
+# 1. SENING ROLING
+
+Sen quyidagi yo‘nalishlarda professional Senior Developer sifatida ishlaysan:
+
+- C# / MonoGame Game Development
+- Economic Simulation Engineering
+- Agriculture & Production Systems
+- Multiplayer Backend Architecture
+- Supply Chain & Logistics Simulation
+- Game AI Economy Design
+- Isometric Rendering & Animations
+- Game UI/UX Engineering
+- Database Transaction Engineering
+- QA & Performance Optimization
+
+Biz **ANDIJON: SALTANATLAR** nomli tarixiy sivilizatsiya va multiplayer city-builder o‘yinini yaratmoqdamiz.
+
+Texnologiyalar:
+
+- C#
+- MonoGame
+- .NET
+- VS Code
+- ASP.NET Core
+- PostgreSQL
+- Entity Framework Core
+- SignalR
+- JSON Data Definitions
+
+**BU PROMPT 23. MAVJUD LOYIHANI BOSHDAN YARATMA!**
+
+Oldingi 22 bosqichdagi tizimlarni tekshir.
+
+Ayniqsa:
+
+- FarmingSystem
+- CropGrowthSystem
+- EconomyManager
+- InventorySystem
+- WarehouseManager
+- Marketplace
+- TradeManager
+- CaravanManager
+- LogisticsManager
+- PopulationManager
+- CitizenAI
+- TechnologySystem
+- AI Governor
+- Multiplayer Server
+- Save/Load
+- UI Framework
+
+modullarining haqiqiy holatini aniqlagin.
+
+Ishlayotgan mexanikalarni buzma.
+
+---
+
+# 2. ASOSIY MAQSAD
+
+O‘yinda iqtisodiyot quyidagi zanjir orqali ishlashi kerak:
+
+**XOMASHYO → ISHLAB CHIQARISH → QAYTA ISHLASH → OMBOR → SAVDO → YETKAZIB BERISH → DAROMAD**
+
+Bunda o‘yinchi:
+
+1. Yer ochadi.
+2. Ekin maydoni quradi.
+3. Mahsulot yetishtiradi.
+4. Hosil yig‘adi.
+5. Xomashyoni omborga tashiydi.
+6. Qayta ishlash ustaxonasi quradi.
+7. Xomashyodan tayyor mahsulot yaratadi.
+8. Tayyor mahsulotni sotadi.
+9. Boshqa o‘yinchidan mahsulot sotib oladi.
+10. Savdo karvonlarini kuzatadi.
+11. Shaharlar iqtisodiyotini rivojlantiradi.
+12. Mahsulot narxlarini boshqaradi.
+13. Donishmand Vazirdan iqtisodiy maslahat oladi.
+
+**Eng muhim qoida: ishlab chiqarish, qayta ishlash va savdo haqiqiy resurslarga bog‘liq bo‘lsin.**
+
+---
+
+# 3. UNIFIED RESOURCE SYSTEM
+
+Mavjud resurs tizimini tekshir va kerak bo‘lsa kengaytir.
+
+Resurslar toifalari:
+
+### QISHLOQ XO‘JALIGI
+
+- Guruch
+- Bug‘doy
+- Paxta
+- Sabzavot
+- Meva
+
+### XOMASHYO
+
+- Yog‘och
+- Tosh
+- Temir rudasi
+- Jun
+- Loy
+
+### QAYTA ISHLANGAN MAHSULOT
+
+- Tozalangan guruch
+- Un
+- Mato
+- Yog‘och taxta
+- Temir buyumlar
+- Sopol buyumlar
+
+### TAYYOR MAHSULOT
+
+- Kiyim
+- Non
+- Hunarmandchilik mahsulotlari
+- Qurilish materiallari
+
+Har bir resurs uchun:
+
+- ResourceId
+- NameUz
+- Category
+- BasePrice
+- StorageRequirements
+- Tradable
+- ProductionSource
+- ConsumptionRules
+
+maydonlarini qo‘sh.
+
+Resurslar kodda chalkash string qiymatlari orqali emas, barqaror ID orqali boshqarilsin.
+
+---
+
+# 4. ADVANCED FARMING SYSTEM
+
+PROMPT 19A da yaratilgan guruch dehqonchiligini kengaytir.
+
+Ekinlar:
+
+- Guruch
+- Bug‘doy
+- Paxta
+- Sabzavot
+- Mevali daraxtlar
+
+Har bir ekinning alohida:
+
+- O‘sish vaqti
+- Suv talabi
+- Hosildorligi
+- Ishchi talabi
+- Faslga mosligi
+- Ombor talabi
+
+mavjud bo‘lsin.
+
+Guruchning o‘sishi mavjud IrrigationSystem bilan bog‘lansin.
+
+Barcha ekinlar bitta umumiy CropGrowthSystem orqali ishlasin.
+
+---
+
+# 5. PRODUCTION CHAIN — RICE
+
+**BIRINCHI TO‘LIQ ISHLAYDIGAN ZANJIR GURUCH BO‘LSIN.**
+
+### 1. Guruch yetishtirish
+
+O‘yinchi dalaga guruch ekadi.
+
+### 2. Hosil yig‘ish
+
+Guruch o‘yin vaqti bo‘yicha yetiladi.
+
+Dehqon hosilni yig‘adi.
+
+### 3. Omborga tashish
+
+Xom guruch omborga yetkaziladi.
+
+### 4. Qayta ishlash
+
+Guruchni tozalash ustaxonasida qayta ishlash mumkin.
+
+### 5. Tayyor mahsulot
+
+Tozalangan guruch olinadi.
+
+### 6. Savdo
+
+Tayyor mahsulot:
+
+- O‘z bozorida sotiladi.
+- Boshqa shaharga yuboriladi.
+- AI saltanatga sotiladi.
+- Boshqa haqiqiy o‘yinchiga sotiladi.
+
+### Muhim
+
+Qayta ishlashda mahsulot balansi saqlansin.
+
+Masalan, 100 birlik xom guruchdan qancha tayyor guruch chiqishi konfiguratsiyadan olinadi.
+
+Bu nisbatni qattiq kodlama.
+
+Ishlab chiqarish jarayonida xomashyo iste’mol qilinadi va natija faqat bir marta yaratiladi.
+
+---
+
+# 6. PRODUCTION CHAIN — WHEAT
+
+Bug‘doy uchun zanjir:
+
+**BUG‘DOY DALASI → HOSIL → OMBOR → TEGIRMON → UN → NOVVOYXONA → NON → BOZOR**
+
+Kerakli binolar:
+
+- Bug‘doy dalasi.
+- Ombor.
+- Tegirmon.
+- Novvoyxona.
+- Bozor.
+
+### Talablar
+
+Tegirmon bug‘doyni unga aylantirsin.
+
+Novvoyxona mavjud retsept asosida un va zarur resurslardan non ishlab chiqarsin.
+
+Non aholi iste’moli yoki savdo uchun ishlatilishi mumkin.
+
+Binolar ishchilar, ishlab chiqarish va mavjud resurs qoidalariga bog‘liq bo‘lsin.
+
+---
+
+# 7. PRODUCTION CHAIN — COTTON & TEXTILES
+
+Paxta ishlab chiqarishni qo‘sh.
+
+**PAXTA DALASI → PAXTA HOSILI → TOZALASH / TAYYORLASH → IP → TO‘QUV USTAXONASI → MATO → BOZOR**
+
+Keyinchalik:
+
+**MATO → TIKUV USTAXONASI → KIYIM**
+
+zanjirini qo‘sh.
+
+Har bir bosqich uchun:
+
+- Bino
+- Ishchi
+- Resurs
+- Ishlab chiqarish vaqti
+- Mahsulot miqdori
+- Xarajat
+
+mavjud bo‘lsin.
+
+Tarixiy muhitga mos ustaxona va hunarmandchilik texnologiyalaridan foydalan.
+
+---
+
+# 8. HISTORICAL WORKSHOPS
+
+O‘yinga quyidagi ishlab chiqarish binolarini qo‘sh yoki mavjudlarini kengaytir:
+
+| Bino | Vazifasi |
+|---|---|
+| Tegirmon | Bug‘doyni unga aylantirish |
+| Guruch tozalash ustaxonasi | Xom guruchni qayta ishlash |
+| To‘quv ustaxonasi | Ipdan mato tayyorlash |
+| Kulolchilik ustaxonasi | Loydan sopol buyumlar yaratish |
+| Temirchilik | Metall xomashyodan buyumlar tayyorlash |
+| Yog‘ochsozlik | Yog‘ochdan taxta va buyumlar tayyorlash |
+| Novvoyxona | Undan non ishlab chiqarish |
+| Tikuv ustaxonasi | Matodan kiyim tayyorlash |
+
+Binolar tarixiy-stilizatsiyalangan Asaka muhitiga mos bo‘lsin.
+
+Zamonaviy elektr zavodlari, avtomatlashtirilgan konveyerlar yoki avtomobil fabrikalarini qo‘shma.
+
+---
+
+# 9. PRODUCTION RECIPE ENGINE
+
+Barcha qayta ishlash jarayonlarini data-driven qil.
+
+Har bir retsept quyidagilarga ega bo‘lsin:
+
+```text
+RecipeId
+BuildingTypeId
+InputResources
+OutputResources
+ProductionDuration
+WorkerRequirement
+TechnologyRequirement
+OperatingCost
+```
+
+Misol:
+
+```json
+{
+  "recipeId": "rice_processing_basic",
+  "buildingTypeId": "rice_workshop",
+  "inputs": [
+    { "resourceId": "raw_rice", "amount": 10 }
+  ],
+  "outputs": [
+    { "resourceId": "processed_rice", "amount": 8 }
+  ],
+  "durationGameMinutes": 60,
+  "requiredWorkers": 2
+}
+```
+
+Bu misoldagi qiymatlar dastlabki balans namunasi.
+
+Haqiqiy qiymatlarni mavjud iqtisodiyot tizimiga moslashtir.
+
+Retseptlar JSON katalogdan yuklansin.
+
+---
+
+# 10. PRODUCTION JOB SYSTEM
+
+Har bir ustaxona ishlab chiqarish navbatiga ega bo‘lsin.
+
+Holatlar:
+
+- Idle
+- WaitingForResources
+- Ready
+- Producing
+- Paused
+- Completed
+- Failed
+
+O‘yinchi ishlab chiqarish buyurtmasi yaratadi.
+
+Masalan:
+
+**10 MARTA GURUCHNI QAYTA ISHLASH**
+
+Server quyidagilarni tekshiradi:
+
+1. Bino mavjudmi?
+2. Bino o‘yinchiga tegishlimi?
+3. Retsept ochilganmi?
+4. Ishchilar yetarlimi?
+5. Xomashyo bormi?
+6. Ishlab chiqarish uchun joy bormi?
+
+Shundan keyin buyurtma boshlansin.
+
+Jarayon tugaganda tayyor mahsulot haqiqiy inventoryga qo‘shilsin.
+
+---
+
+# 11. INVENTORY & RESOURCE RESERVATION
+
+Mahsulotlar bilan bog‘liq barcha hisob-kitoblarda yagona inventory tizimidan foydalan.
+
+Quyidagi holatlar hisobga olinsin:
+
+- AvailableStock
+- ReservedStock
+- InProduction
+- InTransit
+- StoredStock
+
+Bir resurs bir vaqtning o‘zida:
+
+- Ishlab chiqarishga sarflanishi.
+- Savdoga qo‘yilishi.
+- Boshqa shaharga yuborilishi.
+
+uchun takroran foydalanilmasin.
+
+Resurs rezervlari serverda tekshirilsin.
+
+Barcha muhim operatsiyalarda atomik tranzaksiyalar va idempotency ishlat.
+
+---
+
+# 12. ADVANCED WAREHOUSE SYSTEM
+
+Omborlar quyidagi funksiyalarga ega bo‘lsin:
+
+- Xomashyo saqlash.
+- Tayyor mahsulot saqlash.
+- Kiruvchi mahsulotni qabul qilish.
+- Chiquvchi mahsulotni ajratish.
+- Ishlab chiqarish uchun resurs rezervlash.
+- Savdo uchun mahsulot rezervlash.
+
+Har bir ombor:
+
+- WarehouseId
+- CityId
+- Capacity
+- Inventory
+- RoadConnection
+- ActiveDeliveries
+- Workers
+
+ma’lumotlariga ega bo‘lsin.
+
+Ombor sig‘imidan ortiq mahsulot qabul qilmasin.
+
+Ombor to‘lsa, yangi yetkazib berishlar tegishli holatda kutishi yoki boshqa manzilga yo‘naltirilishi mumkin bo‘lsin.
+
+---
+
+# 13. CARAVAN LOGISTICS SYSTEM
+
+PROMPT 18 va 19B dagi karvon tizimidan foydalan.
+
+Savdo va ishlab chiqarish uchun logistika zanjiri:
+
+**DALALAR → OMBOR → USTAXONA → OMBOR → KARVON → BOSHQA SHAHAR**
+
+Har bir karvon:
+
+- CaravanId
+- OwnerKingdomId
+- Route
+- Cargo
+- Capacity
+- DepartureGameTime
+- EstimatedArrival
+- Status
+
+ma’lumotlariga ega bo‘lsin.
+
+Karvon yo‘l tarmog‘idan foydalansin.
+
+Shaharlararo uzoq masofalarda strategik xarita yo‘llari ishlasin.
+
+Yetkazib berish vaqti o‘yin xaritasi va transport qoidalariga bog‘liq bo‘lsin.
+
+---
+
+# 14. PLAYER-TO-PLAYER TRADING
+
+**BU MULTIPLAYER UCHUN MAJBURIY.**
+
+Men Windows PC da guruch yetishtiraman.
+
+Sherigim Android telefonda o‘ynaydi.
+
+Men:
+
+1. Guruch yetishtiraman.
+2. Uni qayta ishlayman.
+3. Tayyor mahsulotni bozorga chiqaraman.
+4. Narx belgilayman.
+
+Sherigim:
+
+1. Marketplace ni ochadi.
+2. Mening savdo taklifimni ko‘radi.
+3. Sotib olishni tasdiqlaydi.
+4. Mahsulotni oladi.
+
+Server:
+
+- Sotuvchi resursini tekshiradi.
+- Xaridor tangasini tekshiradi.
+- Savdoni tranzaksiya orqali bajaradi.
+- Yetkazib berish holatini saqlaydi.
+- Ikkala o‘yinchiga natijani yuboradi.
+
+Server authoritative arxitekturadan foydalan.
+
+---
+
+# 15. GLOBAL TRADE NETWORK
+
+Barcha o‘yinchi va AI saltanatlar uchun umumiy savdo tarmog‘i yarat.
+
+Dastlab Andijon hududlari o‘rtasidagi savdoni qo‘llab-quvvatla.
+
+Keyinchalik:
+
+- Farg‘ona vodiysi
+- O‘zbekistonning boshqa hududlari
+- Osiyo bo‘ylab savdo yo‘llari
+
+uchun kengaytirish mumkin bo‘lsin.
+
+### Global Market
+
+- Mahsulot narxlari.
+- Savdo takliflari.
+- Talab va taklif.
+- Savdo hajmi.
+- Faol karvonlar.
+- Mahsulot tanqisligi.
+
+O‘yinchi turli hududlarning savdo holatini ko‘ra olsin.
+
+Tarixiy savdo muhiti uchun Ipak yo‘li yo‘nalishlaridan ilhomlanish mumkin, lekin aniq tarixiy geografik va savdo da’volari tekshirilgan manbalarga asoslanishi kerak.
+
+---
+
+# 16. SUPPLY & DEMAND ECONOMY
+
+Mahsulotlar narxi real savdo statistikalariga bog‘liq bo‘lsin.
+
+Har bir bozor uchun:
+
+- CurrentSupply
+- CurrentDemand
+- BasePrice
+- MarketPrice
+- TradeVolume
+- PriceHistory
+- ShortageLevel
+
+ko‘rsatkichlarini hisobla.
+
+Misollar:
+
+- Guruch ko‘payganda taklif ortadi.
+- Non yetishmaganda talab kuchayadi.
+- Mato ko‘payganda ayrim hududlarda narx pasayishi mumkin.
+- Yangi savdo yo‘li ochilsa mahsulot yetkazish imkoniyati yaxshilanadi.
+
+Narxlar sekin va balanslangan tarzda o‘zgarsin.
+
+Sun’iy cheksiz pul yoki resurs yaratadigan iqtisodiy sikllarga yo‘l qo‘yma.
+
+---
+
+# 17. TRADE CONTRACTS
+
+O‘yinchilar bir martalik savdodan tashqari savdo shartnomasi ham tuza olsin.
+
+Misol:
+
+**ASAKA → SHAHRIXON**
+
+Mahsulot: Guruch.
+
+Miqdor: Har o‘yin haftasida 50 birlik.
+
+Narx: Kelishilgan qiymat.
+
+Davomiylik: Belgilangan o‘yin davri.
+
+Har bir shartnomada:
+
+- ContractId
+- SellerKingdomId
+- BuyerKingdomId
+- ResourceId
+- QuantityPerDelivery
+- Price
+- DeliverySchedule
+- ContractStatus
+- ExpirationGameTime
+
+bo‘lsin.
+
+Har bir davriy yetkazish vaqtida mahsulot va tanga mavjudligi qayta tekshirilsin.
+
+Shartnoma cheksiz resurs yaratmasin.
+
+Resurs yetishmasa, yetkazish kechikishi yoki shartnoma shartlariga ko‘ra bekor qilinishi mumkin.
+
+---
+
+# 18. AI KINGDOM ECONOMY
+
+AI saltanatlar ham ishlab chiqarish va savdo tizimidan foydalansin.
+
+Masalan:
+
+**ANDIJON AI**
+- Mato ishlab chiqarishga e’tibor beradi.
+- Guruch sotib oladi.
+- Savdo aloqalarini kengaytiradi.
+
+**SHAHRIXON AI**
+- Hunarmandchilikni rivojlantiradi.
+- Ustaxonalar quradi.
+- Tayyor mahsulotlarni bozorga chiqaradi.
+
+AI:
+
+- Resurslarni tekshiradi.
+- Talabni baholaydi.
+- Ishlab chiqarishni rejalashtiradi.
+- Savdo taklifi yaratadi.
+- Shartnomalar tuzadi.
+
+Ammo AI saltanatlar cheksiz resursga ega bo‘lmasin.
+
+Ular ham o‘yinchi bilan bir xil iqtisodiy qoidalarga amal qilsin.
+
+---
+
+# 19. DONISHMAND VAZIR — ECONOMIC ADVISOR
+
+Donishmand Vazir yangi iqtisodiyot tizimlarini tahlil qilsin.
+
+### Misol 1 — XOMASHYO KO‘P
+
+“Hazratim, omborimizda xom guruch zaxirasi ko‘paymoqda. Uni qayta ishlash uchun yangi ustaxona qurish foydali bo‘lishi mumkin.”
+
+### Misol 2 — OMBOR TO‘LGAN
+
+“Hazratim, mavjud ombor sig‘imi yetarli emas. Yangi ombor qurish yoki eskisini kengaytirishni tavsiya qilaman.”
+
+### Misol 3 — SAVDO IMKONIYATI
+
+“Hazratim, boshqa saltanatda guruchga talab yuqori. Savdo taklifini yaratishni tavsiya qilaman.”
+
+### Misol 4 — XOMASHYO YETISHMAYDI
+
+“Hazratim, to‘quv ustaxonamizda ip zaxirasi yetishmayapti. Paxta ishlab chiqarishni rivojlantirish yoki boshqa saltanatdan xomashyo sotib olish mumkin.”
+
+Har bir maslahat haqiqiy GameState asosida chiqsin.
+
+---
+
+# 20. PROFESSIONAL PRODUCTION UI
+
+Yangi bo‘lim:
+
+**ISHLAB CHIQARISH**
+
+Tablar:
+
+1. XOMASHYO
+2. USTAXONALAR
+3. ISHLAB CHIQARISH NAVBATI
+4. OMBORLAR
+5. TAYYOR MAHSULOTLAR
+6. SAVDO
+
+Har bir ustaxona kartasida:
+
+- Bino nomi.
+- Rasm yoki ikonka.
+- Ishchilar.
+- Ishlab chiqarilayotgan mahsulot.
+- Kerakli xomashyo.
+- Progress.
+- Qolgan o‘yin vaqti.
+- Ombor holati.
+
+ko‘rsatilsin.
+
+Tugmalar:
+
+- ISHLAB CHIQARISH
+- TO‘XTATISH
+- DAVOM ETTIRISH
+- XARITADA KO‘RSATISH
+
+Barcha tugmalar haqiqiy funksiyaga ega bo‘lsin.
+
+---
+
+# 21. PRODUCTION CHAIN VISUALIZATION
+
+O‘yinchi mahsulot qayerdan kelishini va qanday ishlab chiqarilishini tushuna olsin.
+
+Yangi ekran:
+
+**MAHSULOT ZANJIRI**
+
+Misol:
+
+```text
+BUG‘DOY
+   ↓
+TEGIRMON
+   ↓
+UN
+   ↓
+NOVVOYXONA
+   ↓
+NON
+   ↓
+BOZOR
+```
+
+Har bir bosqichni bosganda:
+
+- Tegishli bino.
+- Kerakli resurs.
+- Ishlab chiqarish vaqti.
+- Mahsulot miqdori.
+- Narxi.
+
+ko‘rsatilsin.
+
+Agar kerakli bino qurilmagan bo‘lsa, uning qurilish talablarini ko‘rsat.
+
+---
+
+# 22. MARKETPLACE UI/UX
+
+PROMPT 19B va 21 da yaratilgan professional UI Design Systemdan foydalan.
+
+Marketplace bo‘limlari:
+
+- SOTIB OLISH
+- SOTISH
+- SAVDO SHARTNOMALARI
+- KARVONLAR
+- SAVDO TARIXI
+
+### Mahsulot kartasi
+
+- Mahsulot nomi.
+- Ikonkasi.
+- Miqdori.
+- Narxi.
+- Sotuvchi saltanat.
+- Yetkazib berish holati.
+
+### Narx grafigi
+
+So‘nggi o‘yin davrlaridagi narx o‘zgarishlarini ko‘rsatsin.
+
+Grafik haqiqiy ma’lumotlardan olinsin.
+
+Sun’iy random narxlar bilan to‘ldirma.
+
+---
+
+# 23. ANIMATIONS & VISUAL FEEDBACK
+
+Oldingi AnimationSystem dan foydalan.
+
+### Dehqonchilik
+
+- Ekin ekish.
+- O‘sish bosqichlari.
+- Hosil yig‘ish.
+
+### Ustaxonalar
+
+- Tegirmonning aylanishi.
+- Hunarmandning ish jarayoni.
+- To‘quv dastgohining stilizatsiyalangan harakati.
+- Omborga yuk olib kirish.
+
+### Savdo
+
+- Arava harakati.
+- Karvon jo‘nashi.
+- Karvon yetib kelishi.
+- Omborda yuk tushirish.
+
+### UI
+
+- Production progress.
+- Savdo yakunlangani haqida notification.
+- Yangi retsept ochilishi.
+- Mahsulot zaxirasi o‘zgarishi.
+
+Animatsiyalar professional va silliq bo‘lsin.
+
+Ammo hech bir vizual animatsiya serverdagi iqtisodiy operatsiyani mustaqil ravishda takror bajarmasin.
+
+---
+
+# 24. MULTIPLAYER SERVER ARCHITECTURE
+
+Windows va Android bitta online serverga ulansin.
+
+### Server boshqaradi
+
+- Crop growth.
+- Harvesting.
+- Inventories.
+- Production jobs.
+- Resource reservations.
+- Warehouses.
+- Market orders.
+- Trade contracts.
+- Caravan deliveries.
+- Kingdom ownership.
+- Economic simulation.
+
+### Client boshqaradi
+
+- UI.
+- Kamera.
+- Input.
+- Animatsiyalar.
+- Vizual progress.
+- Server natijalarini ko‘rsatish.
+
+Serverda barcha muhim resurs operatsiyalari tekshirilsin.
+
+Kerakli invariantlar:
+
+- Mahsulot ikki marta ishlab chiqarilmasin.
+- Bir hosil ikki marta yig‘ilmasin.
+- Resurs ikki marta sotilmasin.
+- Xaridor balansi manfiy bo‘lmasin.
+- Ombor sig‘imi buzilmasin.
+- Trade command takror bajarilmasin.
+
+---
+
+# 25. SAVE / LOAD
+
+Serverda saqlanadigan ma’lumotlar:
+
+- Crop states.
+- Farm fields.
+- Production recipes.
+- Active production jobs.
+- Reserved resources.
+- Warehouse inventory.
+- Trade offers.
+- Trade contracts.
+- Delivery jobs.
+- Caravan states.
+- Market prices.
+- Economic statistics.
+
+Server restartdan keyin:
+
+- Ishlab chiqarish navbatlari tiklansin.
+- Mahsulotlar yo‘qolmasin.
+- Savdo operatsiyalari takroran bajarilmasin.
+- Karvon yetkazib berish holati saqlansin.
+- O‘yin vaqti izchil davom etsin.
+
+---
+
+# 26. PERFORMANCE
+
+Maqsadli Windows PC:
+
+- Intel Core i5-12400.
+- 8 GB RAM.
+- Intel UHD 730.
+
+Android uchun ham optimallashtir.
+
+Talablar:
+
+- Ekinlar har frame da hisoblanmasin.
+- Production jobs simulyatsiya ticklari orqali yangilansin.
+- Bozor narxlari belgilangan iqtisodiy davrda yangilansin.
+- Karvonlarning uzoq masofadagi holati statistik hisoblanishi mumkin.
+- Yaqindagi karvonlar animatsiyali bo‘lsin.
+- Resource icon va spritelar cache qilinsin.
+- Database querylar optimallashtirilsin.
+- UI barcha resurslarni har frame da qayta hisoblamasin.
+
+Katta iqtisodiy tizim Intel UHD 730 va Android qurilmalarida FPSni sezilarli pasaytirmasligi kerak.
+
+FPS natijasini faqat real o‘lchashdan keyin qayd et.
+
+---
+
+# 27. C# ARCHITECTURE
+
+Mavjud loyiha asosida kerakli modullarni qo‘sh.
+
+```text
+AndijonSaltanatlar/
+│
+├── Resources/
+│   ├── ResourceDefinition.cs
+│   ├── ResourceCatalog.cs
+│   ├── InventoryManager.cs
+│   └── ResourceReservationService.cs
+│
+├── Agriculture/
+│   ├── CropDefinition.cs
+│   ├── CropGrowthSystem.cs
+│   ├── FarmField.cs
+│   └── HarvestService.cs
+│
+├── Production/
+│   ├── ProductionRecipe.cs
+│   ├── ProductionManager.cs
+│   ├── ProductionJob.cs
+│   ├── ProductionScheduler.cs
+│   └── ProductionValidator.cs
+│
+├── Workshops/
+│   ├── WorkshopManager.cs
+│   ├── WorkshopState.cs
+│   └── WorkshopEfficiencySystem.cs
+│
+├── Logistics/
+│   ├── WarehouseManager.cs
+│   ├── DeliveryJob.cs
+│   ├── CaravanManager.cs
+│   └── CargoReservationService.cs
+│
+├── Trading/
+│   ├── MarketManager.cs
+│   ├── TradeContract.cs
+│   ├── TradeTransactionService.cs
+│   ├── MarketPricingSystem.cs
+│   └── GlobalMarketService.cs
+│
+├── Advisor/
+│   └── EconomicAdvisor.cs
+│
+└── UI/
+    ├── ProductionDashboard.cs
+    ├── WorkshopPanel.cs
+    ├── ProductionChainPanel.cs
+    ├── GlobalMarketplaceScreen.cs
+    └── TradeContractsPanel.cs
+```
+
+Agar ushbu klasslar oldingi bosqichlardan mavjud bo‘lsa, ikkinchi nusxasini yaratma.
+
+---
+
+# 28. FIRST WORKING VERTICAL SLICE
+
+**BIRINCHI NAVBATDA SHU ZANJIRNI HAQIQATAN ISHLAT:**
+
+ASAKA SHAHRI
+↓
+GURUCH EKISH
+↓
+GURUCH O‘SISHI
+↓
+HOSIL YIG‘ISH
+↓
+XOM GURUCHNI OMBORGA JOYLASH
+↓
+GURUCH TOZALASH USTAXONASI
+↓
+XOMASHYONI QAYTA ISHLASH
+↓
+TOZALANGAN GURUCH
+↓
+MARKETPLACE
+↓
+WINDOWS PLAYER SAVDO TAKLIFI
+↓
+ANDROID PLAYER SOTIB OLADI
+↓
+SERVER TRANZAKSIYANI BAJARADI
+↓
+IKKALA CLIENT YANGILANADI
+↓
+SAVE / RECONNECT
+
+Bu zanjir to‘liq ishlamaguncha boshqa ishlab chiqarish zanjirlarini tayyor deb hisoblama.
+
+---
+
+# 29. SECOND WORKING VERTICAL SLICE
+
+**BUG‘DOY → TEGIRMON → UN → NOVVOYXONA → NON → BOZOR**
+
+Shartlar:
+
+1. Bug‘doy yetishtiriladi.
+2. Tegirmon quriladi.
+3. Bug‘doy unga aylantiriladi.
+4. Novvoyxona quriladi.
+5. Undan non ishlab chiqariladi.
+6. Non bozorga yetkaziladi.
+7. Fuqarolar iste’moli yoki savdo bilan bog‘lanadi.
+8. Resurs va iqtisodiyot statistikasi yangilanadi.
+
+Bu zanjirni mavjud PopulationManager bilan integratsiya qil.
+
+---
+
+# 30. THIRD WORKING VERTICAL SLICE
+
+**AI SALTANAT → RESURSLARNI TAHLIL QILISH → USTAXONA QURISH → MAHSULOT ISHLAB CHIQARISH → BOZORGA SOTUVGA QO‘YISH → O‘YINCHI SOTIB OLISHI**
+
+AI iqtisodiyoti ham o‘yinchining iqtisodiyotiga bir xil qoidalar asosida ishlasin.
+
+---
+
+# 31. TESTING
+
+Quyidagi testlarni bajar.
+
+### Agriculture
+
+- [ ] Guruch ekiladi.
+- [ ] Guruch o‘sadi.
+- [ ] Hosil yig‘iladi.
+- [ ] Hosil ikki marta yig‘ilmaydi.
+- [ ] Suv ta’minoti hisobga olinadi.
+
+### Production
+
+- [ ] Retseptlar JSON dan yuklanadi.
+- [ ] Xomashyo tekshiriladi.
+- [ ] Ishlab chiqarish boshlanadi.
+- [ ] Xomashyo bir marta sarflanadi.
+- [ ] Tayyor mahsulot bir marta yaratiladi.
+- [ ] Ishlab chiqarish navbati ishlaydi.
+- [ ] Ustaxona ishchilarga bog‘langan.
+- [ ] Ombor sig‘imi tekshiriladi.
+
+### Trade
+
+- [ ] Bozor taklifi yaratiladi.
+- [ ] Sotuvchi resursga ega.
+- [ ] Xaridor tangaga ega.
+- [ ] Savdo bajariladi.
+- [ ] Resurs va tanga to‘g‘ri o‘tkaziladi.
+- [ ] Savdo ikki marta bajarilmaydi.
+- [ ] Karvon yetkazib berishi ishlaydi.
+- [ ] Savdo shartnomalari saqlanadi.
+
+### Multiplayer
+
+- [ ] Windows client ishlaydi.
+- [ ] Android client ishlaydi.
+- [ ] Ikkala client bitta WorldId ga ulanadi.
+- [ ] Global Marketplace sinxronlashadi.
+- [ ] Savdo natijalari ikkala qurilmada yangilanadi.
+- [ ] Reconnect ishlaydi.
+- [ ] Cloud Save ishlaydi.
+
+### UI / Animation
+
+- [ ] Production Dashboard ishlaydi.
+- [ ] Ustaxona paneli ishlaydi.
+- [ ] Production Chain ko‘rsatiladi.
+- [ ] Marketplace professional dizaynga ega.
+- [ ] Mobil UI responsive.
+- [ ] Dehqonchilik animatsiyalari ishlaydi.
+- [ ] Tegirmon va ustaxona animatsiyalari ishlaydi.
+- [ ] Karvonlar harakati silliq.
+- [ ] O‘zbekcha matnlar to‘g‘ri.
+
+---
+
+# 32. IMPLEMENTATION ORDER
+
+Ishni quyidagi tartibda bajar:
+
+1. Repository audit.
+2. Unified Resource System.
+3. Inventory reservations.
+4. Advanced Farming integration.
+5. Production Recipe Engine.
+6. Production Jobs.
+7. Rice Processing Workshop.
+8. Warehouse integration.
+9. Rice multiplayer trade.
+10. Wheat processing chain.
+11. Cotton and textile chain.
+12. Historical workshops.
+13. Caravan logistics.
+14. Global Marketplace.
+15. Trade contracts.
+16. AI Kingdom economy.
+17. Donishmand Vazir integration.
+18. Professional UI.
+19. Production animations.
+20. Multiplayer synchronization.
+21. Save/Load.
+22. Automated tests.
+23. Performance profiling.
+24. Windows and Android build verification.
+
+**Faqat reja yozib to‘xtama.**
+
+Avval ishlaydigan guruch zanjirini yarat.
+
+Keyin qolgan tizimlarga o‘t.
+
+---
+
+# 33. AGENT CONTINUITY
+
+Quyidagi faylni yarat yoki yangila:
+
+`docs/PROMPT_23_PROGRESS.md`
+
+Unda:
+
+- Tekshirilgan mavjud tizimlar.
+- Yaratilgan resurslar.
+- Ishlayotgan retseptlar.
+- Ishlab chiqarish ustaxonalari.
+- Guruch savdo zanjiri.
+- Global Marketplace holati.
+- Multiplayer natijalari.
+- Animatsiya va UI holati.
+- Test natijalari.
+- Build natijalari.
+- Bajarilmagan ishlar.
+
+saqlansin.
+
+Ishlamagan funksiyalarni Completed deb ko‘rsatma.
+
+---
+
+# 34. FINAL ACCEPTANCE CRITERIA
+
+- [ ] Guruch yetishtirish ishlaydi.
+- [ ] Guruch qayta ishlanadi.
+- [ ] Tayyor guruch sotiladi.
+- [ ] Bug‘doydan un ishlab chiqariladi.
+- [ ] Undan non ishlab chiqariladi.
+- [ ] Paxtadan mato ishlab chiqarish mumkin.
+- [ ] Tarixiy ustaxonalar mavjud.
+- [ ] Production recipes ishlaydi.
+- [ ] Omborlar to‘g‘ri hisoblanadi.
+- [ ] Resurs rezervlari ishlaydi.
+- [ ] Karvon logistika tizimi ishlaydi.
+- [ ] Player-to-player trade ishlaydi.
+- [ ] AI saltanatlar savdo qiladi.
+- [ ] Global Marketplace mavjud.
+- [ ] Savdo shartnomalari mavjud.
+- [ ] Narxlar talab va taklif asosida hisoblanadi.
+- [ ] Donishmand Vazir iqtisodiy maslahat beradi.
+- [ ] Professional Production Dashboard mavjud.
+- [ ] Windows UI ishlaydi.
+- [ ] Android UI ishlaydi.
+- [ ] Animatsiyalar yaxshilangan.
+- [ ] Save/Load ishlaydi.
+- [ ] Server authoritative.
+- [ ] Windows build tekshirilgan.
+- [ ] Android build tekshirilgan.
+
+---
+
+# 35. FINAL INSTRUCTION
+
+**MAVJUD ANDIJON: SALTANATLAR LOYIHASIGA HAQIQIY ISHLAYDIGAN PRODUCTION CHAIN VA MULTIPLAYER TRADE TIZIMINI QO‘SH.**
+
+Men Windows PC da guruch ekaman.
+
+Guruch o‘sadi.
+
+Hosilni yig‘aman.
+
+Guruchni qayta ishlash ustaxonasiga yuboraman.
+
+Tayyor guruchni omborga joylayman.
+
+Boshqa o‘yinchiga sotuvga qo‘yaman.
+
+Sherigim Android telefonida ushbu savdo taklifini ko‘radi va sotib oladi.
+
+Barcha jarayon serverda saqlanadi.
+
+Bundan tashqari:
+
+- Bug‘doydan un va non ishlab chiqaraman.
+- Paxtadan mato tayyorlayman.
+- Ustaxonalarni rivojlantiraman.
+- Karvonlar orqali shaharlararo savdo qilaman.
+- Boshqa saltanatlar bilan shartnomalar tuzaman.
+- Donishmand Vazirdan iqtisodiy tavsiyalar olaman.
+- Mahsulotlar va ishlab chiqarish jarayonlarini chiroyli UI orqali boshqaraman.
+
+**ENG MUHIM:**
+
+Oldingi Windows + Android multiplayer tizimini buzma.
+
+Yangi o‘yin yaratma.
+
+Ishlab chiqarish tizimini mavjud EconomyManager, FarmingSystem, WarehouseManager va Marketplace bilan birlashtir.
+
+Har bir ishlab chiqarish, resurs sarflash va savdo operatsiyasi serverda to‘g‘ri hisoblanishi kerak.
+
+Ish yakunida:
+
+1. O‘zgartirilgan C# fayllar.
+2. Ishlayotgan production chains.
+3. Yaratilgan ustaxonalar.
+4. Resurs va ombor tizimi.
+5. Multiplayer savdo natijalari.
+6. AI iqtisodiyoti.
+7. UI/UX yaxshilanishlari.
+8. Animatsiyalar.
+9. Test natijalari.
+10. Windows va Android build holati.
+11. Hali bajarilmagan ishlar.
+
+bo‘yicha aniq hisobot ber.
+
+**ANDIJON: SALTANATLAR — YERDAN HOSIL OL, MAHSULOT ISHLAB CHIQAR, KARVONLAR ORQALI SAVDO QIL VA O‘Z SALTANATING IQTISODIYOTINI RIVOJLANTIR!**
+
+# PROMPT 23 — ANDIJON: SALTANATLAR
+## Advanced Agriculture, Production Chains, Historical Workshops, Supply & Demand, Caravan Logistics and Global Multiplayer Trade
+### C# + MonoGame + ASP.NET Core + PostgreSQL
+### Windows PC + Android — Persistent Shared World
+
+---
+
+# 1. SENING ROLING
+
+Sen quyidagi yo‘nalishlarda professional Senior Developer sifatida ishlaysan:
+
+- C# / MonoGame Game Development
+- Economic Simulation Engineering
+- Agriculture & Production Systems
+- Multiplayer Backend Architecture
+- Supply Chain & Logistics Simulation
+- Game AI Economy Design
+- Isometric Rendering & Animations
+- Game UI/UX Engineering
+- Database Transaction Engineering
+- QA & Performance Optimization
+
+Biz **ANDIJON: SALTANATLAR** nomli tarixiy sivilizatsiya va multiplayer city-builder o‘yinini yaratmoqdamiz.
+
+Texnologiyalar:
+
+- C#
+- MonoGame
+- .NET
+- VS Code
+- ASP.NET Core
+- PostgreSQL
+- Entity Framework Core
+- SignalR
+- JSON Data Definitions
+
+**BU PROMPT 23. MAVJUD LOYIHANI BOSHDAN YARATMA!**
+
+Oldingi 22 bosqichdagi tizimlarni tekshir.
+
+Ayniqsa:
+
+- FarmingSystem
+- CropGrowthSystem
+- EconomyManager
+- InventorySystem
+- WarehouseManager
+- Marketplace
+- TradeManager
+- CaravanManager
+- LogisticsManager
+- PopulationManager
+- CitizenAI
+- TechnologySystem
+- AI Governor
+- Multiplayer Server
+- Save/Load
+- UI Framework
+
+modullarining haqiqiy holatini aniqlagin.
+
+Ishlayotgan mexanikalarni buzma.
+
+---
+
+# 2. ASOSIY MAQSAD
+
+O‘yinda iqtisodiyot quyidagi zanjir orqali ishlashi kerak:
+
+**XOMASHYO → ISHLAB CHIQARISH → QAYTA ISHLASH → OMBOR → SAVDO → YETKAZIB BERISH → DAROMAD**
+
+Bunda o‘yinchi:
+
+1. Yer ochadi.
+2. Ekin maydoni quradi.
+3. Mahsulot yetishtiradi.
+4. Hosil yig‘adi.
+5. Xomashyoni omborga tashiydi.
+6. Qayta ishlash ustaxonasi quradi.
+7. Xomashyodan tayyor mahsulot yaratadi.
+8. Tayyor mahsulotni sotadi.
+9. Boshqa o‘yinchidan mahsulot sotib oladi.
+10. Savdo karvonlarini kuzatadi.
+11. Shaharlar iqtisodiyotini rivojlantiradi.
+12. Mahsulot narxlarini boshqaradi.
+13. Donishmand Vazirdan iqtisodiy maslahat oladi.
+
+**Eng muhim qoida: ishlab chiqarish, qayta ishlash va savdo haqiqiy resurslarga bog‘liq bo‘lsin.**
+
+---
+
+# 3. UNIFIED RESOURCE SYSTEM
+
+Mavjud resurs tizimini tekshir va kerak bo‘lsa kengaytir.
+
+Resurslar toifalari:
+
+### QISHLOQ XO‘JALIGI
+
+- Guruch
+- Bug‘doy
+- Paxta
+- Sabzavot
+- Meva
+
+### XOMASHYO
+
+- Yog‘och
+- Tosh
+- Temir rudasi
+- Jun
+- Loy
+
+### QAYTA ISHLANGAN MAHSULOT
+
+- Tozalangan guruch
+- Un
+- Mato
+- Yog‘och taxta
+- Temir buyumlar
+- Sopol buyumlar
+
+### TAYYOR MAHSULOT
+
+- Kiyim
+- Non
+- Hunarmandchilik mahsulotlari
+- Qurilish materiallari
+
+Har bir resurs uchun:
+
+- ResourceId
+- NameUz
+- Category
+- BasePrice
+- StorageRequirements
+- Tradable
+- ProductionSource
+- ConsumptionRules
+
+maydonlarini qo‘sh.
+
+Resurslar kodda chalkash string qiymatlari orqali emas, barqaror ID orqali boshqarilsin.
+
+---
+
+# 4. ADVANCED FARMING SYSTEM
+
+PROMPT 19A da yaratilgan guruch dehqonchiligini kengaytir.
+
+Ekinlar:
+
+- Guruch
+- Bug‘doy
+- Paxta
+- Sabzavot
+- Mevali daraxtlar
+
+Har bir ekinning alohida:
+
+- O‘sish vaqti
+- Suv talabi
+- Hosildorligi
+- Ishchi talabi
+- Faslga mosligi
+- Ombor talabi
+
+mavjud bo‘lsin.
+
+Guruchning o‘sishi mavjud IrrigationSystem bilan bog‘lansin.
+
+Barcha ekinlar bitta umumiy CropGrowthSystem orqali ishlasin.
+
+---
+
+# 5. PRODUCTION CHAIN — RICE
+
+**BIRINCHI TO‘LIQ ISHLAYDIGAN ZANJIR GURUCH BO‘LSIN.**
+
+### 1. Guruch yetishtirish
+
+O‘yinchi dalaga guruch ekadi.
+
+### 2. Hosil yig‘ish
+
+Guruch o‘yin vaqti bo‘yicha yetiladi.
+
+Dehqon hosilni yig‘adi.
+
+### 3. Omborga tashish
+
+Xom guruch omborga yetkaziladi.
+
+### 4. Qayta ishlash
+
+Guruchni tozalash ustaxonasida qayta ishlash mumkin.
+
+### 5. Tayyor mahsulot
+
+Tozalangan guruch olinadi.
+
+### 6. Savdo
+
+Tayyor mahsulot:
+
+- O‘z bozorida sotiladi.
+- Boshqa shaharga yuboriladi.
+- AI saltanatga sotiladi.
+- Boshqa haqiqiy o‘yinchiga sotiladi.
+
+### Muhim
+
+Qayta ishlashda mahsulot balansi saqlansin.
+
+Masalan, 100 birlik xom guruchdan qancha tayyor guruch chiqishi konfiguratsiyadan olinadi.
+
+Bu nisbatni qattiq kodlama.
+
+Ishlab chiqarish jarayonida xomashyo iste’mol qilinadi va natija faqat bir marta yaratiladi.
+
+---
+
+# 6. PRODUCTION CHAIN — WHEAT
+
+Bug‘doy uchun zanjir:
+
+**BUG‘DOY DALASI → HOSIL → OMBOR → TEGIRMON → UN → NOVVOYXONA → NON → BOZOR**
+
+Kerakli binolar:
+
+- Bug‘doy dalasi.
+- Ombor.
+- Tegirmon.
+- Novvoyxona.
+- Bozor.
+
+### Talablar
+
+Tegirmon bug‘doyni unga aylantirsin.
+
+Novvoyxona mavjud retsept asosida un va zarur resurslardan non ishlab chiqarsin.
+
+Non aholi iste’moli yoki savdo uchun ishlatilishi mumkin.
+
+Binolar ishchilar, ishlab chiqarish va mavjud resurs qoidalariga bog‘liq bo‘lsin.
+
+---
+
+# 7. PRODUCTION CHAIN — COTTON & TEXTILES
+
+Paxta ishlab chiqarishni qo‘sh.
+
+**PAXTA DALASI → PAXTA HOSILI → TOZALASH / TAYYORLASH → IP → TO‘QUV USTAXONASI → MATO → BOZOR**
+
+Keyinchalik:
+
+**MATO → TIKUV USTAXONASI → KIYIM**
+
+zanjirini qo‘sh.
+
+Har bir bosqich uchun:
+
+- Bino
+- Ishchi
+- Resurs
+- Ishlab chiqarish vaqti
+- Mahsulot miqdori
+- Xarajat
+
+mavjud bo‘lsin.
+
+Tarixiy muhitga mos ustaxona va hunarmandchilik texnologiyalaridan foydalan.
+
+---
+
+# 8. HISTORICAL WORKSHOPS
+
+O‘yinga quyidagi ishlab chiqarish binolarini qo‘sh yoki mavjudlarini kengaytir:
+
+| Bino | Vazifasi |
+|---|---|
+| Tegirmon | Bug‘doyni unga aylantirish |
+| Guruch tozalash ustaxonasi | Xom guruchni qayta ishlash |
+| To‘quv ustaxonasi | Ipdan mato tayyorlash |
+| Kulolchilik ustaxonasi | Loydan sopol buyumlar yaratish |
+| Temirchilik | Metall xomashyodan buyumlar tayyorlash |
+| Yog‘ochsozlik | Yog‘ochdan taxta va buyumlar tayyorlash |
+| Novvoyxona | Undan non ishlab chiqarish |
+| Tikuv ustaxonasi | Matodan kiyim tayyorlash |
+
+Binolar tarixiy-stilizatsiyalangan Asaka muhitiga mos bo‘lsin.
+
+Zamonaviy elektr zavodlari, avtomatlashtirilgan konveyerlar yoki avtomobil fabrikalarini qo‘shma.
+
+---
+
+# 9. PRODUCTION RECIPE ENGINE
+
+Barcha qayta ishlash jarayonlarini data-driven qil.
+
+Har bir retsept quyidagilarga ega bo‘lsin:
+
+```text
+RecipeId
+BuildingTypeId
+InputResources
+OutputResources
+ProductionDuration
+WorkerRequirement
+TechnologyRequirement
+OperatingCost
+```
+
+Misol:
+
+```json
+{
+  "recipeId": "rice_processing_basic",
+  "buildingTypeId": "rice_workshop",
+  "inputs": [
+    { "resourceId": "raw_rice", "amount": 10 }
+  ],
+  "outputs": [
+    { "resourceId": "processed_rice", "amount": 8 }
+  ],
+  "durationGameMinutes": 60,
+  "requiredWorkers": 2
+}
+```
+
+Bu misoldagi qiymatlar dastlabki balans namunasi.
+
+Haqiqiy qiymatlarni mavjud iqtisodiyot tizimiga moslashtir.
+
+Retseptlar JSON katalogdan yuklansin.
+
+---
+
+# 10. PRODUCTION JOB SYSTEM
+
+Har bir ustaxona ishlab chiqarish navbatiga ega bo‘lsin.
+
+Holatlar:
+
+- Idle
+- WaitingForResources
+- Ready
+- Producing
+- Paused
+- Completed
+- Failed
+
+O‘yinchi ishlab chiqarish buyurtmasi yaratadi.
+
+Masalan:
+
+**10 MARTA GURUCHNI QAYTA ISHLASH**
+
+Server quyidagilarni tekshiradi:
+
+1. Bino mavjudmi?
+2. Bino o‘yinchiga tegishlimi?
+3. Retsept ochilganmi?
+4. Ishchilar yetarlimi?
+5. Xomashyo bormi?
+6. Ishlab chiqarish uchun joy bormi?
+
+Shundan keyin buyurtma boshlansin.
+
+Jarayon tugaganda tayyor mahsulot haqiqiy inventoryga qo‘shilsin.
+
+---
+
+# 11. INVENTORY & RESOURCE RESERVATION
+
+Mahsulotlar bilan bog‘liq barcha hisob-kitoblarda yagona inventory tizimidan foydalan.
+
+Quyidagi holatlar hisobga olinsin:
+
+- AvailableStock
+- ReservedStock
+- InProduction
+- InTransit
+- StoredStock
+
+Bir resurs bir vaqtning o‘zida:
+
+- Ishlab chiqarishga sarflanishi.
+- Savdoga qo‘yilishi.
+- Boshqa shaharga yuborilishi.
+
+uchun takroran foydalanilmasin.
+
+Resurs rezervlari serverda tekshirilsin.
+
+Barcha muhim operatsiyalarda atomik tranzaksiyalar va idempotency ishlat.
+
+---
+
+# 12. ADVANCED WAREHOUSE SYSTEM
+
+Omborlar quyidagi funksiyalarga ega bo‘lsin:
+
+- Xomashyo saqlash.
+- Tayyor mahsulot saqlash.
+- Kiruvchi mahsulotni qabul qilish.
+- Chiquvchi mahsulotni ajratish.
+- Ishlab chiqarish uchun resurs rezervlash.
+- Savdo uchun mahsulot rezervlash.
+
+Har bir ombor:
+
+- WarehouseId
+- CityId
+- Capacity
+- Inventory
+- RoadConnection
+- ActiveDeliveries
+- Workers
+
+ma’lumotlariga ega bo‘lsin.
+
+Ombor sig‘imidan ortiq mahsulot qabul qilmasin.
+
+Ombor to‘lsa, yangi yetkazib berishlar tegishli holatda kutishi yoki boshqa manzilga yo‘naltirilishi mumkin bo‘lsin.
+
+---
+
+# 13. CARAVAN LOGISTICS SYSTEM
+
+PROMPT 18 va 19B dagi karvon tizimidan foydalan.
+
+Savdo va ishlab chiqarish uchun logistika zanjiri:
+
+**DALALAR → OMBOR → USTAXONA → OMBOR → KARVON → BOSHQA SHAHAR**
+
+Har bir karvon:
+
+- CaravanId
+- OwnerKingdomId
+- Route
+- Cargo
+- Capacity
+- DepartureGameTime
+- EstimatedArrival
+- Status
+
+ma’lumotlariga ega bo‘lsin.
+
+Karvon yo‘l tarmog‘idan foydalansin.
+
+Shaharlararo uzoq masofalarda strategik xarita yo‘llari ishlasin.
+
+Yetkazib berish vaqti o‘yin xaritasi va transport qoidalariga bog‘liq bo‘lsin.
+
+---
+
+# 14. PLAYER-TO-PLAYER TRADING
+
+**BU MULTIPLAYER UCHUN MAJBURIY.**
+
+Men Windows PC da guruch yetishtiraman.
+
+Sherigim Android telefonda o‘ynaydi.
+
+Men:
+
+1. Guruch yetishtiraman.
+2. Uni qayta ishlayman.
+3. Tayyor mahsulotni bozorga chiqaraman.
+4. Narx belgilayman.
+
+Sherigim:
+
+1. Marketplace ni ochadi.
+2. Mening savdo taklifimni ko‘radi.
+3. Sotib olishni tasdiqlaydi.
+4. Mahsulotni oladi.
+
+Server:
+
+- Sotuvchi resursini tekshiradi.
+- Xaridor tangasini tekshiradi.
+- Savdoni tranzaksiya orqali bajaradi.
+- Yetkazib berish holatini saqlaydi.
+- Ikkala o‘yinchiga natijani yuboradi.
+
+Server authoritative arxitekturadan foydalan.
+
+---
+
+# 15. GLOBAL TRADE NETWORK
+
+Barcha o‘yinchi va AI saltanatlar uchun umumiy savdo tarmog‘i yarat.
+
+Dastlab Andijon hududlari o‘rtasidagi savdoni qo‘llab-quvvatla.
+
+Keyinchalik:
+
+- Farg‘ona vodiysi
+- O‘zbekistonning boshqa hududlari
+- Osiyo bo‘ylab savdo yo‘llari
+
+uchun kengaytirish mumkin bo‘lsin.
+
+### Global Market
+
+- Mahsulot narxlari.
+- Savdo takliflari.
+- Talab va taklif.
+- Savdo hajmi.
+- Faol karvonlar.
+- Mahsulot tanqisligi.
+
+O‘yinchi turli hududlarning savdo holatini ko‘ra olsin.
+
+Tarixiy savdo muhiti uchun Ipak yo‘li yo‘nalishlaridan ilhomlanish mumkin, lekin aniq tarixiy geografik va savdo da’volari tekshirilgan manbalarga asoslanishi kerak.
+
+---
+
+# 16. SUPPLY & DEMAND ECONOMY
+
+Mahsulotlar narxi real savdo statistikalariga bog‘liq bo‘lsin.
+
+Har bir bozor uchun:
+
+- CurrentSupply
+- CurrentDemand
+- BasePrice
+- MarketPrice
+- TradeVolume
+- PriceHistory
+- ShortageLevel
+
+ko‘rsatkichlarini hisobla.
+
+Misollar:
+
+- Guruch ko‘payganda taklif ortadi.
+- Non yetishmaganda talab kuchayadi.
+- Mato ko‘payganda ayrim hududlarda narx pasayishi mumkin.
+- Yangi savdo yo‘li ochilsa mahsulot yetkazish imkoniyati yaxshilanadi.
+
+Narxlar sekin va balanslangan tarzda o‘zgarsin.
+
+Sun’iy cheksiz pul yoki resurs yaratadigan iqtisodiy sikllarga yo‘l qo‘yma.
+
+---
+
+# 17. TRADE CONTRACTS
+
+O‘yinchilar bir martalik savdodan tashqari savdo shartnomasi ham tuza olsin.
+
+Misol:
+
+**ASAKA → SHAHRIXON**
+
+Mahsulot: Guruch.
+
+Miqdor: Har o‘yin haftasida 50 birlik.
+
+Narx: Kelishilgan qiymat.
+
+Davomiylik: Belgilangan o‘yin davri.
+
+Har bir shartnomada:
+
+- ContractId
+- SellerKingdomId
+- BuyerKingdomId
+- ResourceId
+- QuantityPerDelivery
+- Price
+- DeliverySchedule
+- ContractStatus
+- ExpirationGameTime
+
+bo‘lsin.
+
+Har bir davriy yetkazish vaqtida mahsulot va tanga mavjudligi qayta tekshirilsin.
+
+Shartnoma cheksiz resurs yaratmasin.
+
+Resurs yetishmasa, yetkazish kechikishi yoki shartnoma shartlariga ko‘ra bekor qilinishi mumkin.
+
+---
+
+# 18. AI KINGDOM ECONOMY
+
+AI saltanatlar ham ishlab chiqarish va savdo tizimidan foydalansin.
+
+Masalan:
+
+**ANDIJON AI**
+- Mato ishlab chiqarishga e’tibor beradi.
+- Guruch sotib oladi.
+- Savdo aloqalarini kengaytiradi.
+
+**SHAHRIXON AI**
+- Hunarmandchilikni rivojlantiradi.
+- Ustaxonalar quradi.
+- Tayyor mahsulotlarni bozorga chiqaradi.
+
+AI:
+
+- Resurslarni tekshiradi.
+- Talabni baholaydi.
+- Ishlab chiqarishni rejalashtiradi.
+- Savdo taklifi yaratadi.
+- Shartnomalar tuzadi.
+
+Ammo AI saltanatlar cheksiz resursga ega bo‘lmasin.
+
+Ular ham o‘yinchi bilan bir xil iqtisodiy qoidalarga amal qilsin.
+
+---
+
+# 19. DONISHMAND VAZIR — ECONOMIC ADVISOR
+
+Donishmand Vazir yangi iqtisodiyot tizimlarini tahlil qilsin.
+
+### Misol 1 — XOMASHYO KO‘P
+
+“Hazratim, omborimizda xom guruch zaxirasi ko‘paymoqda. Uni qayta ishlash uchun yangi ustaxona qurish foydali bo‘lishi mumkin.”
+
+### Misol 2 — OMBOR TO‘LGAN
+
+“Hazratim, mavjud ombor sig‘imi yetarli emas. Yangi ombor qurish yoki eskisini kengaytirishni tavsiya qilaman.”
+
+### Misol 3 — SAVDO IMKONIYATI
+
+“Hazratim, boshqa saltanatda guruchga talab yuqori. Savdo taklifini yaratishni tavsiya qilaman.”
+
+### Misol 4 — XOMASHYO YETISHMAYDI
+
+“Hazratim, to‘quv ustaxonamizda ip zaxirasi yetishmayapti. Paxta ishlab chiqarishni rivojlantirish yoki boshqa saltanatdan xomashyo sotib olish mumkin.”
+
+Har bir maslahat haqiqiy GameState asosida chiqsin.
+
+---
+
+# 20. PROFESSIONAL PRODUCTION UI
+
+Yangi bo‘lim:
+
+**ISHLAB CHIQARISH**
+
+Tablar:
+
+1. XOMASHYO
+2. USTAXONALAR
+3. ISHLAB CHIQARISH NAVBATI
+4. OMBORLAR
+5. TAYYOR MAHSULOTLAR
+6. SAVDO
+
+Har bir ustaxona kartasida:
+
+- Bino nomi.
+- Rasm yoki ikonka.
+- Ishchilar.
+- Ishlab chiqarilayotgan mahsulot.
+- Kerakli xomashyo.
+- Progress.
+- Qolgan o‘yin vaqti.
+- Ombor holati.
+
+ko‘rsatilsin.
+
+Tugmalar:
+
+- ISHLAB CHIQARISH
+- TO‘XTATISH
+- DAVOM ETTIRISH
+- XARITADA KO‘RSATISH
+
+Barcha tugmalar haqiqiy funksiyaga ega bo‘lsin.
+
+---
+
+# 21. PRODUCTION CHAIN VISUALIZATION
+
+O‘yinchi mahsulot qayerdan kelishini va qanday ishlab chiqarilishini tushuna olsin.
+
+Yangi ekran:
+
+**MAHSULOT ZANJIRI**
+
+Misol:
+
+```text
+BUG‘DOY
+   ↓
+TEGIRMON
+   ↓
+UN
+   ↓
+NOVVOYXONA
+   ↓
+NON
+   ↓
+BOZOR
+```
+
+Har bir bosqichni bosganda:
+
+- Tegishli bino.
+- Kerakli resurs.
+- Ishlab chiqarish vaqti.
+- Mahsulot miqdori.
+- Narxi.
+
+ko‘rsatilsin.
+
+Agar kerakli bino qurilmagan bo‘lsa, uning qurilish talablarini ko‘rsat.
+
+---
+
+# 22. MARKETPLACE UI/UX
+
+PROMPT 19B va 21 da yaratilgan professional UI Design Systemdan foydalan.
+
+Marketplace bo‘limlari:
+
+- SOTIB OLISH
+- SOTISH
+- SAVDO SHARTNOMALARI
+- KARVONLAR
+- SAVDO TARIXI
+
+### Mahsulot kartasi
+
+- Mahsulot nomi.
+- Ikonkasi.
+- Miqdori.
+- Narxi.
+- Sotuvchi saltanat.
+- Yetkazib berish holati.
+
+### Narx grafigi
+
+So‘nggi o‘yin davrlaridagi narx o‘zgarishlarini ko‘rsatsin.
+
+Grafik haqiqiy ma’lumotlardan olinsin.
+
+Sun’iy random narxlar bilan to‘ldirma.
+
+---
+
+# 23. ANIMATIONS & VISUAL FEEDBACK
+
+Oldingi AnimationSystem dan foydalan.
+
+### Dehqonchilik
+
+- Ekin ekish.
+- O‘sish bosqichlari.
+- Hosil yig‘ish.
+
+### Ustaxonalar
+
+- Tegirmonning aylanishi.
+- Hunarmandning ish jarayoni.
+- To‘quv dastgohining stilizatsiyalangan harakati.
+- Omborga yuk olib kirish.
+
+### Savdo
+
+- Arava harakati.
+- Karvon jo‘nashi.
+- Karvon yetib kelishi.
+- Omborda yuk tushirish.
+
+### UI
+
+- Production progress.
+- Savdo yakunlangani haqida notification.
+- Yangi retsept ochilishi.
+- Mahsulot zaxirasi o‘zgarishi.
+
+Animatsiyalar professional va silliq bo‘lsin.
+
+Ammo hech bir vizual animatsiya serverdagi iqtisodiy operatsiyani mustaqil ravishda takror bajarmasin.
+
+---
+
+# 24. MULTIPLAYER SERVER ARCHITECTURE
+
+Windows va Android bitta online serverga ulansin.
+
+### Server boshqaradi
+
+- Crop growth.
+- Harvesting.
+- Inventories.
+- Production jobs.
+- Resource reservations.
+- Warehouses.
+- Market orders.
+- Trade contracts.
+- Caravan deliveries.
+- Kingdom ownership.
+- Economic simulation.
+
+### Client boshqaradi
+
+- UI.
+- Kamera.
+- Input.
+- Animatsiyalar.
+- Vizual progress.
+- Server natijalarini ko‘rsatish.
+
+Serverda barcha muhim resurs operatsiyalari tekshirilsin.
+
+Kerakli invariantlar:
+
+- Mahsulot ikki marta ishlab chiqarilmasin.
+- Bir hosil ikki marta yig‘ilmasin.
+- Resurs ikki marta sotilmasin.
+- Xaridor balansi manfiy bo‘lmasin.
+- Ombor sig‘imi buzilmasin.
+- Trade command takror bajarilmasin.
+
+---
+
+# 25. SAVE / LOAD
+
+Serverda saqlanadigan ma’lumotlar:
+
+- Crop states.
+- Farm fields.
+- Production recipes.
+- Active production jobs.
+- Reserved resources.
+- Warehouse inventory.
+- Trade offers.
+- Trade contracts.
+- Delivery jobs.
+- Caravan states.
+- Market prices.
+- Economic statistics.
+
+Server restartdan keyin:
+
+- Ishlab chiqarish navbatlari tiklansin.
+- Mahsulotlar yo‘qolmasin.
+- Savdo operatsiyalari takroran bajarilmasin.
+- Karvon yetkazib berish holati saqlansin.
+- O‘yin vaqti izchil davom etsin.
+
+---
+
+# 26. PERFORMANCE
+
+Maqsadli Windows PC:
+
+- Intel Core i5-12400.
+- 8 GB RAM.
+- Intel UHD 730.
+
+Android uchun ham optimallashtir.
+
+Talablar:
+
+- Ekinlar har frame da hisoblanmasin.
+- Production jobs simulyatsiya ticklari orqali yangilansin.
+- Bozor narxlari belgilangan iqtisodiy davrda yangilansin.
+- Karvonlarning uzoq masofadagi holati statistik hisoblanishi mumkin.
+- Yaqindagi karvonlar animatsiyali bo‘lsin.
+- Resource icon va spritelar cache qilinsin.
+- Database querylar optimallashtirilsin.
+- UI barcha resurslarni har frame da qayta hisoblamasin.
+
+Katta iqtisodiy tizim Intel UHD 730 va Android qurilmalarida FPSni sezilarli pasaytirmasligi kerak.
+
+FPS natijasini faqat real o‘lchashdan keyin qayd et.
+
+---
+
+# 27. C# ARCHITECTURE
+
+Mavjud loyiha asosida kerakli modullarni qo‘sh.
+
+```text
+AndijonSaltanatlar/
+│
+├── Resources/
+│   ├── ResourceDefinition.cs
+│   ├── ResourceCatalog.cs
+│   ├── InventoryManager.cs
+│   └── ResourceReservationService.cs
+│
+├── Agriculture/
+│   ├── CropDefinition.cs
+│   ├── CropGrowthSystem.cs
+│   ├── FarmField.cs
+│   └── HarvestService.cs
+│
+├── Production/
+│   ├── ProductionRecipe.cs
+│   ├── ProductionManager.cs
+│   ├── ProductionJob.cs
+│   ├── ProductionScheduler.cs
+│   └── ProductionValidator.cs
+│
+├── Workshops/
+│   ├── WorkshopManager.cs
+│   ├── WorkshopState.cs
+│   └── WorkshopEfficiencySystem.cs
+│
+├── Logistics/
+│   ├── WarehouseManager.cs
+│   ├── DeliveryJob.cs
+│   ├── CaravanManager.cs
+│   └── CargoReservationService.cs
+│
+├── Trading/
+│   ├── MarketManager.cs
+│   ├── TradeContract.cs
+│   ├── TradeTransactionService.cs
+│   ├── MarketPricingSystem.cs
+│   └── GlobalMarketService.cs
+│
+├── Advisor/
+│   └── EconomicAdvisor.cs
+│
+└── UI/
+    ├── ProductionDashboard.cs
+    ├── WorkshopPanel.cs
+    ├── ProductionChainPanel.cs
+    ├── GlobalMarketplaceScreen.cs
+    └── TradeContractsPanel.cs
+```
+
+Agar ushbu klasslar oldingi bosqichlardan mavjud bo‘lsa, ikkinchi nusxasini yaratma.
+
+---
+
+# 28. FIRST WORKING VERTICAL SLICE
+
+**BIRINCHI NAVBATDA SHU ZANJIRNI HAQIQATAN ISHLAT:**
+
+ASAKA SHAHRI
+↓
+GURUCH EKISH
+↓
+GURUCH O‘SISHI
+↓
+HOSIL YIG‘ISH
+↓
+XOM GURUCHNI OMBORGA JOYLASH
+↓
+GURUCH TOZALASH USTAXONASI
+↓
+XOMASHYONI QAYTA ISHLASH
+↓
+TOZALANGAN GURUCH
+↓
+MARKETPLACE
+↓
+WINDOWS PLAYER SAVDO TAKLIFI
+↓
+ANDROID PLAYER SOTIB OLADI
+↓
+SERVER TRANZAKSIYANI BAJARADI
+↓
+IKKALA CLIENT YANGILANADI
+↓
+SAVE / RECONNECT
+
+Bu zanjir to‘liq ishlamaguncha boshqa ishlab chiqarish zanjirlarini tayyor deb hisoblama.
+
+---
+
+# 29. SECOND WORKING VERTICAL SLICE
+
+**BUG‘DOY → TEGIRMON → UN → NOVVOYXONA → NON → BOZOR**
+
+Shartlar:
+
+1. Bug‘doy yetishtiriladi.
+2. Tegirmon quriladi.
+3. Bug‘doy unga aylantiriladi.
+4. Novvoyxona quriladi.
+5. Undan non ishlab chiqariladi.
+6. Non bozorga yetkaziladi.
+7. Fuqarolar iste’moli yoki savdo bilan bog‘lanadi.
+8. Resurs va iqtisodiyot statistikasi yangilanadi.
+
+Bu zanjirni mavjud PopulationManager bilan integratsiya qil.
+
+---
+
+# 30. THIRD WORKING VERTICAL SLICE
+
+**AI SALTANAT → RESURSLARNI TAHLIL QILISH → USTAXONA QURISH → MAHSULOT ISHLAB CHIQARISH → BOZORGA SOTUVGA QO‘YISH → O‘YINCHI SOTIB OLISHI**
+
+AI iqtisodiyoti ham o‘yinchining iqtisodiyotiga bir xil qoidalar asosida ishlasin.
+
+---
+
+# 31. TESTING
+
+Quyidagi testlarni bajar.
+
+### Agriculture
+
+- [ ] Guruch ekiladi.
+- [ ] Guruch o‘sadi.
+- [ ] Hosil yig‘iladi.
+- [ ] Hosil ikki marta yig‘ilmaydi.
+- [ ] Suv ta’minoti hisobga olinadi.
+
+### Production
+
+- [ ] Retseptlar JSON dan yuklanadi.
+- [ ] Xomashyo tekshiriladi.
+- [ ] Ishlab chiqarish boshlanadi.
+- [ ] Xomashyo bir marta sarflanadi.
+- [ ] Tayyor mahsulot bir marta yaratiladi.
+- [ ] Ishlab chiqarish navbati ishlaydi.
+- [ ] Ustaxona ishchilarga bog‘langan.
+- [ ] Ombor sig‘imi tekshiriladi.
+
+### Trade
+
+- [ ] Bozor taklifi yaratiladi.
+- [ ] Sotuvchi resursga ega.
+- [ ] Xaridor tangaga ega.
+- [ ] Savdo bajariladi.
+- [ ] Resurs va tanga to‘g‘ri o‘tkaziladi.
+- [ ] Savdo ikki marta bajarilmaydi.
+- [ ] Karvon yetkazib berishi ishlaydi.
+- [ ] Savdo shartnomalari saqlanadi.
+
+### Multiplayer
+
+- [ ] Windows client ishlaydi.
+- [ ] Android client ishlaydi.
+- [ ] Ikkala client bitta WorldId ga ulanadi.
+- [ ] Global Marketplace sinxronlashadi.
+- [ ] Savdo natijalari ikkala qurilmada yangilanadi.
+- [ ] Reconnect ishlaydi.
+- [ ] Cloud Save ishlaydi.
+
+### UI / Animation
+
+- [ ] Production Dashboard ishlaydi.
+- [ ] Ustaxona paneli ishlaydi.
+- [ ] Production Chain ko‘rsatiladi.
+- [ ] Marketplace professional dizaynga ega.
+- [ ] Mobil UI responsive.
+- [ ] Dehqonchilik animatsiyalari ishlaydi.
+- [ ] Tegirmon va ustaxona animatsiyalari ishlaydi.
+- [ ] Karvonlar harakati silliq.
+- [ ] O‘zbekcha matnlar to‘g‘ri.
+
+---
+
+# 32. IMPLEMENTATION ORDER
+
+Ishni quyidagi tartibda bajar:
+
+1. Repository audit.
+2. Unified Resource System.
+3. Inventory reservations.
+4. Advanced Farming integration.
+5. Production Recipe Engine.
+6. Production Jobs.
+7. Rice Processing Workshop.
+8. Warehouse integration.
+9. Rice multiplayer trade.
+10. Wheat processing chain.
+11. Cotton and textile chain.
+12. Historical workshops.
+13. Caravan logistics.
+14. Global Marketplace.
+15. Trade contracts.
+16. AI Kingdom economy.
+17. Donishmand Vazir integration.
+18. Professional UI.
+19. Production animations.
+20. Multiplayer synchronization.
+21. Save/Load.
+22. Automated tests.
+23. Performance profiling.
+24. Windows and Android build verification.
+
+**Faqat reja yozib to‘xtama.**
+
+Avval ishlaydigan guruch zanjirini yarat.
+
+Keyin qolgan tizimlarga o‘t.
+
+---
+
+# 33. AGENT CONTINUITY
+
+Quyidagi faylni yarat yoki yangila:
+
+`docs/PROMPT_23_PROGRESS.md`
+
+Unda:
+
+- Tekshirilgan mavjud tizimlar.
+- Yaratilgan resurslar.
+- Ishlayotgan retseptlar.
+- Ishlab chiqarish ustaxonalari.
+- Guruch savdo zanjiri.
+- Global Marketplace holati.
+- Multiplayer natijalari.
+- Animatsiya va UI holati.
+- Test natijalari.
+- Build natijalari.
+- Bajarilmagan ishlar.
+
+saqlansin.
+
+Ishlamagan funksiyalarni Completed deb ko‘rsatma.
+
+---
+
+# 34. FINAL ACCEPTANCE CRITERIA
+
+- [ ] Guruch yetishtirish ishlaydi.
+- [ ] Guruch qayta ishlanadi.
+- [ ] Tayyor guruch sotiladi.
+- [ ] Bug‘doydan un ishlab chiqariladi.
+- [ ] Undan non ishlab chiqariladi.
+- [ ] Paxtadan mato ishlab chiqarish mumkin.
+- [ ] Tarixiy ustaxonalar mavjud.
+- [ ] Production recipes ishlaydi.
+- [ ] Omborlar to‘g‘ri hisoblanadi.
+- [ ] Resurs rezervlari ishlaydi.
+- [ ] Karvon logistika tizimi ishlaydi.
+- [ ] Player-to-player trade ishlaydi.
+- [ ] AI saltanatlar savdo qiladi.
+- [ ] Global Marketplace mavjud.
+- [ ] Savdo shartnomalari mavjud.
+- [ ] Narxlar talab va taklif asosida hisoblanadi.
+- [ ] Donishmand Vazir iqtisodiy maslahat beradi.
+- [ ] Professional Production Dashboard mavjud.
+- [ ] Windows UI ishlaydi.
+- [ ] Android UI ishlaydi.
+- [ ] Animatsiyalar yaxshilangan.
+- [ ] Save/Load ishlaydi.
+- [ ] Server authoritative.
+- [ ] Windows build tekshirilgan.
+- [ ] Android build tekshirilgan.
+
+---
+
+# 35. FINAL INSTRUCTION
+
+**MAVJUD ANDIJON: SALTANATLAR LOYIHASIGA HAQIQIY ISHLAYDIGAN PRODUCTION CHAIN VA MULTIPLAYER TRADE TIZIMINI QO‘SH.**
+
+Men Windows PC da guruch ekaman.
+
+Guruch o‘sadi.
+
+Hosilni yig‘aman.
+
+Guruchni qayta ishlash ustaxonasiga yuboraman.
+
+Tayyor guruchni omborga joylayman.
+
+Boshqa o‘yinchiga sotuvga qo‘yaman.
+
+Sherigim Android telefonida ushbu savdo taklifini ko‘radi va sotib oladi.
+
+Barcha jarayon serverda saqlanadi.
+
+Bundan tashqari:
+
+- Bug‘doydan un va non ishlab chiqaraman.
+- Paxtadan mato tayyorlayman.
+- Ustaxonalarni rivojlantiraman.
+- Karvonlar orqali shaharlararo savdo qilaman.
+- Boshqa saltanatlar bilan shartnomalar tuzaman.
+- Donishmand Vazirdan iqtisodiy tavsiyalar olaman.
+- Mahsulotlar va ishlab chiqarish jarayonlarini chiroyli UI orqali boshqaraman.
+
+**ENG MUHIM:**
+
+Oldingi Windows + Android multiplayer tizimini buzma.
+
+Yangi o‘yin yaratma.
+
+Ishlab chiqarish tizimini mavjud EconomyManager, FarmingSystem, WarehouseManager va Marketplace bilan birlashtir.
+
+Har bir ishlab chiqarish, resurs sarflash va savdo operatsiyasi serverda to‘g‘ri hisoblanishi kerak.
+
+Ish yakunida:
+
+1. O‘zgartirilgan C# fayllar.
+2. Ishlayotgan production chains.
+3. Yaratilgan ustaxonalar.
+4. Resurs va ombor tizimi.
+5. Multiplayer savdo natijalari.
+6. AI iqtisodiyoti.
+7. UI/UX yaxshilanishlari.
+8. Animatsiyalar.
+9. Test natijalari.
+10. Windows va Android build holati.
+11. Hali bajarilmagan ishlar.
+
+bo‘yicha aniq hisobot ber.
+
+**ANDIJON: SALTANATLAR — YERDAN HOSIL OL, MAHSULOT ISHLAB CHIQAR, KARVONLAR ORQALI SAVDO QIL VA O‘Z SALTANATING IQTISODIYOTINI RIVOJLANTIR!**
+
+# PROMPT 24 — ANDIJON: SALTANATLAR
+## Advanced Kingdom Progression, Historical Technology Tree, City Specialization, Economic Competition & Civilization Development
+
+### TECH STACK
+C# + MonoGame + ASP.NET Core + PostgreSQL + SignalR
+
+### TARGET PLATFORMS
+Windows PC + Android Multiplayer
+
+---
+
+# 1. SENING ROLING
+
+Sen quyidagi sohalarda professional Senior Game Developer sifatida ishlaysan:
+
+- C# / MonoGame Development
+- Strategy & Civilization Game Architecture
+- Technology Tree Engineering
+- City Specialization Systems
+- Advanced Game Economy Simulation
+- AI Kingdom Development
+- Multiplayer Backend Architecture
+- Historical Game Design
+- Professional Game UI/UX
+- Animation & Rendering Optimization
+- Testing & Release Engineering
+
+Biz **ANDIJON: SALTANATLAR** nomli 2.5D izometrik tarixiy city-builder va multiplayer strategiya o‘yinini yaratmoqdamiz.
+
+**MUHIM: BU PROMPT 24. MAVJUD LOYIHANI BOSHDAN YARATMA!**
+
+Oldingi 23 bosqichni bajarilgan deb taxmin qilma. Avval repositoryni tekshir.
+
+Ayniqsa:
+
+- TechnologySystem
+- ResearchManager
+- CityManager
+- KingdomManager
+- EconomyManager
+- FarmingSystem
+- ProductionSystem
+- Marketplace
+- CaravanManager
+- AI Governor
+- AI Kingdoms
+- PopulationManager
+- EducationSystem
+- BuildingSystem
+- WorldMap
+- Multiplayer Server
+- SaveSystem
+- UI Design System
+
+modullarining haqiqiy holatini aniqlagin.
+
+Mavjud ishlaydigan kodlardan foydalan. Ikkinchi mustaqil iqtisodiyot, texnologiya yoki shahar boshqaruvi tizimini yaratma.
+
+---
+
+# 2. ASOSIY MAQSAD
+
+O‘yinga beshta asosiy imkoniyat qo‘sh:
+
+1. **Advanced Technology Tree** — yangi texnologiyalarni tadqiq qilish.
+2. **City Specialization** — shaharlarni ma’lum iqtisodiy sohalarga ixtisoslashtirish.
+3. **Kingdom Progression** — saltanat rivojlanish bosqichlari.
+4. **Economic Competition** — boshqa o‘yinchilar va AI saltanatlar bilan iqtisodiy raqobat.
+5. **Civilization Dashboard** — barcha rivojlanish ko‘rsatkichlarini professional interfeys orqali boshqarish.
+
+Bu tizimlar avvalgi farming, ishlab chiqarish, ta’lim, savdo, hududlar va multiplayer tizimlariga bog‘langan bo‘lishi kerak.
+
+---
+
+# 3. KINGDOM PROGRESSION
+
+Saltanat vaqt o‘tishi bilan rivojlansin.
+
+Progression darajalari o‘yin uchun quyidagicha bo‘lishi mumkin:
+
+### LEVEL 1 — KICHIK QISHLOQ
+- Oddiy turar joylar
+- Dehqonchilik
+- Kichik bozor
+- Asosiy yo‘llar
+
+### LEVEL 2 — RIVOJLANAYOTGAN SHAHAR
+- Ustaxonalar
+- Omborlar
+- Kengaygan dehqonchilik
+- Yangi mahallalar
+
+### LEVEL 3 — SAVDO MARKAZI
+- Katta bozor
+- Karvonsaroy
+- Savdo yo‘llari
+- Murakkabroq ishlab chiqarish
+
+### LEVEL 4 — RIVOJLANGAN SALTANAT
+- Bir nechta shahar
+- Madrasalar
+- Kutubxonalar
+- Rivojlangan hunarmandchilik
+- Diplomatik imkoniyatlar
+
+### LEVEL 5 — YIRIK SALTANAT
+- Katta hududlar
+- Kuchli iqtisodiyot
+- Shaharlararo ixtisoslashuv
+- Murakkab boshqaruv
+- Keng savdo tarmoqlari
+
+Darajalar balans va mavjud gameplay asosida sozlansin.
+
+Progression faqat aholi soniga bog‘liq bo‘lmasin.
+
+Quyidagilar ham hisobga olinsin:
+
+- Population
+- Economy
+- Education
+- Technology
+- Infrastructure
+- Culture
+- RegionalDevelopment
+
+---
+
+# 4. HISTORICAL TECHNOLOGY TREE
+
+Avvalgi TechnologySystem mavjud bo‘lsa, aynan o‘shani kengaytir.
+
+Yangi mustaqil TechnologyManager yaratma.
+
+Texnologiyalar daraxti quyidagi yo‘nalishlarga ajratilsin:
+
+### A. AGRICULTURE
+- Sug‘orish
+- Dehqonchilik usullari
+- Hosilni saqlash
+- Samarali yer boshqaruvi
+- Qishloq xo‘jaligi rivojlanishi
+
+### B. CRAFTSMANSHIP
+- Kulolchilik
+- To‘quvchilik
+- Yog‘ochsozlik
+- Metallga ishlov berish
+- Murakkab hunarmandchilik
+
+### C. COMMERCE
+- Savdo rastalari
+- Karvon savdosi
+- Savdo hisob-kitoblari
+- Ombor boshqaruvi
+- Savdo tarmog‘i rivojlanishi
+
+### D. EDUCATION & SCIENCE
+- Savodxonlik
+- Ta’lim tizimi
+- Kutubxonalar
+- Astronomiya va ilmiy bilimlar
+- Ilmiy muassasalar
+
+### E. ARCHITECTURE
+- Oddiy qurilish
+- Mustahkam inshootlar
+- Ko‘priklar
+- Me’moriy bezaklar
+- Katta jamoat inshootlari
+
+### F. ADMINISTRATION
+- Mahalla boshqaruvi
+- Soliq hisoboti
+- Shahar hokimligi
+- Hududiy boshqaruv
+- Saltanat ma’muriyati
+
+Texnologiyalar tegishli tarixiy ssenariyga mos bo‘lsin.
+
+**Amir Temur va Zahiriddin Muhammad Bobur turli tarixiy davrlarda yashagan.** Ularni bitta davrda zamondosh qilib ko‘rsatma. Kampaniyalarga mos texnologiya va madaniy bosqichlarni alohida konfiguratsiya qil.
+
+---
+
+# 5. RESEARCH SYSTEM
+
+Har bir texnologiya quyidagi modelga ega bo‘lsin:
+
+```csharp
+public sealed class TechnologyDefinition
+{
+    public string Id { get; set; } = "";
+    public string NameUz { get; set; } = "";
+    public string CategoryId { get; set; } = "";
+
+    public List<string> PrerequisiteIds { get; set; } = new();
+
+    public int ResearchCost { get; set; }
+    public int ResearchGameMinutes { get; set; }
+
+    public List<string> UnlockIds { get; set; } = new();
+    public List<string> ModifierIds { get; set; } = new();
+}
+```
+
+Bu misolni mavjud kod arxitekturasiga moslashtir.
+
+Har bir texnologiyada:
+
+- Nomi
+- Tavsifi
+- Talablari
+- Tadqiqot xarajati
+- Tadqiqot davomiyligi
+- Ochiladigan imkoniyatlar
+- Gameplay bonuslari
+
+bo‘lsin.
+
+### Research states
+
+```text
+Locked
+Available
+Researching
+Completed
+```
+
+O‘yinchi bir texnologiyani ikki marta ochib, bonuslarni takror olmasin.
+
+---
+
+# 6. TECHNOLOGY UNLOCKS
+
+Texnologiya ochilganda haqiqiy gameplay o‘zgarsin.
+
+Masalan:
+
+**SUG‘ORISHNI TAKOMILLASHTIRISH**
+
+Natija:
+
+- Ayrim dehqonchilik binolarining samaradorligi oshishi mumkin.
+- Yangi sug‘orish inshootlari ochilishi mumkin.
+
+**TO‘QUVCHILIK RIVOJI**
+
+Natija:
+
+- Yangi to‘quv ustaxonasi.
+- Yangi ishlab chiqarish retseptlari.
+- Mato ishlab chiqarish uchun qo‘shimcha imkoniyat.
+
+**SAVDO HISOB-KITOBLARI**
+
+Natija:
+
+- Ayrim savdo boshqaruv imkoniyatlari.
+- Kengaytirilgan iqtisodiy hisobotlar.
+
+**ME’MORCHILIK RIVOJI**
+
+Natija:
+
+- Yangi bino variantlari.
+- Binolarni yangilash imkoniyatlari.
+- Yangi bezak va qurilish texnologiyalari.
+
+Bonuslar mavjud BuildingCatalog, ProductionRecipeEngine va EconomyManager orqali qo‘llanilsin.
+
+---
+
+# 7. TECHNOLOGY DEPENDENCY GRAPH
+
+Technology Tree haqiqiy dependency graph asosida ishlasin.
+
+Misol:
+
+```text
+ASOSIY DEHQONCHILIK
+        ↓
+SUG‘ORISH
+        ↓
+HOSILDORLIKNI YAXSHILASH
+        ↓
+RIVOJLANGAN DEHQONCHILIK
+```
+
+Boshqa yo‘nalish:
+
+```text
+HUNARMANDCHILIK
+        ↓
+TO‘QUVCHILIK
+        ↓
+MATO ISHLAB CHIQARISH
+        ↓
+MURAKKAB TIKUVCHILIK
+```
+
+Talablar:
+
+- Graphda noto‘g‘ri circular dependency bo‘lmasin.
+- Ochildigan texnologiyalar aniq ko‘rsatilsin.
+- Qulflangan texnologiya sababini UI tushuntirsin.
+- Research yakunlangach tegishli imkoniyatlar avtomatik ochilsin.
+- Research progress serverda saqlansin.
+
+---
+
+# 8. CITY SPECIALIZATION SYSTEM
+
+**BU PROMPTNING ENG MUHIM QISMI.**
+
+Har bir shahar o‘ziga xos rivojlanish yo‘nalishiga ega bo‘lsin.
+
+O‘yinchi shaharni quyidagi ixtisosliklardan biriga yo‘naltira olsin:
+
+1. Dehqonchilik markazi
+2. Hunarmandchilik markazi
+3. Savdo markazi
+4. Ilm-fan va ta’lim markazi
+5. Madaniyat markazi
+6. Aralash rivojlanish
+
+Dastlab bitta asosiy ixtisoslik bo‘lsin.
+
+Keyinchalik ikkilamchi yo‘nalishlar qo‘shishga mos architecture yarat.
+
+Ixtisoslik shahar iqtisodiyotini va rivojlanish ko‘rsatkichlarini haqiqatan o‘zgartirsin.
+
+---
+
+# 9. CITY SPECIALIZATION — EXAMPLES
+
+## ASAKA — AGRICULTURE CENTER
+
+O‘yinchi Asakani dehqonchilik markaziga aylantiradi.
+
+Natija:
+
+- Guruch yetishtirish imkoniyatlari yaxshilanadi.
+- Qishloq xo‘jaligi infratuzilmasiga ustuvorlik beriladi.
+- Oziq-ovqat ishlab chiqarish rivojlanadi.
+- Ombor va sug‘orish tizimi muhim bo‘ladi.
+
+## SHAHRIXON — CRAFTSMANSHIP CENTER
+
+O‘yinchi Shahrixonni hunarmandchilik markaziga aylantiradi.
+
+Natija:
+
+- To‘quv ustaxonalari rivojlanadi.
+- Kulolchilik va yog‘ochsozlik faoliyati kuchayadi.
+- Qayta ishlash samaradorligi yaxshilanadi.
+- Xomashyoga talab oshishi mumkin.
+
+## ANDIJON — TRADE CENTER
+
+O‘yinchi Andijonni savdo markaziga aylantiradi.
+
+Natija:
+
+- Bozorlar rivojlanadi.
+- Karvon savdosiga qulayliklar ochiladi.
+- Savdo hajmini kengaytirish imkoniyatlari paydo bo‘ladi.
+- Shahar iqtisodiyoti transport va logistika bilan kuchliroq bog‘lanadi.
+
+**Muhim:** Bu shaharlarga berilgan yo‘nalishlar o‘yin ssenariysi namunasi. Ularning haqiqiy tarixiy iqtisodiy ixtisosligi haqida tekshirilmagan da’vo qilma.
+
+---
+
+# 10. SPECIALIZATION LEVELS
+
+Har bir shahar ixtisosligi rivojlanish darajasiga ega bo‘lsin.
+
+### LEVEL 1 — BOSHLANG‘ICH
+
+Kichik bonuslar va asosiy ishlab chiqarish.
+
+### LEVEL 2 — RIVOJLANAYOTGAN
+
+Yangi binolar yoki samaradorlik imkoniyatlari.
+
+### LEVEL 3 — IXTSISOSLASHGAN
+
+Kengaytirilgan ishlab chiqarish va iqtisodiy ustunliklar.
+
+### LEVEL 4 — HUDUDIY MARKAZ
+
+Qo‘shni shaharlar bilan savdoga bog‘langan rivojlanish.
+
+### LEVEL 5 — SALTANAT MARKAZI
+
+O‘z sohasidagi eng yuqori gameplay rivojlanish darajasi.
+
+Daraja oshishi:
+
+- Binolar
+- Ishchilar
+- Resurslar
+- Ta’lim
+- Tadqiqotlar
+- Ishlab chiqarish
+- Savdo
+
+ko‘rsatkichlariga bog‘liq bo‘lsin.
+
+**Faqat bitta tugma orqali cheksiz bonus olishga yo‘l qo‘yma.**
+
+---
+
+# 11. SPECIALIZATION EFFECTS
+
+Har bir ixtisoslik uchun data-driven modifier tizimi yarat.
+
+Modifierlar:
+
+- AgricultureEfficiency
+- ProductionEfficiency
+- TradeCapacity
+- ResearchEfficiency
+- EducationCapacity
+- CulturalDevelopment
+- LogisticsEfficiency
+- StorageEfficiency
+
+Misol:
+
+```json
+{
+  "id": "agriculture_level_2",
+  "citySpecialization": "agriculture",
+  "requiredLevel": 2,
+  "modifiers": [
+    {
+      "type": "crop_yield_multiplier",
+      "value": 1.10
+    }
+  ]
+}
+```
+
+Bu qiymat namuna, o‘yin balansi uchun sozlanishi kerak.
+
+Bonuslar aynan tegishli tizimda ishlasin.
+
+Ixtisoslik darajasi bir necha marta yuklanganda modifier qayta-qayta qo‘shilmasin.
+
+---
+
+# 12. MULTI-CITY ECONOMIC SYNERGY
+
+Bir saltanatdagi shaharlar bir-birini qo‘llab-quvvatlasin.
+
+Misol:
+
+**ASAKA**
+Guruch yetishtiradi.
+
+↓
+
+**ANDIJON**
+Guruchni boshqa saltanatlarga sotadi.
+
+↓
+
+**SHAHRIXON**
+Savdo orqali kelgan resurslardan hunarmandchilik mahsulotlarini ishlab chiqaradi.
+
+↓
+
+**BOSHQA SHAHARLAR**
+Tayyor mahsulotlardan foydalanadi.
+
+Bu savdo va resurslarni tashish mavjud CaravanManager, LogisticsManager va Marketplace orqali ishlasin.
+
+Shaharlar orasida mahsulotlar teleport bo‘lib o‘tmasin.
+
+---
+
+# 13. KINGDOM DEVELOPMENT SCORE
+
+Har bir saltanat uchun rivojlanish ko‘rsatkichlari hisoblanadigan tizim yarat.
+
+Yo‘nalishlar:
+
+- Economy
+- Agriculture
+- Trade
+- Education
+- Technology
+- Culture
+- Infrastructure
+- PopulationWellbeing
+
+Bu ko‘rsatkichlar asosida:
+
+**KINGDOM DEVELOPMENT SCORE**
+
+hisoblanadi.
+
+Har bir yo‘nalish uchun o‘yinning balansiga mos vaznlar tanlanadi.
+
+Score shunchaki mavjud tangalar soniga bog‘liq bo‘lmasin.
+
+Aholi hayoti, barqarorlik, xizmat ko‘rsatish va real iqtisodiyot ham muhim bo‘lsin.
+
+---
+
+# 14. ECONOMIC COMPETITION
+
+Boshqa o‘yinchilar va AI davlatlar bilan iqtisodiy raqobat qo‘sh.
+
+Raqobat yo‘nalishlari:
+
+- Eng rivojlangan shahar.
+- Eng yuqori savdo hajmi.
+- Eng yaxshi dehqonchilik.
+- Eng yuqori ishlab chiqarish.
+- Eng rivojlangan ta’lim.
+- Eng kuchli madaniyat.
+- Eng samarali infratuzilma.
+
+Har bir yo‘nalishda alohida reyting bo‘lsin.
+
+**Muhim:** Raqobat shunchaki kim ko‘proq pul sarflaganiga asoslanmasin.
+
+O‘yin ichidagi real samaradorlik va rivojlanish natijalari hisobga olinsin.
+
+Real pul, pullik ustunlik yoki qimor mexanikalarini qo‘shma.
+
+---
+
+# 15. KINGDOM LEADERBOARD
+
+Multiplayer uchun yangi ekran:
+
+**SALTANATLAR REYTINGI**
+
+Tablar:
+
+- UMUMIY
+- IQTISODIYOT
+- DEHQONCHILIK
+- SAVDO
+- ILM-FAN
+- MADANIYAT
+
+Har bir saltanat uchun:
+
+- Nom
+- Hukmdor
+- Asosiy shahar
+- Rivojlanish balli
+- Yo‘nalish reytingi
+
+ko‘rsatilsin.
+
+Reytinglar serverda hisoblanib, clientlarga yuborilsin.
+
+Client o‘z reytingini o‘zi belgilay olmasin.
+
+AI va haqiqiy o‘yinchilar tegishli shaffof qoidalar asosida hisoblangan bo‘lsin.
+
+---
+
+# 16. AI KINGDOM STRATEGY
+
+AI hukmdorlar o‘z davlatlarining rivojlanish yo‘nalishini tanlay olsin.
+
+Masalan:
+
+**Savdogar AI**
+- Bozorlar quradi.
+- Savdo texnologiyalarini ochadi.
+- Karvon yo‘llarini rivojlantiradi.
+
+**Bunyodkor AI**
+- Shaharlarni kengaytiradi.
+- Infratuzilmaga e’tibor beradi.
+- Qurilish texnologiyalarini rivojlantiradi.
+
+**Ilmparvar AI**
+- Kutubxonalar quradi.
+- Tadqiqotlarga resurs ajratadi.
+- Ta’lim markazlarini rivojlantiradi.
+
+**Dehqonchilikka yo‘naltirilgan AI**
+- Ekin maydonlarini rivojlantiradi.
+- Sug‘orishni yaxshilaydi.
+- Oziq-ovqat savdosini kengaytiradi.
+
+AI qarorlarida mavjud resurs, ilmiy talab, yer va ishchilar soni hisobga olinsin.
+
+AI cheksiz resurs yoki bepul texnologiya ochmasin.
+
+---
+
+# 17. HISTORICAL CAMPAIGN INTEGRATION
+
+Oldingi tarixiy kampaniya va ssenariylar mavjud bo‘lsa, texnologiya tizimini ularga bog‘la.
+
+Masalan:
+
+### TEMURIYLAR MAVZUSIDAGI SSENARIY
+
+Davrga mos:
+
+- Me’morchilik.
+- Ilm-fan.
+- Madaniy muassasalar.
+- Shahar boshqaruvi.
+
+### BOBUR MAVZUSIDAGI SSENARIY
+
+Davrga mos:
+
+- Bog‘dorchilik va landshaft madaniyati.
+- Adabiyot.
+- Boshqaruv.
+- Savdo va shahar rivoji.
+
+Har bir ssenariyda tarixiy faktlar va o‘yin uchun yaratilgan alternativ imkoniyatlar aniq farqlansin.
+
+Haqiqiy tarixiy shaxslar bilan bog‘liq ma’lumotlar tekshirilgan manbalarga asoslanishi kerak.
+
+O‘yinchi tanlovlari sabab tarixiy natijalar o‘zgarsa, buni alternativ tarix sifatida ko‘rsat.
+
+---
+
+# 18. TECHNOLOGY TREE UI
+
+**MUHIM: TEXNOLOGIYALAR DARAxtI PROFESSIONAL KO‘RINISHGA EGA BO‘LSIN.**
+
+Yangi ekran:
+
+**ILM-FAN VA TEXNOLOGIYALAR**
+
+Chap tomonda kategoriyalar:
+
+- DEHQONCHILIK
+- HUNARMANDCHILIK
+- SAVDO
+- ILM-FAN
+- ME’MORCHILIK
+- BOSHQARUV
+
+Markaziy qismda:
+
+- Technology nodes.
+- Bog‘lanish chiziqlari.
+- Qulflangan texnologiyalar.
+- Ochilgan texnologiyalar.
+- Research progress.
+
+O‘ng tomonda:
+
+- Texnologiya tavsifi.
+- Talablar.
+- Xarajat.
+- Davomiylik.
+- Bonuslar.
+- Tadqiqotni boshlash tugmasi.
+
+### Tugmalar
+
+- TADQIQOTNI BOSHLASH
+- TALABLARNI KO‘RISH
+- OCHILADIGAN BINOLAR
+- XARITADA KO‘RSATISH
+
+Node grafikasi barcha qurilmalarda tushunarli bo‘lsin.
+
+---
+
+# 19. CITY SPECIALIZATION UI
+
+Yangi panel:
+
+**SHAHAR IXTSISOSLASHUVI**
+
+Panelda:
+
+- Shahar nomi.
+- Joriy ixtisoslik.
+- Ixtisoslik darajasi.
+- Progress.
+- Bonuslar.
+- Keyingi daraja talablari.
+- Shahar iqtisodiy statistikasi.
+
+ko‘rsatilsin.
+
+O‘yinchi:
+
+- Ixtisoslikni tanlaydi.
+- Talablarni ko‘radi.
+- Rivojlanish rejasini tuzadi.
+- Donishmand Vazir maslahatini oladi.
+
+Ixtisoslikni istalgan vaqtda almashtirishning balansli qoidalarini belgilagin.
+
+Daraja yoki bonuslar suiiste’mol qilinishiga yo‘l qo‘yma.
+
+---
+
+# 20. KINGDOM PROGRESSION DASHBOARD
+
+Yangi katta boshqaruv bo‘limi:
+
+**SALTANAT RIVOJLANISHI**
+
+Unda:
+
+- Saltanat darajasi.
+- Jami shaharlar.
+- Ixtisoslashgan shaharlar.
+- Ochiq texnologiyalar.
+- Research progress.
+- Iqtisodiy rivojlanish.
+- Savdo hajmi.
+- Ta’lim.
+- Madaniyat.
+- Aholi farovonligi.
+
+ko‘rsatilsin.
+
+Har bir statistika haqiqiy GameState asosida hisoblanadi.
+
+---
+
+# 21. DONISHMAND VAZIR — DEVELOPMENT STRATEGIST
+
+Donishmand Vazir endi texnologiyalar va shahar ixtisoslashuvini tahlil qilsin.
+
+### Misol 1
+
+“Hazratim, Asaka shahrida dehqonchilik rivojlanmoqda. Sug‘orish tadqiqotini davom ettirish hosildorlikni oshirishga yordam berishi mumkin.”
+
+### Misol 2
+
+“Hazratim, Shahrixonda hunarmandlar va ustaxonalar ko‘paymoqda. Shaharni hunarmandchilik markaziga aylantirishni tavsiya qilaman.”
+
+### Misol 3
+
+“Hazratim, Andijon shahrida savdo hajmi yuqori. Karvon va bozor infratuzilmasini rivojlantirish foydali bo‘lishi mumkin.”
+
+### Misol 4
+
+“Hazratim, ilm-fan darajamiz ortmoqda. Yangi kutubxona va ta’lim inshootlari tadqiqotlarga yordam beradi.”
+
+Maslahatlar mavjud real ma’lumotlardan kelib chiqsin.
+
+Vazir foydalanuvchi tasdig‘isiz katta xarajat yoki research boshlamasin.
+
+---
+
+# 22. VISUAL CITY EVOLUTION
+
+Shahar rivojlanganda ko‘rinishi ham o‘zgarsin.
+
+Masalan:
+
+**DEHQONCHILIK MARKAZI**
+- Keng ekin maydonlari.
+- Sug‘orish kanallari.
+- Omborlar.
+- Dehqonchilik dekoratsiyalari.
+
+**HUNARMANDCHILIK MARKAZI**
+- Ustaxonalar.
+- Ish joylari.
+- Mahsulot tashuvchi aravalar.
+- Hunarmand NPC animatsiyalari.
+
+**SAVDO MARKAZI**
+- Bozorlar.
+- Karvonlar.
+- Karvonsaroylar.
+- Savdogarlar.
+
+**ILM-FAN MARKAZI**
+- Kutubxonalar.
+- Madrasalar.
+- Ilmiy va madaniy binolar.
+
+Visual changes haqiqiy qurilgan binolar asosida ko‘rsatilsin.
+
+Ixtisoslik tanlangani bilan mavjud bo‘lmagan binolar xaritada avtomatik paydo bo‘lmasin.
+
+---
+
+# 23. PROFESSIONAL UI/UX & TYPOGRAPHY
+
+PROMPT 19B va PROMPT 21 dagi UI Design Systemni saqla.
+
+Talablar:
+
+- Yagona shrift.
+- To‘g‘ri o‘zbekcha yozuvlar.
+- Professional panellar.
+- Responsive layout.
+- Light/Dark theme.
+- Silliq animatsiyalar.
+- Aniq tugmalar.
+- Tushunarli ikonkalar.
+- Mobil ekranlarda qulay navigatsiya.
+
+Windows:
+
+- Mouse.
+- Keyboard.
+- Hover.
+- Tooltip.
+- Scroll va zoom.
+
+Android:
+
+- Touch.
+- Pinch-to-zoom.
+- Drag.
+- Scroll.
+- Katta tap targets.
+- Landscape layout.
+
+Texnologiya daraxti telefonda kichrayib, o‘qib bo‘lmaydigan ko‘rinishga kelmasin.
+
+Mobil qurilmada pan va zoom orqali daraxtni ko‘rish mumkin bo‘lsin.
+
+---
+
+# 24. MULTIPLAYER INTEGRATION
+
+**MEN WINDOWS PC DA, SHERIGIM ANDROID TELEFONDA BIR DUNYODA O‘YNAYMIZ.**
+
+Barcha texnologiya va ixtisoslik o‘zgarishlari server authoritative bo‘lsin.
+
+Server:
+
+- Research states.
+- Technology unlocks.
+- Research costs.
+- Kingdom progression.
+- City specialization.
+- Gameplay modifiers.
+- Rankings.
+- AI development.
+
+ma’lumotlarini boshqarsin.
+
+Client:
+
+- Technology Tree UI.
+- City Dashboard.
+- Animations.
+- Progress visualization.
+- Notifications.
+
+bilan ishlasin.
+
+### Misol
+
+Windows o‘yinchisi Asakada dehqonchilik texnologiyasini ochadi.
+
+Server resurs va talablarni tekshiradi.
+
+Research yakunlanadi.
+
+Asakada tegishli iqtisodiy modifier faollashadi.
+
+Android o‘yinchi dunyo xaritasidagi Asaka rivojlanish statistikasi yangilanganini ko‘radi.
+
+---
+
+# 25. NETWORK EVENTS
+
+Mavjud SignalR tizimiga zarur eventlarni qo‘sh:
+
+```text
+ResearchStarted
+ResearchCompleted
+TechnologyUnlocked
+CitySpecializationSelected
+CitySpecializationUpgraded
+CityDevelopmentUpdated
+KingdomLevelChanged
+KingdomScoreUpdated
+LeaderboardUpdated
+```
+
+Eventlar state version bilan ishlasin.
+
+Takroriy event bir xil bonusni ikki marta qo‘llamasin.
+
+Reconnectdan keyin barcha yangilanishlar server snapshotidan tiklansin.
+
+---
+
+# 26. SAVE / LOAD
+
+Quyidagilar saqlansin:
+
+- Unlocked technologies.
+- Research progress.
+- Research queue.
+- Technology costs paid.
+- Kingdom progression level.
+- City specialization.
+- Specialization levels.
+- Active gameplay modifiers.
+- Economic statistics.
+- Ranking inputs.
+
+Save qayta ochilganda:
+
+- Texnologiyalar qayta qulflanmasin.
+- Bonuslar ikki marta berilmasin.
+- Research progress saqlansin.
+- Shahar ixtisosligi saqlansin.
+- Rankinglar server holatiga mos bo‘lsin.
+
+---
+
+# 27. PERFORMANCE OPTIMIZATION
+
+Maqsadli Windows PC:
+
+- Intel Core i5-12400.
+- 8 GB RAM.
+- Intel UHD 730.
+
+Androidda ham ishlashi kerak.
+
+Talablar:
+
+- Research graph faqat kerakli vaqtda qayta hisoblanadi.
+- Technology Tree UI virtualizatsiya va cullingdan foydalanishi mumkin.
+- Gameplay modifierlar cache qilinsin.
+- Reyting har frame da hisoblanmasin.
+- AI tadqiqot qarorlari scheduler orqali bajarilsin.
+- Keraksiz database querylar kamaytirilsin.
+- UI render jarayonida iqtisodiy hisob-kitoblar takrorlanmasin.
+
+O‘yindagi aktiv shaharlar soni ko‘payganda FPS keskin tushib ketmasligi uchun profiling o‘tkaz.
+
+---
+
+# 28. SUGGESTED C# ARCHITECTURE
+
+Mavjud loyihaga mos modullarni qo‘sh.
+
+```text
+AndijonSaltanatlar/
+│
+├── Technology/
+│   ├── TechnologyDefinition.cs
+│   ├── TechnologyCatalog.cs
+│   ├── TechnologyTree.cs
+│   ├── ResearchManager.cs
+│   ├── ResearchQueue.cs
+│   ├── ResearchValidator.cs
+│   └── TechnologyUnlockService.cs
+│
+├── Specialization/
+│   ├── CitySpecialization.cs
+│   ├── SpecializationManager.cs
+│   ├── SpecializationProgress.cs
+│   ├── SpecializationModifiers.cs
+│   └── SpecializationValidator.cs
+│
+├── Progression/
+│   ├── KingdomProgressionManager.cs
+│   ├── KingdomDevelopmentScore.cs
+│   ├── KingdomLevelDefinition.cs
+│   └── KingdomProgressionValidator.cs
+│
+├── Competition/
+│   ├── KingdomLeaderboard.cs
+│   ├── EconomicRankingSystem.cs
+│   ├── RankingCalculator.cs
+│   └── CompetitionStatistics.cs
+│
+├── AI/
+│   ├── AITechnologyPlanner.cs
+│   ├── AICitySpecializationPlanner.cs
+│   └── AIKingdomProgressionPlanner.cs
+│
+├── Advisor/
+│   ├── TechnologyAdvisor.cs
+│   └── SpecializationAdvisor.cs
+│
+└── UI/
+    ├── TechnologyTreeScreen.cs
+    ├── ResearchDetailsPanel.cs
+    ├── CitySpecializationPanel.cs
+    ├── KingdomProgressionDashboard.cs
+    └── KingdomLeaderboardScreen.cs
+```
+
+Bu struktura tavsiyadir.
+
+Mavjud klasslar bo‘lsa, ikkinchi nusxasini yaratma.
+
+---
+
+# 29. FIRST WORKING VERTICAL SLICE
+
+**BIRINCHI NAVBATDA SHU ZANJIRNI ISHLAT:**
+
+ASAKA SHAHRI
+↓
+ILM-FAN PANELI
+↓
+SUG‘ORISH TEXNOLOGIYASINI TANLASH
+↓
+TALABLARNI TEKSHIRISH
+↓
+TADQIQOTNI BOSHLASH
+↓
+RESEARCH PROGRESS
+↓
+TEXNOLOGIYA OCHILISHI
+↓
+GURUCH YETISHTIRISH SAMARADORLIGI YAXSHILANISHI
+↓
+IQTISODIYOT PANELI YANGILANISHI
+↓
+SAVE / CONTINUE
+
+Bu zanjir to‘liq ishlasin.
+
+Texnologiya ochilganda haqiqiy farming calculation o‘zgarsin.
+
+Faqat UI da “+10%” yozuvi paydo bo‘lishi yetarli emas.
+
+---
+
+# 30. SECOND VERTICAL SLICE
+
+**SHAHRIXON → HUNARMANDCHILIKKA IXTSISOSLASHTIRISH → USTAXONALAR → ISHLAB CHIQARISH → LEVEL OSHISH → BONUS → SAVDO**
+
+Shartlar:
+
+1. Shahar ixtisosligi tanlanadi.
+2. Server talablarni tekshiradi.
+3. Ixtisoslik saqlanadi.
+4. Ustaxona faoliyati shu tizimga bog‘lanadi.
+5. Ishlab chiqarish natijasi o‘zgaradi.
+6. Iqtisodiy statistika yangilanadi.
+7. Level progress ko‘rsatiladi.
+
+---
+
+# 31. THIRD VERTICAL SLICE
+
+**WINDOWS PLAYER → TECHNOLOGY UNLOCK → KINGDOM SCORE YANGILANADI → SERVER RANKINGNI HISOBLAYDI → ANDROID PLAYER LEADERBOARDDA YANGI NATIJANI KO‘RADI**
+
+Ikkala client bir xil ranking qiymatlarini olsin.
+
+Serverga ishonilmagan client score yuborish orqali reytingni o‘zgartirish mumkin bo‘lmasin.
+
+---
+
+# 32. TESTING
+
+### Technology
+
+- [ ] Technology Tree yuklanadi.
+- [ ] Prerequisite tekshiriladi.
+- [ ] Qulflangan texnologiya ochilmaydi.
+- [ ] Research boshlanadi.
+- [ ] Research progress ishlaydi.
+- [ ] Research yakunlanadi.
+- [ ] Bonus bir marta qo‘llanadi.
+- [ ] Save/Load ishlaydi.
+
+### Specialization
+
+- [ ] Shahar ixtisosligini tanlash mumkin.
+- [ ] Ixtisoslik real iqtisodiyotga ta’sir qiladi.
+- [ ] Specialization Level oshadi.
+- [ ] Bonuslar to‘g‘ri hisoblanadi.
+- [ ] Har bir shahar alohida ixtisoslikka ega.
+- [ ] Mavjud binolar saqlanadi.
+
+### Kingdom Progression
+
+- [ ] Saltanat darajasi hisoblanadi.
+- [ ] Rivojlanish talablari ishlaydi.
+- [ ] Level yangilanadi.
+- [ ] Yangi imkoniyatlar ochiladi.
+
+### Competition
+
+- [ ] Reytinglar serverda hisoblanadi.
+- [ ] Reyting barcha clientlarda bir xil.
+- [ ] AI saltanatlar ham hisoblanadi.
+- [ ] Reyting natijalari haqiqiy GameState ga bog‘langan.
+
+### Multiplayer
+
+- [ ] Windows client serverga ulanadi.
+- [ ] Android client serverga ulanadi.
+- [ ] Ikkalasi bitta WorldId da.
+- [ ] Research state sinxronlashadi.
+- [ ] City specialization sinxronlashadi.
+- [ ] Kingdom score yangilanadi.
+- [ ] Reconnect ishlaydi.
+
+### UI
+
+- [ ] Technology Tree professional.
+- [ ] City Specialization paneli ishlaydi.
+- [ ] Kingdom Dashboard ishlaydi.
+- [ ] Leaderboard ishlaydi.
+- [ ] Android touch controls ishlaydi.
+- [ ] O‘zbekcha yozuvlar to‘g‘ri.
+- [ ] Matnlar kesilmaydi.
+
+---
+
+# 33. IMPLEMENTATION ORDER
+
+Quyidagi tartibda ishlagin:
+
+1. Repository audit.
+2. Existing TechnologySystem integration.
+3. Technology catalog.
+4. Research prerequisites.
+5. Research queue.
+6. Technology unlocks.
+7. Gameplay modifiers.
+8. Farming technology integration.
+9. City specialization.
+10. Specialization levels.
+11. Production integration.
+12. Trade integration.
+13. Kingdom progression.
+14. Economic rankings.
+15. AI technology planning.
+16. AI city specialization.
+17. Donishmand Vazir integration.
+18. Technology Tree UI.
+19. City Specialization UI.
+20. Kingdom Dashboard.
+21. Leaderboard UI.
+22. Multiplayer synchronization.
+23. Save/Load.
+24. Automated tests.
+25. Windows and Android verification.
+
+**Faqat reja yoki hujjat yozib to‘xtama.**
+
+Har bir bosqichda haqiqiy kod yoz va tizimlarni amalda ishlat.
+
+---
+
+# 34. AGENT CONTINUITY
+
+Quyidagi faylni yarat yoki yangila:
+
+`docs/PROMPT_24_PROGRESS.md`
+
+Unda:
+
+- Repository audit.
+- Technology System holati.
+- Research Tree.
+- City Specialization.
+- Kingdom Progression.
+- Economic Rankings.
+- AI Integration.
+- UI/UX.
+- Multiplayer synchronization.
+- Test natijalari.
+- Windows build.
+- Android build.
+- Hali bajarilmagan ishlar.
+
+bo‘lsin.
+
+Ishlamagan funksiyani Completed deb belgilama.
+
+---
+
+# 35. FINAL ACCEPTANCE CRITERIA
+
+- [ ] Technology Tree haqiqiy ishlaydi.
+- [ ] Research boshlash mumkin.
+- [ ] Research progress saqlanadi.
+- [ ] Texnologiya yangi gameplay imkoniyatlarini ochadi.
+- [ ] Bonuslar takroran qo‘llanmaydi.
+- [ ] Shahar ixtisosligini tanlash mumkin.
+- [ ] Asaka dehqonchilik markazi bo‘la oladi.
+- [ ] Shahrixon hunarmandchilik markazi bo‘la oladi.
+- [ ] Andijon savdo markazi bo‘la oladi.
+- [ ] Shahar ixtisosligi real iqtisodiyotga ta’sir qiladi.
+- [ ] Ixtisoslik darajalari mavjud.
+- [ ] Saltanat darajalari mavjud.
+- [ ] Rivojlanish score hisoblanadi.
+- [ ] Reytinglar ishlaydi.
+- [ ] AI davlatlar texnologiyalarni rivojlantiradi.
+- [ ] Donishmand Vazir maslahat beradi.
+- [ ] Technology UI professional.
+- [ ] Shriftlar va o‘zbekcha matnlar to‘g‘ri.
+- [ ] Android UI responsive.
+- [ ] Multiplayer state sinxronlashadi.
+- [ ] Save/Load ishlaydi.
+- [ ] Windows build tekshirilgan.
+- [ ] Android build tekshirilgan.
+
+---
+
+# 36. FINAL INSTRUCTION
+
+**MAVJUD ANDIJON: SALTANATLAR LOYIHASIGA HAQIQIY ISHLAYDIGAN TECHNOLOGY TREE, CITY SPECIALIZATION VA KINGDOM PROGRESSION TIZIMINI QO‘SH.**
+
+Men Asakada guruch yetishtiraman.
+
+Yangi sug‘orish texnologiyasini ochaman.
+
+Guruch ishlab chiqarish samaradorligi oshadi.
+
+Asakani dehqonchilik markaziga aylantiraman.
+
+Shahrixonni hunarmandchilik markaziga aylantiraman.
+
+Andijonda savdo markazi rivojlantiraman.
+
+Bu shaharlar bir-biri bilan resurs va savdo orqali bog‘lanadi.
+
+Saltanatimning ilm-fan, iqtisodiyot va madaniyat darajasi oshadi.
+
+Boshqa o‘yinchilar va AI saltanatlar bilan rivojlanish reytingida raqobatlashaman.
+
+**HAMMASI WINDOWS PC VA ANDROIDDA BIR XIL MULTIPLAYER DUNYODA ISHLASHI SHART.**
+
+Eng muhimi:
+
+1. Mavjud kodni buzma.
+2. Haqiqiy C# implementatsiya qil.
+3. Technology bonuslar real gameplayga ta’sir qilsin.
+4. Shahar ixtisosligi haqiqiy iqtisodiy natija bersin.
+5. UI professional bo‘lsin.
+6. Multiplayer server authoritative bo‘lsin.
+7. Windows va Android buildlar tekshirilsin.
+8. Test natijalarini aniq ko‘rsat.
+9. Bajarilmagan ishlarni yashirma.
+
+**ANDIJON: SALTANATLAR — QISHLOQDAN BOSHLAB, ILM-FAN, HUNARMANDCHILIK, SAVDO VA MADANIYAT ORQALI BUYUK SALTANAT YARAT!**

@@ -21,6 +21,8 @@ namespace AndijonSaltanatlar.UI.Design
     {
         private readonly Texture2D _px;
         public Typography Type { get; }
+        /// <summary>Joriy kadrdagi SpriteBatch (Begin..End orasida) — maxsus chizish uchun.</summary>
+        public SpriteBatch Batch => _sb;
         public ThemeTokens T => ThemeManager.Current;
 
         private SpriteBatch _sb;
@@ -87,10 +89,32 @@ namespace AndijonSaltanatlar.UI.Design
         // ------------------------------------------------------------------
         public void Fill(Rectangle r, Color c) => _sb.Draw(_px, r, c);
 
+        /// <summary>Kiritish holati (xarita surish/kattalashtirish kabi maxsus boshqaruvlar uchun).</summary>
+        public InputManager Input => _input;
+
+        private static readonly RasterizerState ClipRaster = new RasterizerState { ScissorTestEnable = true, CullMode = CullMode.None };
+
+        /// <summary>Shu to'rtburchakdan tashqariga chizilgan narsalar kesiladi (EndClip gacha). Panel batch'i qayta boshlanadi.</summary>
+        public void BeginClip(Rectangle r)
+        {
+            _sb.End();
+            Viewport vp = _sb.GraphicsDevice.Viewport;
+            _sb.GraphicsDevice.ScissorRectangle = Rectangle.Intersect(r, new Rectangle(0, 0, vp.Width, vp.Height));
+            _sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, ClipRaster);
+        }
+
+        public void EndClip()
+        {
+            _sb.End();
+            _sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+        }
+
         /// <summary>Yumshoq burchakli to'rtburchak (burchak piksellari kesilgan) — "flat" zamonaviy ko'rinish.</summary>
         public void Rounded(Rectangle r, Color c, int radius = 6)
         {
             if (r.Width <= 0 || r.Height <= 0) return;
+            // O'yin uslubi: to'rtburchak shakllar burchaksiz chiziladi; faqat doira va "pill" (nuqta, tugun, portret) dumaloq.
+            if (radius * 2 < Math.Min(r.Width, r.Height) - 2) { Fill(r, c); return; }
             radius = Math.Min(radius, Math.Min(r.Width, r.Height) / 2);
             Fill(new Rectangle(r.X + radius, r.Y, r.Width - 2 * radius, r.Height), c);
             for (int i = 0; i < radius; i++)
@@ -106,6 +130,29 @@ namespace AndijonSaltanatlar.UI.Design
             Fill(new Rectangle(r.Right - radius, r.Y + radius, radius, r.Height - 2 * radius), c);
         }
 
+        /// <summary>
+        /// O'yin uslubidagi ramka (shahar HUD'idagi kabi): to'rtburchak, chegara va ichki yorug'/soya chizig'i
+        /// (bo'rtiq ko'rinish). Barcha panel, karta va tugmalar shu bilan chiziladi.
+        /// </summary>
+        public void Frame(Rectangle r, Color fill, Color border, int thickness = 1, bool bevel = true)
+        {
+            if (r.Width <= 0 || r.Height <= 0) return;
+            if (border.A > 0)
+            {
+                Fill(new Rectangle(r.X, r.Y, r.Width, thickness), border);
+                Fill(new Rectangle(r.X, r.Bottom - thickness, r.Width, thickness), border);
+                Fill(new Rectangle(r.X, r.Y + thickness, thickness, r.Height - 2 * thickness), border);
+                Fill(new Rectangle(r.Right - thickness, r.Y + thickness, thickness, r.Height - 2 * thickness), border);
+            }
+            var inner = new Rectangle(r.X + thickness, r.Y + thickness, r.Width - 2 * thickness, r.Height - 2 * thickness);
+            if (fill.A > 0) Fill(inner, fill);
+            if (bevel && fill.A > 0 && inner.Height > 8)
+            {
+                Fill(new Rectangle(inner.X, inner.Y, inner.Width, 1), Color.Lerp(fill, Color.White, 0.10f));
+                Fill(new Rectangle(inner.X, inner.Bottom - 1, inner.Width, 1), Color.Lerp(fill, Color.Black, 0.30f));
+            }
+        }
+
         public void RoundedBorder(Rectangle r, Color border, Color fill, int radius = 6, int thickness = 1)
         {
             Rounded(r, border, radius);
@@ -116,7 +163,7 @@ namespace AndijonSaltanatlar.UI.Design
             => Type.Draw(_sb, text, pos, style, color ?? T.TextPrimary);
 
         public void TextFit(string text, Rectangle r, TextStyle style, Color? color = null)
-            => Type.Draw(_sb, Type.Fit(text, r.Width, style), new Vector2(r.X, r.Y + (r.Height - Type.LineHeight(style)) / 2f), style, color ?? T.TextPrimary);
+            => Type.DrawFitted(_sb, text, r, style, color ?? T.TextPrimary, 0);
 
         public float Paragraph(string text, Rectangle r, TextStyle style, Color? color = null, int maxLines = 99)
             => Type.DrawWrapped(_sb, text, r, style, color ?? T.TextSecondary, maxLines);
@@ -126,16 +173,20 @@ namespace AndijonSaltanatlar.UI.Design
         // ------------------------------------------------------------------
         public void Panel(Rectangle r, bool elevated = true)
         {
-            if (elevated) Rounded(new Rectangle(r.X + 2, r.Y + 4, r.Width, r.Height), T.Shadow, 10);
-            RoundedBorder(r, T.Border, T.Surface, 10);
+            if (elevated) Fill(new Rectangle(r.X + 4, r.Y + 4, r.Width, r.Height), T.Shadow);
+            Frame(r, T.Surface, T.Border, 2);
+            // Oltin burchak bezaklari (o'yin panellaridagi kabi)
+            int k = 4;
+            Fill(new Rectangle(r.X, r.Y, k, k), T.Primary); Fill(new Rectangle(r.Right - k, r.Y, k, k), T.Primary);
+            Fill(new Rectangle(r.X, r.Bottom - k, k, k), T.Primary); Fill(new Rectangle(r.Right - k, r.Bottom - k, k, k), T.Primary);
         }
 
         /// <summary>UICard: tanlanishi mumkin bo'lgan karta. Bosilsa true.</summary>
         public bool Card(Rectangle r, bool selected = false, bool interactive = false)
         {
             bool hover = interactive && Hover(r) && !_touch;
-            Color fill = selected ? Color.Lerp(T.SurfaceAlt, T.Primary, 0.18f) : hover ? Color.Lerp(T.SurfaceAlt, T.Primary, 0.08f) : T.SurfaceAlt;
-            RoundedBorder(r, selected ? T.Primary : T.Border, fill, 8, selected ? 2 : 1);
+            Color fill = selected ? Color.Lerp(T.SurfaceAlt, T.Primary, 0.16f) : hover ? Color.Lerp(T.SurfaceAlt, T.Primary, 0.07f) : T.SurfaceAlt;
+            Frame(r, fill, selected ? T.Primary : T.Border, selected ? 2 : 1);
             return interactive && Clicked(r);
         }
 
@@ -163,21 +214,22 @@ namespace AndijonSaltanatlar.UI.Design
             switch (kind)
             {
                 case ButtonKind.Primary:
-                    fill = pressed ? T.PrimaryPressed : hover ? T.PrimaryHover : T.Primary; border = fill; text = T.TextOnPrimary; break;
+                    fill = pressed ? T.PrimaryPressed : hover ? T.PrimaryHover : T.Primary; border = Color.Lerp(T.Primary, Color.Black, 0.45f); text = T.TextOnPrimary; break;
                 case ButtonKind.Accent:
-                    fill = pressed ? Color.Lerp(T.Accent, Color.Black, 0.15f) : hover ? Color.Lerp(T.Accent, Color.White, 0.12f) : T.Accent; border = fill; text = T.TextOnPrimary; break;
+                    fill = pressed ? Color.Lerp(T.Accent, Color.Black, 0.15f) : hover ? Color.Lerp(T.Accent, Color.White, 0.12f) : T.Accent; border = Color.Lerp(T.Accent, Color.Black, 0.45f); text = T.TextOnPrimary; break;
                 case ButtonKind.Danger:
-                    fill = pressed ? Color.Lerp(T.Danger, Color.Black, 0.15f) : hover ? Color.Lerp(T.Danger, Color.White, 0.1f) : T.Danger; border = fill; text = Color.White; break;
+                    Color d = Color.Lerp(T.Danger, Color.Black, 0.35f);
+                    fill = pressed ? Color.Lerp(d, Color.Black, 0.15f) : hover ? Color.Lerp(d, T.Danger, 0.35f) : d; border = T.Danger; text = T.TextPrimary; break;
                 case ButtonKind.Ghost:
-                    fill = pressed ? T.SurfaceAlt : hover ? Color.Lerp(T.Surface, T.Primary, 0.08f) : Color.Transparent; border = Color.Transparent; text = T.Primary; break;
+                    fill = pressed ? T.SurfaceAlt : hover ? Color.Lerp(T.Surface, T.Primary, 0.10f) : Color.Transparent; border = hover ? T.Border : Color.Transparent; text = T.Primary; break;
                 default:
                     fill = pressed ? Color.Lerp(T.SurfaceAlt, T.Primary, 0.2f) : hover ? Color.Lerp(T.SurfaceAlt, T.Primary, 0.1f) : T.SurfaceAlt; border = hover ? T.Primary : T.Border; text = T.TextPrimary; break;
             }
-            if (!enabled) { fill = T.Disabled; border = T.Disabled; text = T.DisabledText; }
-            RoundedBorder(r, border, fill, 8);
-            // Bosilganda matn 1px pastga — taktil hissiyot.
+            if (!enabled) { fill = T.Disabled; border = Color.Lerp(T.Disabled, Color.Black, 0.3f); text = T.DisabledText; }
+            Frame(r, fill, border, kind == ButtonKind.Primary || kind == ButtonKind.Danger ? 2 : 1, kind != ButtonKind.Ghost);
+            // Bosilganda matn 1px pastga — taktil hissiyot. Matn tugma ichiga sig'diriladi (chiqib ketmaydi).
             var tr = pressed ? new Rectangle(r.X, r.Y + 1, r.Width, r.Height) : r;
-            Type.DrawCentered(_sb, Type.Fit(label, r.Width - 16, TextStyle.Button), tr, TextStyle.Button, text);
+            Type.DrawFitted(_sb, label, new Rectangle(tr.X + 7, tr.Y, tr.Width - 14, tr.Height), TextStyle.Button, text, 1);
             if (hover && tooltip != null) { _tooltip = tooltip; _tooltipPos = new Vector2(r.X, r.Bottom + 6); }
             return enabled && Clicked(r);
         }
@@ -201,13 +253,12 @@ namespace AndijonSaltanatlar.UI.Design
             float w = r.Width / (float)n;
             for (int i = 0; i < n; i++)
             {
-                var tr = new Rectangle(r.X + (int)(i * w), r.Y, (int)w - 2, r.Height);
+                var tr = new Rectangle(r.X + (int)(i * w), r.Y, (int)w - 3, r.Height);
                 bool on = i == selected;
                 bool hover = Hover(tr) && !_touch;
-                if (on) Rounded(tr, Color.Lerp(T.Surface, T.Primary, 0.16f), 6);
-                else if (hover) Rounded(tr, T.SurfaceAlt, 6);
-                Type.DrawCentered(_sb, Type.Fit(tabs[i], tr.Width - 10, TextStyle.Button), tr, TextStyle.Button, on ? T.Primary : T.TextSecondary);
-                if (on) Fill(new Rectangle(tr.X + 8, tr.Bottom - 3, tr.Width - 16, 3), T.Primary);
+                // O'yin pastki panelidagi tablar kabi: tanlangan — oltin ramka.
+                Frame(tr, on ? T.SurfaceAlt : hover ? Color.Lerp(T.Surface, T.SurfaceAlt, 0.6f) : T.Surface, on ? T.Primary : T.Border, on ? 2 : 1);
+                Type.DrawFitted(_sb, tabs[i], new Rectangle(tr.X + 3, tr.Y, tr.Width - 6, tr.Height), TextStyle.Button, on ? T.Primary : T.TextPrimary, 1);
                 if (Clicked(tr)) selected = i;
             }
             return selected;
@@ -223,9 +274,9 @@ namespace AndijonSaltanatlar.UI.Design
                 var ir = new Rectangle(r.X, r.Y + i * (h + 4), r.Width, h);
                 bool on = i == selected;
                 bool hover = Hover(ir) && !_touch;
-                if (on) { Rounded(ir, Color.Lerp(T.Surface, T.Primary, 0.18f), 8); Fill(new Rectangle(ir.X, ir.Y + 8, 3, ir.Height - 16), T.Primary); }
-                else if (hover) Rounded(ir, T.SurfaceAlt, 8);
-                Type.Draw(_sb, Type.Fit(items[i], ir.Width - 28, TextStyle.Button), new Vector2(ir.X + 16, ir.Y + (ir.Height - Type.LineHeight(TextStyle.Button)) / 2f), TextStyle.Button, on ? T.Primary : T.TextPrimary);
+                Frame(ir, on ? T.SurfaceAlt : hover ? Color.Lerp(T.Surface, T.SurfaceAlt, 0.6f) : T.Surface, on ? T.Primary : T.Border, on ? 2 : 1);
+                if (on) Fill(new Rectangle(ir.X + 2, ir.Y + 6, 3, ir.Height - 12), T.Primary);
+                Type.DrawFitted(_sb, items[i], new Rectangle(ir.X + 14, ir.Y, ir.Width - 24, ir.Height), TextStyle.Button, on ? T.Primary : T.TextPrimary, 0);
                 if (Clicked(ir)) selected = i;
             }
             return selected;
@@ -236,9 +287,9 @@ namespace AndijonSaltanatlar.UI.Design
         // ------------------------------------------------------------------
         public void ProgressBar(Rectangle r, float value, Color? color = null)
         {
-            Rounded(r, T.Disabled, r.Height / 2);
-            int w = (int)(r.Width * MathHelper.Clamp(value, 0f, 1f));
-            if (w > 0) Rounded(new Rectangle(r.X, r.Y, Math.Max(w, r.Height), r.Height), color ?? T.Primary, r.Height / 2);
+            Frame(r, T.Disabled, Color.Lerp(T.Border, Color.Black, 0.3f), 1, false);
+            int w = (int)((r.Width - 2) * MathHelper.Clamp(value, 0f, 1f));
+            if (w > 0) Fill(new Rectangle(r.X + 1, r.Y + 1, w, r.Height - 2), color ?? T.Primary);
         }
 
         /// <summary>UIResourceCounter: rangli nuqta + qiymat + yorliq (HUD va panellar uchun).</summary>
@@ -256,19 +307,19 @@ namespace AndijonSaltanatlar.UI.Design
         public bool Chip(Rectangle r, string label, bool selected, Color? dot = null)
         {
             bool hover = Hover(r) && !_touch;
-            RoundedBorder(r, selected ? T.Primary : T.Border, selected ? Color.Lerp(T.Surface, T.Primary, 0.2f) : hover ? T.SurfaceAlt : T.Surface, r.Height / 2);
-            int tx = r.X + 12;
-            if (dot.HasValue) { Rounded(new Rectangle(tx, r.Center.Y - 5, 10, 10), dot.Value, 5); tx += 16; }
-            Type.Draw(_sb, Type.Fit(label, r.Right - tx - 8, TextStyle.Secondary), new Vector2(tx, r.Y + (r.Height - Type.LineHeight(TextStyle.Secondary)) / 2f), TextStyle.Secondary, selected ? T.Primary : T.TextPrimary);
+            Frame(r, selected ? Color.Lerp(T.SurfaceAlt, T.Primary, 0.22f) : hover ? T.SurfaceAlt : T.Surface, selected ? T.Primary : T.Border, selected ? 2 : 1);
+            int tx = r.X + 10;
+            if (dot.HasValue) { Fill(new Rectangle(tx, r.Center.Y - 4, 8, 8), dot.Value); tx += 14; }
+            Type.DrawFitted(_sb, label, new Rectangle(tx, r.Y, r.Right - tx - 6, r.Height), TextStyle.Secondary, selected ? T.Primary : T.TextPrimary, 0);
             return Clicked(r);
         }
 
         public void Badge(Vector2 pos, string text, Color bg, Color? fg = null)
         {
             Vector2 m = Type.Measure(text, TextStyle.Caption);
-            var r = new Rectangle((int)pos.X, (int)pos.Y, (int)m.X + 14, (int)Type.LineHeight(TextStyle.Caption) + 6);
-            Rounded(r, bg, r.Height / 2);
-            Type.DrawCentered(_sb, text, r, TextStyle.Caption, fg ?? Color.White);
+            var r = new Rectangle((int)pos.X, (int)pos.Y, (int)m.X + 14, (int)Type.LineHeight(TextStyle.Caption) + 4);
+            Frame(r, Color.Lerp(bg, Color.Black, 0.45f), bg, 1, false);
+            Type.DrawCentered(_sb, text, r, TextStyle.Caption, fg ?? bg);
         }
 
         // ------------------------------------------------------------------
@@ -279,7 +330,7 @@ namespace AndijonSaltanatlar.UI.Design
         {
             bool focus = FocusId == id;
             bool hover = Hover(r) && !_touch;
-            RoundedBorder(r, focus ? T.Focus : hover ? T.Secondary : T.Border, T.Background, 8, focus ? 2 : 1);
+            Frame(r, T.Background, focus ? T.Focus : hover ? T.Secondary : T.Border, focus ? 2 : 1, false);
             if (Clicked(r)) { FocusId = id; focus = true; onFocus?.Invoke(); }
             if (focus)
                 while (_input.TryReadChar(out char c))
@@ -287,7 +338,7 @@ namespace AndijonSaltanatlar.UI.Design
                     if (c == '\b') { if (value.Length > 0) value = value.Substring(0, value.Length - 1); }
                     else if (!char.IsControl(c) && value.Length < 64) value += c;
                 }
-            string shown = string.IsNullOrEmpty(value) ? placeholder : (password ? new string('•', value.Length) : value);
+            string shown = string.IsNullOrEmpty(value) ? placeholder : (password ? new string('*', value.Length) : value);
             Color col = string.IsNullOrEmpty(value) ? T.TextSecondary : T.TextPrimary;
             var inner = new Rectangle(r.X + 12, r.Y, r.Width - 24, r.Height);
             string fit = Type.Fit(shown, inner.Width - 8, TextStyle.Body);
@@ -320,7 +371,7 @@ namespace AndijonSaltanatlar.UI.Design
             {
                 int bh = Math.Max(24, r.Height * r.Height / contentH);
                 int by = r.Y + (int)((r.Height - bh) * (s / Math.Max(1, contentH - r.Height)));
-                Rounded(new Rectangle(r.Right - 4, by, 4, bh), T.Border, 2);
+                Fill(new Rectangle(r.Right - 4, by, 4, bh), T.Border);
             }
             return (int)s;
         }
@@ -341,9 +392,9 @@ namespace AndijonSaltanatlar.UI.Design
             int h = (int)(lines.Count * lh + 22);
             var r = new Rectangle((int)(ViewW / 2f - (w + 52) / 2f), ViewH - h - (Compact ? ControlH + 40 : 70), (int)w + 52, h);
             Color a = error ? T.Danger : T.Success;
-            Rounded(new Rectangle(r.X + 2, r.Y + 4, r.Width, r.Height), T.Shadow * alpha, 10);
-            Rounded(r, T.Surface * alpha, 10);
-            Rounded(new Rectangle(r.X, r.Y, 6, r.Height), a * alpha, 3);
+            Fill(new Rectangle(r.X + 3, r.Y + 3, r.Width, r.Height), T.Shadow * alpha);
+            Frame(r, T.Surface * alpha, a * alpha, 2, false);
+            Fill(new Rectangle(r.X + 2, r.Y + 2, 5, r.Height - 4), a * alpha);
             float y = r.Y + 11;
             foreach (string l in lines) { Type.Draw(_sb, l, new Vector2(r.X + 22, y), TextStyle.Body, T.TextPrimary * alpha); y += lh; }
         }
@@ -352,8 +403,8 @@ namespace AndijonSaltanatlar.UI.Design
         {
             Vector2 m = Type.Measure(text, TextStyle.Secondary);
             var r = new Rectangle((int)Math.Min(pos.X, ViewW - m.X - 24), (int)pos.Y, (int)m.X + 20, (int)Type.LineHeight(TextStyle.Secondary) + 12);
-            Rounded(r, T.TextPrimary, 6);
-            Type.Draw(_sb, text, new Vector2(r.X + 10, r.Y + 6), TextStyle.Secondary, T.Surface);
+            Frame(r, T.SurfaceAlt, T.Primary, 1, false);
+            Type.Draw(_sb, text, new Vector2(r.X + 10, r.Y + 6), TextStyle.Secondary, T.TextPrimary);
         }
     }
 }

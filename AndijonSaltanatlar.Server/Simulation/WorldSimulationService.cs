@@ -44,10 +44,27 @@ namespace AndijonSaltanatlar.Server.Simulation
                 try
                 {
                     await DeliverCaravansAsync();
+                    await TickWarAsync();
                     if (++_tick % SlowEvery == 0) await SlowTickAsync();
                 }
                 catch (Exception ex) { _log.LogWarning(ex, "Simulyatsiya tikida xatolik (DB ulanmagan bo'lishi mumkin)."); }
                 await Task.Delay(FastInterval, stoppingToken);
+            }
+        }
+
+        /// <summary>PROMPT 25: yetib kelgan yurishlar jangga aylanadi; javobsiz raundlar sarkarda qarori bilan davom etadi.</summary>
+        private async Task TickWarAsync()
+        {
+            using IServiceScope scope = _scopes.CreateScope();
+            var war = scope.ServiceProvider.GetRequiredService<WarService>();
+            var db = scope.ServiceProvider.GetRequiredService<GameDbContext>();
+            if (!await db.Database.CanConnectAsync()) return;
+            foreach (int worldId in await db.Worlds.Select(w => w.Id).ToListAsync())
+            {
+                await war.TickWorldAsync(worldId);
+                foreach (WarEvent e in war.Events)
+                    await _hub.Clients.Group(GameHub.WorldGroup(e.WorldId)).SendCoreAsync(e.Name, e.Args);
+                war.Events.Clear();
             }
         }
 

@@ -94,12 +94,12 @@ namespace AndijonSaltanatlar.Shared.Farming
     {
         /// <summary>Bir xil hududdagi shaharlar orasida minimal yo'l vaqti (real soniya).</summary>
         public const int MinTravelSeconds = 20;
-        /// <summary>Har bir "masofa birligi" (xarita koordinatasi farqi) uchun qo'shimcha soniya.</summary>
-        public const double SecondsPerDistanceUnit = 1.0;
-        public const int MaxTravelSeconds = 180;
+        /// <summary>Har 100 km uchun qo'shimcha soniya (masofa — O'zbekiston xaritasida, km).</summary>
+        public const double SecondsPer100Km = 13;
+        public const int MaxTravelSeconds = 240;
 
-        public static int TravelSeconds(double distance)
-            => (int)Math.Clamp(MinTravelSeconds + distance * SecondsPerDistanceUnit, MinTravelSeconds, MaxTravelSeconds);
+        public static int TravelSeconds(double distanceKm)
+            => (int)Math.Clamp(MinTravelSeconds + distanceKm * SecondsPer100Km / 100.0, MinTravelSeconds, MaxTravelSeconds);
     }
 
     /// <summary>Hudud qo'shish (Kingdom expansion) qoidalari — abstrakt siyosiy ko'rsatkichlar.</summary>

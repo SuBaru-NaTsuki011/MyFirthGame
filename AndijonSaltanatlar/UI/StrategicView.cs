@@ -60,7 +60,7 @@ namespace AndijonSaltanatlar.UI
         {
             _mapRect = new Rectangle(16, 56, (int)(vw * 0.58f), vh - 56 - 150);
             _rightPanel = new Rectangle(_mapRect.Right + 12, 56, vw - _mapRect.Right - 28, vh - 56 - 16);
-            _backBtn = new Rectangle(vw - 190, 14, 174, 30);
+            _backBtn = new Rectangle(vw - 226, 14, 210, 30);
 
             _node.Clear(); _radius.Clear();
             var center = new Vector2(_mapRect.Center.X, _mapRect.Center.Y);
@@ -185,7 +185,7 @@ namespace AndijonSaltanatlar.UI
             _font.Draw(sb, "SALTANAT XARITASI", new Vector2(16, 14), Gold, 3, 1);
             _font.Draw(sb, "Andijon viloyati - muqobil tarix", new Vector2(360, 20), Muted, 2, 1);
             Panel(sb, _backBtn, PanelBg, Border, 1);
-            _font.DrawCentered(sb, "SHAHARGA QAYTISH (M)", _backBtn.Center.ToVector2(), Cream, 2, 1);
+            _font.DrawCentered(sb, "SHAHARGA QAYTISH", _backBtn.Center.ToVector2(), Cream, 2, 1);
 
             Panel(sb, _mapRect, new Color(26, 32, 42, 240), Border, 2);
             DrawEdges(sb);

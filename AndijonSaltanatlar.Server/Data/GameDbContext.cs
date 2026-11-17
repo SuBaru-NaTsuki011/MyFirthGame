@@ -34,11 +34,39 @@ namespace AndijonSaltanatlar.Server.Data
         public DbSet<AllianceContributionEntity> AllianceContributions => Set<AllianceContributionEntity>();
         public DbSet<DiplomaticAgreementEntity> DiplomaticAgreements => Set<DiplomaticAgreementEntity>();
         public DbSet<WorldNewsEntity> WorldNews => Set<WorldNewsEntity>();
+        // Google login + bulutdagi saqlash
+        public DbSet<CloudSaveEntity> CloudSaves => Set<CloudSaveEntity>();
+        // PROMPT 25: urush tizimi
+        public DbSet<KingdomWarStateEntity> WarStates => Set<KingdomWarStateEntity>();
+        public DbSet<ArmyEntity> Armies => Set<ArmyEntity>();
+        public DbSet<ArmyUnitEntity> ArmyUnits => Set<ArmyUnitEntity>();
+        public DbSet<CommanderEntity> Commanders => Set<CommanderEntity>();
+        public DbSet<MilitaryFacilityEntity> MilitaryFacilities => Set<MilitaryFacilityEntity>();
+        public DbSet<RecruitOrderEntity> RecruitOrders => Set<RecruitOrderEntity>();
+        public DbSet<BattleEntity> Battles => Set<BattleEntity>();
+        public DbSet<BattleDecisionEntity> BattleDecisions => Set<BattleDecisionEntity>();
+        public DbSet<BattleRoundEntity> BattleRounds => Set<BattleRoundEntity>();
+        public DbSet<BattleInvitationEntity> BattleInvitations => Set<BattleInvitationEntity>();
+        public DbSet<KingdomConflictEntity> KingdomConflicts => Set<KingdomConflictEntity>();
 
         protected override void OnModelCreating(ModelBuilder b)
         {
             b.Entity<AppUser>().HasIndex(u => u.Email).IsUnique();
             b.Entity<AppUser>().HasIndex(u => u.Username).IsUnique();
+            b.Entity<AppUser>().HasIndex(u => u.GoogleSub).IsUnique();
+            b.Entity<CloudSaveEntity>().HasIndex(c => c.UserId).IsUnique();
+            // PROMPT 25: takror qarorlar, takror raund natijalari va ikki marta qo'shilgan guruhlar DB darajasida ham mumkin emas.
+            b.Entity<KingdomWarStateEntity>().HasIndex(w => w.KingdomId).IsUnique();
+            b.Entity<ArmyEntity>().HasIndex(a => a.KingdomId);
+            b.Entity<ArmyUnitEntity>().HasIndex(u => new { u.ArmyId, u.Line, u.Level }).IsUnique();
+            b.Entity<CommanderEntity>().HasIndex(c => c.KingdomId);
+            b.Entity<MilitaryFacilityEntity>().HasIndex(f => new { f.KingdomId, f.Kind }).IsUnique();
+            b.Entity<RecruitOrderEntity>().HasIndex(o => new { o.KingdomId, o.Delivered });
+            b.Entity<BattleEntity>().HasIndex(x => new { x.WorldId, x.Status });
+            b.Entity<BattleDecisionEntity>().HasIndex(d => new { d.BattleId, d.Round, d.KingdomId }).IsUnique();
+            b.Entity<BattleRoundEntity>().HasIndex(r => new { r.BattleId, r.Round }).IsUnique();
+            b.Entity<BattleInvitationEntity>().HasIndex(i => new { i.ToKingdomId, i.Status });
+            b.Entity<KingdomConflictEntity>().HasIndex(c => new { c.WorldId, c.KingdomA, c.KingdomB }).IsUnique();
             b.Entity<GameCommandEntity>().HasKey(c => c.CommandId);
             // Bitta hududda bitta asosiy ega (neytrallardan tashqari) — indeks orqali nazorat
             b.Entity<RegionEntity>().HasIndex(r => new { r.WorldId, r.Name }).IsUnique();

@@ -36,6 +36,53 @@ namespace AndijonSaltanatlar.UI.Design
         public float UiScale { get; set; } = 1f;
         public bool HasTrueType => _regular != null;
 
+        /// <summary>
+        /// O'yin uslubi: barcha menyu va panellar shahar HUD'idagi kabi piksel shrift bilan chiziladi
+        /// (bir xil ko'rinish). false — Noto Sans TTF (eski "zamonaviy" ko'rinish).
+        /// </summary>
+        public bool PixelMode { get; set; } = true;
+
+        private bool UsePixel => PixelMode || !HasTrueType;
+
+        /// <summary>Piksel shrift masshtabi (butun son — harflar aniq, xira emas): matn 2x, sarlavhalar 3–5x.</summary>
+        public int PixelScale(TextStyle s)
+        {
+            int pc = s == TextStyle.MainTitle ? 4 : s == TextStyle.ScreenTitle || s == TextStyle.PanelTitle ? 3 : 2;
+            // Telefonda kattaroq, lekin HUD'dan oshib ketmasin (matn kenglikka sig'sin): masalan matn 3x, sarlavha 5x.
+            float k = UiScale > 1.01f ? UiScale * 0.85f : 1f;
+            return Math.Max(2, (int)Math.Round(pc * k));
+        }
+
+        /// <summary>
+        /// Matnni to'rtburchak ichiga sig'diradi: avval shrift bir-ikki pog'ona kichrayadi (2x gacha), shunda ham sig'masa
+        /// oxiri "..." bilan qisqartiriladi. align: 0 — chap, 1 — markaz, 2 — o'ng. Matn hech qachon chegaradan chiqmaydi.
+        /// </summary>
+        public void DrawFitted(SpriteBatch sb, string text, Rectangle r, TextStyle style, Color color, int align = 1)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            if (!UsePixel)
+            {
+                string t = Fit(text, r.Width, style);
+                Vector2 m0 = Measure(t, style);
+                float x0 = align == 1 ? r.X + (r.Width - m0.X) / 2f : align == 2 ? r.Right - m0.X : r.X;
+                Draw(sb, t, new Vector2(x0, r.Y + (r.Height - LineHeight(style)) / 2f), style, color);
+                return;
+            }
+            text = Uz(text);
+            int sc = PixelScale(style);
+            while (sc > 2 && _fallback.Measure(text, sc, 1).X > r.Width) sc--;
+            if (_fallback.Measure(text, sc, 1).X > r.Width)
+            {
+                string t = text;
+                while (t.Length > 1 && _fallback.Measure(t + "..", sc, 1).X > r.Width) t = t.Substring(0, t.Length - 1);
+                text = t.TrimEnd() + "..";
+            }
+            Vector2 m = _fallback.Measure(text, sc, 1);
+            float x = align == 1 ? r.X + (r.Width - m.X) / 2f : align == 2 ? r.Right - m.X : r.X;
+            float y = r.Y + (r.Height - m.Y) / 2f;
+            _fallback.Draw(sb, text, new Vector2(MathF.Round(x), MathF.Round(y)), color, sc, 1);
+        }
+
         public Typography(PixelFont fallback)
         {
             _fallback = fallback;
@@ -130,18 +177,24 @@ namespace AndijonSaltanatlar.UI.Design
         public Vector2 Measure(string text, TextStyle style)
         {
             text = Uz(text);
-            if (!HasTrueType) return _fallback.Measure(text.ToUpperInvariant(), Math.Max(1, Size(style) / 8), 1);
+            if (UsePixel) return _fallback.Measure(text, PixelScale(style), 1);
             return Font(style).MeasureString(text);
         }
 
-        public float LineHeight(TextStyle style) => HasTrueType ? Font(style).LineHeight : Size(style);
+        public float LineHeight(TextStyle style) => UsePixel ? PixelScale(style) * 10 : Font(style).LineHeight;
 
         public void Draw(SpriteBatch sb, string text, Vector2 pos, TextStyle style, Color color)
         {
             if (string.IsNullOrEmpty(text)) return;
             text = Uz(text);
             pos = new Vector2(MathF.Round(pos.X), MathF.Round(pos.Y));
-            if (!HasTrueType) { _fallback.Draw(sb, text, pos, color, Math.Max(1, Size(style) / 8), 1); return; }
+            if (UsePixel)
+            {
+                int sc = PixelScale(style);
+                // Glif (7 qator) qator balandligi (10 qator) ichida vertikal markazda.
+                _fallback.Draw(sb, text, new Vector2(pos.X, pos.Y + (int)(sc * 1.5f)), color, sc, 1);
+                return;
+            }
             Font(style).DrawText(sb, text, pos, color);
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -11,6 +12,11 @@ using AndijonSaltanatlar.Server.Services;
 using AndijonSaltanatlar.Server.Simulation;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Mahalliy maxfiy sozlamalar (Google ClientId/ClientSecret): server papkasidagi google.local.json.
+// Fayl git'ga qo'shilmaydi (.gitignore). Buyruq qatori argumentlari baribir ustun turadi.
+builder.Configuration.AddJsonFile("google.local.json", optional: true, reloadOnChange: false);
+builder.Configuration.AddCommandLine(args);
 
 // --- Ma'lumotlar bazasi (PostgreSQL / EF Core) ---
 // Provider: "Postgres" (production / docker-compose) yoki "Sqlite" (PostgreSQL o'rnatilmagan lokal LAN sinovi).
@@ -61,12 +67,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
+// --- Google orqali kirish (yagona kirish usuli) ---
+var googleOptions = AndijonSaltanatlar.Server.Authentication.GoogleAuthOptions.From(builder.Configuration);
+builder.Services.AddSingleton(googleOptions);
+builder.Services.AddHttpClient("google", c => c.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddSingleton<AndijonSaltanatlar.Server.Authentication.GoogleLoginService>();
+
 builder.Services.AddScoped<BuildingService>();
 builder.Services.AddScoped<AiPlanValidationService>();
 builder.Services.AddSingleton<IServerClock, SystemClock>();
 builder.Services.AddScoped<OnlineGameService>();
 builder.Services.AddScoped<KingdomService>();
 builder.Services.AddScoped<DiplomacyService>();
+builder.Services.AddScoped<WarService>();
 builder.Services.AddControllers();
 builder.Services.AddSignalR();
 builder.Services.AddHostedService<WorldSimulationService>();
@@ -89,9 +102,20 @@ catch (Exception ex)
     app.Logger.LogWarning(ex, "Ma'lumotlar bazasiga ulanib bo'lmadi. Server ishlaydi, lekin auth/saqlash funksiyalari DB talab qiladi. PostgreSQL'ni ishga tushiring (docker compose up).");
 }
 
+if (googleOptions.IsConfigured)
+    app.Logger.LogInformation("Google kirish sozlangan (ClientId ...{Tail}).", googleOptions.ClientId.Length > 6 ? googleOptions.ClientId[^6..] : "");
+else if (googleOptions.DevLogin)
+    app.Logger.LogWarning("Google:DevLogin YOQILGAN — sinov sahifasi haqiqiy Google o'rnida. Production'da o'chiring!");
+else
+    app.Logger.LogWarning("Google kirish sozlanmagan: Google:ClientId va Google:ClientSecret kiriting (docs/GOOGLE_LOGIN.md).");
+
+// Tunnel (Cloudflare) yoki reverse-proxy ortida: tashqi manzil https bo'lsa — kirish havolalari ham https bo'ladi.
+// Faqat shu kompyuterdagi proksi (localhost) sarlavhalariga ishoniladi (standart KnownProxies = loopback).
+app.UseForwardedHeaders(new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto });
+
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapGet("/", () => "Andijon: Saltanatlar — Server ishlayapti. API: /api/auth, /api/game, /api/online, Hub: /gamehub");
+app.MapGet("/", () => "Andijon: Saltanatlar — Server ishlayapti. API: /api/auth/google, /api/save, /api/game, /api/online, Hub: /gamehub");
 app.MapGet("/health", () => Results.Ok(new { ok = true, provider, utc = DateTime.UtcNow }));
 app.MapControllers();
 app.MapHub<GameHub>("/gamehub");

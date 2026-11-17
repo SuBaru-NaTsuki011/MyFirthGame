@@ -116,7 +116,7 @@ namespace AndijonSaltanatlar.Buildings
         {
             if (!_state.IsBuildingUnlocked(_ghost.Type))
             {
-                if (showErrors) _state.ShowMessage("Avval texnologiyani oching (SIVILIZATSIYA)", true);
+                if (showErrors) _state.ShowMessage("Avval texnologiyani oching (TARAQQIYOT)", true);
                 return false;
             }
             if (!_state.IsLandBuildable(Origin, _ghost.Size.X))

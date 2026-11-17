@@ -47,14 +47,16 @@ namespace AndijonSaltanatlar.UI
 
         private void Layout(int vw, int vh)
         {
-            _backBtn = new Rectangle(vw - 190, 14, 174, 30);
+            _backBtn = new Rectangle(vw - 226, 14, 210, 30);
             _techTabBtn = new Rectangle(360, 54, 190, 26);
             _histTabBtn = new Rectangle(556, 54, 190, 26);
 
             _cards.Clear();
             if (!_showHistory)
             {
-                int gx = 360, gy = 92, cw = 210, ch = 66, px = 12, py = 10, cols = 4;
+                // Kartalar ekran eniga moslashadi (nomlari karta ichida qoladi).
+                int gx = 360, gy = 92, ch = 66, px = 12, py = 10, cols = 4;
+                int cw = System.Math.Max(170, System.Math.Min(270, (vw - gx - 16 - (cols - 1) * px) / cols));
                 for (int i = 0; i < TechnologyCatalog.All.Count; i++)
                 {
                     int col = i % cols, row = i / cols;
@@ -83,9 +85,9 @@ namespace AndijonSaltanatlar.UI
         {
             Layout(vw, vh);
             Fill(sb, new Rectangle(0, 0, vw, vh), Bg);
-            _font.Draw(sb, "SIVILIZATSIYA", new Vector2(16, 14), Gold, 3, 1);
+            _font.Draw(sb, "TARAQQIYOT", new Vector2(16, 14), Gold, 3, 1);
             Panel(sb, _backBtn, PanelBg, Border, 1);
-            _font.DrawCentered(sb, "SHAHARGA QAYTISH (C)", _backBtn.Center.ToVector2(), Cream, 2, 1);
+            _font.DrawCentered(sb, FitPx("SHAHARGA QAYTISH", _backBtn.Width - 10), _backBtn.Center.ToVector2(), Cream, 2, 1);
 
             DrawDashboard(sb, vh);
 
@@ -117,7 +119,8 @@ namespace AndijonSaltanatlar.UI
                 "Hozirgi tadqiqot:",
                 "  " + current,
             };
-            foreach (string l in lines) { _font.Draw(sb, l, new Vector2(x, y), Cream, 2, 1); y += 18; }
+            foreach (string l in lines)
+                foreach (string w in l.Length == 0 ? new List<string> { "" } : Wrap(l, box.Width - 28, 2)) { _font.Draw(sb, w, new Vector2(x, y), Cream, 2, 1); y += 18; }
 
             if (Civ.IsResearching)
             {
@@ -132,8 +135,8 @@ namespace AndijonSaltanatlar.UI
             }
 
             y += 10;
-            _font.Draw(sb, "Texnologiya yangi binolarni", new Vector2(x, y), Muted, 2, 1); y += 16;
-            _font.Draw(sb, "va iqtisodiy bonuslarni ochadi.", new Vector2(x, y), Muted, 2, 1);
+            foreach (string w in Wrap("Texnologiya yangi binolarni va iqtisodiy bonuslarni ochadi.", box.Width - 28, 2))
+            { _font.Draw(sb, w, new Vector2(x, y), Muted, 2, 1); y += 16; }
         }
 
         private void DrawTechTree(SpriteBatch sb)
@@ -149,13 +152,13 @@ namespace AndijonSaltanatlar.UI
                 Panel(sb, rect, bg, border, done || researching || avail ? 2 : 1);
 
                 Color nameCol = done ? Teal : avail || researching ? Cream : Muted;
-                _font.Draw(sb, Fit(t.NameUz, 26), new Vector2(rect.X + 8, rect.Y + 7), nameCol, 2, 1);
-                _font.Draw(sb, t.Category, new Vector2(rect.X + 8, rect.Y + 25), Muted, 2, 1);
+                _font.Draw(sb, FitPx(t.NameUz, rect.Width - 14), new Vector2(rect.X + 8, rect.Y + 7), nameCol, 2, 1);
+                _font.Draw(sb, FitPx(t.Category, rect.Width - 14), new Vector2(rect.X + 8, rect.Y + 25), Muted, 2, 1);
 
                 string status = done ? "KASHF ETILGAN" : researching ? "TADQIQOTDA (" + Civ.CurrentProgress + "/" + t.ResearchCost + ")"
                                 : avail ? "Ilm: " + t.ResearchCost : "QULFLANGAN";
                 Color stCol = done ? Teal : researching ? Gold : avail ? Gold : Muted;
-                _font.Draw(sb, status, new Vector2(rect.X + 8, rect.Y + 44), stCol, 2, 1);
+                _font.Draw(sb, FitPx(status, rect.Width - 14), new Vector2(rect.X + 8, rect.Y + 44), stCol, 2, 1);
             }
         }
 
@@ -188,6 +191,15 @@ namespace AndijonSaltanatlar.UI
         }
         private static float MathClamp(float v, float lo, float hi) => v < lo ? lo : (v > hi ? hi : v);
         private static string Fit(string s, int max) => s.Length <= max ? s : s.Substring(0, max);
+
+        /// <summary>Matnni piksel kengligiga sig'diradi (sig'masa ".." bilan qisqartiriladi).</summary>
+        private string FitPx(string text, int maxPx)
+        {
+            text = text ?? "";
+            if (_font.Measure(text, 2, 1).X <= maxPx) return text;
+            while (text.Length > 1 && _font.Measure(text + "..", 2, 1).X > maxPx) text = text.Substring(0, text.Length - 1);
+            return text.TrimEnd() + "..";
+        }
 
         private List<string> Wrap(string text, int maxPx, int scale)
         {

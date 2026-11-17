@@ -56,7 +56,7 @@ namespace AndijonSaltanatlar.UI
 
         private void Layout(int vw, int vh)
         {
-            _backBtn = new Rectangle(vw - 190, 14, 174, 30);
+            _backBtn = new Rectangle(vw - 226, 14, 210, 30);
             int tx = 16, ty = 54, tw = (vw - 32 - 4 * 8) / 5, th = 30;
             for (int i = 0; i < 5; i++) _tabBtns[i] = new Rectangle(tx + i * (tw + 8), ty, tw, th);
         }
@@ -110,7 +110,7 @@ namespace AndijonSaltanatlar.UI
             Fill(sb, new Rectangle(0, 0, vw, vh), Bg);
             _font.Draw(sb, "TOPSHIRIQLAR", new Vector2(16, 14), Gold, 3, 1);
             Panel(sb, _backBtn, PanelBg, Border, 1);
-            _font.DrawCentered(sb, "SHAHARGA QAYTISH (J)", _backBtn.Center.ToVector2(), Cream, 2, 1);
+            _font.DrawCentered(sb, "SHAHARGA QAYTISH", _backBtn.Center.ToVector2(), Cream, 2, 1);
 
             string[] names = { "ASOSIY HIKOYA", "QO'SHIMCHA", "KUNLIK", "YUTUQLAR", "KAMPANIYALAR" };
             for (int i = 0; i < 5; i++)

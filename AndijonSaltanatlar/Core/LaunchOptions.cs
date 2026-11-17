@@ -64,6 +64,27 @@ public sealed class LaunchOptions
 	public string OnlinePass;
 	public bool OnlineRegister;
 	public string OnlineTab;
+
+	/// <summary>Google kirish ekranini majburan ko'rsatish (skrinshot/sinov rejimida ham).</summary>
+	public bool Login;
+
+	/// <summary>Sinov: brauzer ochilmaydi, Google login manzili shu faylga yoziladi.</summary>
+	public string LoginUrlFile;
+
+	/// <summary>Server manzili (kirish ekrani uchun standart qiymat).</summary>
+	public string Server;
+
+	/// <summary>Sinov: kirish + bulutdan yuklash tugagach skrinshot olinsin (kirish kutiladi).</summary>
+	public bool ScreenshotAfterLogin;
+
+	/// <summary>Sinov: kirgandan keyin shu uchastkani ochib, bulutga saqlash (yer kengaytirish e2e).</summary>
+	public int? UnlockParcelAfterLogin;
+
+	/// <summary>Ma'lumotlar papkasi (token, sozlamalar) — sinovlar haqiqiy hisobga tegmasligi uchun.</summary>
+	public string DataDir;
+
+	/// <summary>PC'da telefon interfeysini sinash (katta tugmalar, telefon UI masshtabi).</summary>
+	public bool Phone;
 	/// <summary>Skrinshotni shuncha kadrdan keyin olish (server javobini kutish uchun).</summary>
 	public int? ScreenshotFrames;
 
@@ -163,6 +184,32 @@ public sealed class LaunchOptions
 				break;
 			case "--online":
 				launchOptions.Online = true;
+				break;
+			case "--login":
+				launchOptions.Login = true;
+				break;
+			case "--login-url-file":
+				launchOptions.LoginUrlFile = text;
+				launchOptions.Login = true;
+				i++;
+				break;
+			case "--data-dir":
+				launchOptions.DataDir = text;
+				i++;
+				break;
+			case "--phone":
+				launchOptions.Phone = true;
+				break;
+			case "--server":
+				launchOptions.Server = text;
+				i++;
+				break;
+			case "--shot-after-login":
+				launchOptions.ScreenshotAfterLogin = true;
+				break;
+			case "--unlock-parcel":
+				launchOptions.UnlockParcelAfterLogin = int.Parse(text, CultureInfo.InvariantCulture);
+				i++;
 				break;
 			case "--online-server":
 				launchOptions.OnlineServer = text;

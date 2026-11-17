@@ -41,10 +41,20 @@ namespace AndijonSaltanatlar.Core
         public bool MouseOverUI { get; set; }
 
         /// <summary>Oxirgi kiritish sensordan keldimi (UI katta tugmalar uchun).</summary>
-        public bool IsTouch => _touchMode;
+        public bool IsTouch => _touchMode || ForceTouchUi;
 
-        public Point MousePosition => _touchMode ? _tPos : _ms.Position;
-        public Vector2 MouseVector => _touchMode ? new Vector2(_tPos.X, _tPos.Y) : new Vector2(_ms.X, _ms.Y);
+        /// <summary>Sinov: PC'da telefon interfeysini ko'rsatish (katta tugmalar, telefon masshtabi).</summary>
+        public bool ForceTouchUi { get; set; }
+
+        /// <summary>
+        /// Eski piksel-shriftli panellar virtual o'lchamda chiziladi (telefonda 720p balandlik). Ular yangilanayotganda
+        /// Game1 shu koeffitsientni o'rnatadi — kursor/barmoq koordinatalari panel koordinatalariga o'giriladi.
+        /// </summary>
+        public float PointerScale { get; set; } = 1f;
+
+        private Point RawPosition => _touchMode ? _tPos : _ms.Position;
+        public Point MousePosition => PointerScale == 1f ? RawPosition : new Point((int)(RawPosition.X / PointerScale), (int)(RawPosition.Y / PointerScale));
+        public Vector2 MouseVector => new Vector2(RawPosition.X, RawPosition.Y) / PointerScale;
         public Point MouseDelta => _touchMode ? (_tPanning ? _tPos - _tPrevPos : Point.Zero) : _ms.Position - _prevMs.Position;
         public int WheelDelta => _touchMode ? _pinchDelta : _ms.ScrollWheelValue - _prevMs.ScrollWheelValue;
 
@@ -78,6 +88,10 @@ namespace AndijonSaltanatlar.Core
             }
 
             UpdateTouch(windowActive);
+            bool back = false;
+            try { back = windowActive && GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed; } catch { }
+            BackPressed = back && !_backDown;
+            _backDown = back;
             if (LeftPressed) _clickLatch = true;
 
             RightClicked = false;
@@ -170,7 +184,11 @@ namespace AndijonSaltanatlar.Core
         }
 
         public bool KeyDown(Keys k) => _kb.IsKeyDown(k);
-        public bool KeyPressed(Keys k) => _kb.IsKeyDown(k) && !_prevKb.IsKeyDown(k);
+        public bool KeyPressed(Keys k) => (_kb.IsKeyDown(k) && !_prevKb.IsKeyDown(k)) || (k == Keys.Escape && BackPressed);
+
+        /// <summary>Android "Orqaga" tugmasi shu kadrda bosildi (Esc kabi ishlaydi: panelni yopadi, o'yindan chiqmaydi).</summary>
+        public bool BackPressed { get; private set; }
+        private bool _backDown;
 
         // ---- Matn kiritish ----
         public void PushText(char c)

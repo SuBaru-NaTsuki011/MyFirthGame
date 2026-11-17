@@ -34,6 +34,11 @@ namespace AndijonSaltanatlar.SaveSystem
     {
         public int Version { get; set; } = 1;
         public int Seed { get; set; }
+        /// <summary>
+        /// Shahar bloki xaritada qancha siljigan (GameConfig.CityOffset). Eski (v1) saqlashlarda 0 —
+        /// yuklashda barcha tile koordinatalari yangi kattaroq xaritaga ko'chiriladi.
+        /// </summary>
+        public int MapOffset { get; set; }
 
         public int Coins { get; set; }
         public int Food { get; set; }

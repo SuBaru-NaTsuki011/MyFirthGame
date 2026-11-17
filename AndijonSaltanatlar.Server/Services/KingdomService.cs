@@ -30,7 +30,7 @@ namespace AndijonSaltanatlar.Server.Services
         // ------------------------------------------------------------------
         // Diplomatik munosabat (juftlik bo'yicha bitta qator, A < B)
         // ------------------------------------------------------------------
-        private static (int a, int b) Pair(int x, int y) => x < y ? (x, y) : (y, x);
+        public static (int a, int b) Pair(int x, int y) => x < y ? (x, y) : (y, x);
 
         public async Task<int> RelationAsync(int worldId, int k1, int k2)
         {
@@ -39,7 +39,7 @@ namespace AndijonSaltanatlar.Server.Services
                 .Where(r => r.WorldId == worldId && r.KingdomA == a && r.KingdomB == b).Select(r => r.Value).FirstOrDefaultAsync();
         }
 
-        private async Task AdjustRelationAsync(int worldId, int k1, int k2, int delta)
+        public async Task AdjustRelationAsync(int worldId, int k1, int k2, int delta)
         {
             (int a, int b) = Pair(k1, k2);
             int changed = await Db.DiplomaticRelations.Where(r => r.WorldId == worldId && r.KingdomA == a && r.KingdomB == b)
@@ -74,6 +74,7 @@ namespace AndijonSaltanatlar.Server.Services
                 {
                     Id = r.Id, Name = r.Name, OwnerKingdomId = r.OwnerKingdomId, OwnerName = owner?.Name ?? "Mustaqil hudud",
                     ColorR = owner?.ColorR ?? 150, ColorG = owner?.ColorG ?? 150, ColorB = owner?.ColorB ?? 140,
+                    Flag = WorldSeeder.FlagOf(owner), Province = r.Province ?? "",
                     MapX = (float)r.Latitude, MapY = (float)r.Longitude, Population = pop, Development = r.Development, Stability = r.Stability,
                     Cities = rc.Select(c => c.Name).ToList(), IsMine = r.OwnerKingdomId == me.Id, Relation = rel,
                     AnnexCost = TerritoryRules.AnnexCost(pop, r.Development)
@@ -184,6 +185,7 @@ namespace AndijonSaltanatlar.Server.Services
             var dto = new KingdomOverviewDto
             {
                 KingdomId = me.Id, Name = me.Name, Ruler = me.RulerName, Coin = st.Coin,
+                Flag = WorldSeeder.FlagOf(me), Color = new[] { me.ColorR, me.ColorG, me.ColorB },
                 Capital = cities.FirstOrDefault(c => c.IsCapital)?.Name ?? cities.FirstOrDefault()?.Name ?? "",
                 Population = cities.Sum(c => c.Population), CityCount = cities.Count, Inventory = st.Inventory
             };

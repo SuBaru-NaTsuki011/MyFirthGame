@@ -8,6 +8,48 @@ namespace AndijonSaltanatlar.Shared.DTOs
     {
         public int WorldId { get; set; } = 1;
         public string KingdomName { get; set; } = "";
+        /// <summary>Yangi mijoz: boshlang'ich yurtni o'yinchi xaritadan o'zi tanlaydi (server avtomatik joy bermaydi).</summary>
+        public bool ChooseStart { get; set; }
+    }
+
+    /// <summary>Boshlang'ich yurt tanlash xaritasi uchun hudud.</summary>
+    public sealed class StartRegionDto
+    {
+        public int RegionId { get; set; }
+        public string Name { get; set; } = "";
+        public string Province { get; set; } = "";
+        public float MapX { get; set; }
+        public float MapY { get; set; }
+        public int Population { get; set; }
+        /// <summary>Mustaqil (bo'sh) — shu yerda saltanat qurish mumkin.</summary>
+        public bool Free { get; set; }
+        public int OwnerKingdomId { get; set; }
+        public string OwnerName { get; set; } = "";
+        public bool OwnerIsAi { get; set; }
+        public int[] Color { get; set; } = { 150, 150, 150 };
+        public string Flag { get; set; } = "";
+    }
+
+    public sealed class StartRegionsDto
+    {
+        public List<StartRegionDto> Regions { get; set; } = new();
+        public string SuggestedName { get; set; } = "";
+        public string Flag { get; set; } = "";
+        public int[] Color { get; set; } = { 128, 128, 128 };
+    }
+
+    public sealed class ChooseStartRequest
+    {
+        public string CommandId { get; set; } = "";
+        public int RegionId { get; set; }
+        public string KingdomName { get; set; } = "";
+        public string Flag { get; set; } = "";
+    }
+
+    public sealed class SetFlagRequest
+    {
+        public string CommandId { get; set; } = "";
+        public string Flag { get; set; } = "";
     }
 
     public sealed class RiceFieldDto
@@ -58,6 +100,10 @@ namespace AndijonSaltanatlar.Shared.DTOs
         public List<CaravanDto> Caravans { get; set; } = new();
         public int CityCount { get; set; }
         public int Population { get; set; }
+        /// <summary>Saltanatning hali yurti yo'q — o'yinchi xaritadan boshlang'ich hududni tanlashi kerak.</summary>
+        public bool NeedsHome { get; set; }
+        public string Flag { get; set; } = "";
+        public int[] Color { get; set; } = { 128, 128, 128 };
     }
 
     public sealed class FieldActionRequest

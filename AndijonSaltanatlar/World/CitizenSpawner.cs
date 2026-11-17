@@ -17,7 +17,7 @@ namespace AndijonSaltanatlar.World
             void C(int kind, float speed, params (float x, float y)[] pts)
             {
                 var route = new List<Vector2>();
-                foreach (var (x, y) in pts) route.Add(new Vector2(x, y));
+                foreach (var (x, y) in pts) route.Add(new Vector2(x + GameConfig.CityOffset, y + GameConfig.CityOffset));
                 units.Add(new CitizenUnit(route, kind, speed));
             }
 

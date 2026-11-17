@@ -1,105 +1,124 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using AndijonSaltanatlar.Server.Data;
+using AndijonSaltanatlar.Shared.Geo;
+using AndijonSaltanatlar.Shared.Heraldry;
 
 namespace AndijonSaltanatlar.Server.Services
 {
     /// <summary>
-    /// Dunyoning boshlang'ich siyosiy xaritasi (PROMPT 19B). Faqat bir marta — dunyoda hudud bo'lmasa — yaratiladi.
-    /// Xarita koordinatasi (0..100) RegionEntity.Latitude (X) va Longitude (Y) maydonlarida saqlanadi.
-    /// Aholi SHAHARLARDA: hudud aholisi = uning shaharlari aholisi yig'indisi.
+    /// Dunyoning siyosiy xaritasi — butun O'ZBEKISTON (UzMap): 13 viloyat, ~93 hudud (tuman/shahar), tarixiy
+    /// AI saltanatlar (Andijon, Farg'ona, Xiva, Buxoro, Qo'qon). Qolgan hududlar mustaqil — o'yinchi istalganini
+    /// boshlang'ich yurt qilib tanlaydi. Xarita koordinatasi (0..100) RegionEntity.Latitude (X) va Longitude (Y) da.
+    /// Eski dunyolar (faqat Farg'ona vodiysi) birinchi ishga tushishda yangi xaritaga ko'chiriladi: egalik, shaharlar,
+    /// aholi va binolar saqlanadi — faqat koordinata/viloyat yangilanadi va yetishmayotgan hududlar qo'shiladi.
     /// </summary>
     public static class WorldSeeder
     {
-        private sealed record SeedCity(string Region, float X, float Y, string City, int Population, int Housing, int Jobs, int Development);
-
-        private static readonly SeedCity[] AndijonKhanate =
-        {
-            new("Andijon", 60, 40, "Andijon", 520, 600, 380, 55),
-            new("Shahrixon", 45, 62, "Shahrixon", 340, 380, 240, 40),
-            new("Marhamat", 74, 64, "Marhamat", 180, 220, 120, 30),
-        };
-
-        private static readonly SeedCity[] FerganaBeylik =
-        {
-            new("Marg'ilon", 22, 58, "Marg'ilon", 410, 460, 300, 50),
-            new("Quva", 32, 40, "Quva", 260, 300, 170, 35),
-        };
-
-        private static readonly SeedCity[] Neutral =
-        {
-            new("Paxtaobod", 66, 20, "Paxtaobod", 120, 150, 70, 20),
-            new("Bo'z", 30, 22, "Bo'z", 90, 120, 50, 18),
-        };
-
-        /// <summary>O'yinchilar boshlanadigan hududlar (navbat bilan beriladi).</summary>
-        private static readonly (string Name, float X, float Y)[] PlayerStarts =
-        {
-            ("Asaka", 55, 52), ("Xo'jaobod", 84, 50), ("Qo'rg'ontepa", 86, 30), ("Baliqchi", 44, 14), ("Izboskan", 52, 26), ("Oltinko'l", 40, 46)
-        };
-
         private static readonly (int R, int G, int B)[] PlayerColors =
         {
-            (50, 107, 150), (60, 150, 110), (200, 140, 50), (140, 80, 160), (40, 150, 170), (170, 70, 90)
+            (50, 107, 150), (60, 150, 110), (200, 140, 50), (140, 80, 160), (40, 150, 170), (170, 70, 90),
+            (210, 180, 60), (90, 90, 200), (200, 100, 150), (100, 160, 60)
         };
 
         public static (int, int, int) PlayerColor(int index) => PlayerColors[Math.Abs(index) % PlayerColors.Length];
 
         /// <summary>
-        /// Dunyoni to'ldirish va o'yinchi hududini berish ketma-ket bajariladi: ikki o'yinchi bir vaqtda yangi dunyoga
-        /// kirsa ham AI saltanatlar ikki marta yaratilmaydi va ikkalasiga bitta boshlang'ich hudud berilmaydi.
-        /// (Bitta server jarayoni uchun. Bir nechta server nusxasida — DB darajasidagi qulf kerak.)
+        /// Dunyoni to'ldirish va o'yinchi hududini berish ketma-ket bajariladi: ikki o'yinchi bir vaqtda kirsa ham
+        /// AI saltanatlar ikki marta yaratilmaydi va ikkalasiga bitta hudud berilmaydi (bitta server jarayoni uchun).
         /// </summary>
         private static readonly System.Threading.SemaphoreSlim Gate = new System.Threading.SemaphoreSlim(1, 1);
 
         public static async Task SeedAsync(GameDbContext db, World w)
         {
+            if (w.MapVersion >= UzMap.Version) return;
             await Gate.WaitAsync();
-            try { await SeedCoreAsync(db, w); }
+            try
+            {
+                int current = await db.Worlds.AsNoTracking().Where(x => x.Id == w.Id).Select(x => x.MapVersion).FirstAsync();
+                if (current >= UzMap.Version) { w.MapVersion = current; return; }
+                await SeedOrMigrateAsync(db, w.Id);
+                await db.Worlds.Where(x => x.Id == w.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.MapVersion, UzMap.Version));
+                w.MapVersion = UzMap.Version;
+            }
             finally { Gate.Release(); }
         }
 
-        private static async Task SeedCoreAsync(GameDbContext db, World w)
+        private static async Task SeedOrMigrateAsync(GameDbContext db, int worldId)
         {
-            if (await db.Regions.AnyAsync(r => r.WorldId == w.Id)) return;
-            Kingdom andijon = await AiKingdom(db, w.Id, "Andijon xonligi", "Umarbek", 190, 80, 60, "balanced");
-            Kingdom fergana = await AiKingdom(db, w.Id, "Farg'ona begligi", "Sulaymonbek", 120, 90, 170, "trade");
-            await AddCities(db, w.Id, andijon.Id, AndijonKhanate);
-            await AddCities(db, w.Id, fergana.Id, FerganaBeylik);
-            await AddCities(db, w.Id, 0, Neutral);
-            // AI omborlari: bozorda haqiqiy mol bilan qatnashadi (cheksiz emas).
-            db.Inventory.Add(new InventoryEntity { KingdomId = andijon.Id, Product = "Wheat", Quantity = 600 });
-            db.Inventory.Add(new InventoryEntity { KingdomId = andijon.Id, Product = "Cotton", Quantity = 300 });
-            db.Inventory.Add(new InventoryEntity { KingdomId = fergana.Id, Product = "Cotton", Quantity = 500 });
-            db.Inventory.Add(new InventoryEntity { KingdomId = fergana.Id, Product = "Fruit", Quantity = 400 });
-            await db.SaveChangesAsync();
-        }
-
-        private static async Task<Kingdom> AiKingdom(GameDbContext db, int worldId, string name, string ruler, int r, int g, int b, string strategy)
-        {
-            var k = new Kingdom { WorldId = worldId, Name = name, RulerName = ruler, IsAi = true, ColorR = r, ColorG = g, ColorB = b, AiStrategy = strategy };
-            db.Kingdoms.Add(k);
-            await db.SaveChangesAsync();
-            db.KingdomResources.Add(new KingdomResource { KingdomId = k.Id, Coin = 3000, Food = 800 });
-            await db.SaveChangesAsync();
-            return k;
-        }
-
-        private static async Task AddCities(GameDbContext db, int worldId, int ownerId, SeedCity[] seeds)
-        {
-            bool first = true;
-            foreach (SeedCity s in seeds)
+            // 1) AI saltanatlar (nomi bo'yicha — eski dunyodagilari qayta yaratilmaydi)
+            var aiByKey = new Dictionary<string, Kingdom>();
+            foreach (MapKingdomSeed ks in UzMap.Kingdoms)
             {
-                var region = new RegionEntity { WorldId = worldId, Name = s.Region, OwnerKingdomId = ownerId, Latitude = s.X, Longitude = s.Y, Development = s.Development, Stability = 60 };
+                Kingdom k = await db.Kingdoms.FirstOrDefaultAsync(x => x.WorldId == worldId && x.Name == ks.Name);
+                bool created = k == null;
+                if (created)
+                {
+                    k = new Kingdom { WorldId = worldId, Name = ks.Name, RulerName = ks.Ruler, IsAi = true, ColorR = ks.R, ColorG = ks.G, ColorB = ks.B, AiStrategy = ks.Strategy, Flag = ks.Flag };
+                    db.Kingdoms.Add(k);
+                    await db.SaveChangesAsync();
+                    db.KingdomResources.Add(new KingdomResource { KingdomId = k.Id, Coin = 3000, Food = 800 });
+                    // AI omborlari: bozorda haqiqiy mol bilan qatnashadi (cheksiz emas).
+                    foreach ((string product, int qty) in AiStock(ks.Key))
+                        db.Inventory.Add(new InventoryEntity { KingdomId = k.Id, Product = product, Quantity = qty });
+                }
+                else if (string.IsNullOrEmpty(k.Flag)) k.Flag = ks.Flag;
+                aiByKey[ks.Key] = k;
+            }
+            await db.SaveChangesAsync();
+
+            // 2) Mavjud hududlar: koordinata va viloyat yangi xaritaga
+            var existing = await db.Regions.Where(r => r.WorldId == worldId).ToListAsync();
+            var names = new HashSet<string>(existing.Select(r => r.Name), StringComparer.OrdinalIgnoreCase);
+            foreach (RegionEntity r in existing)
+            {
+                MapRegionSeed s = UzMap.Find(r.Name);
+                if (s != null)
+                {
+                    r.Latitude = UzMap.X(s.Lon); r.Longitude = UzMap.Y(s.Lat); r.Province = s.Province;
+                }
+                else if (string.IsNullOrEmpty(r.Province))
+                {
+                    // Katalogda yo'q (masalan "Yangi yurt 12") — eski Farg'ona koordinatasidan o'giriladi.
+                    (float x, float y) = UzMap.FromLegacyFergana(r.Latitude, r.Longitude);
+                    r.Latitude = x; r.Longitude = y; r.Province = UzMap.NearestProvince(x, y);
+                }
+            }
+            await db.SaveChangesAsync();
+
+            // 3) Yetishmayotgan hududlar (har biri bitta shahar bilan)
+            var capitalSet = new HashSet<int>(await db.Cities.Where(c => c.IsCapital && c.KingdomId != 0).Select(c => c.KingdomId).ToListAsync());
+            foreach (MapRegionSeed s in UzMap.Regions)
+            {
+                if (names.Contains(s.Name)) continue;
+                int owner = s.Owner != null && aiByKey.TryGetValue(s.Owner, out Kingdom ok) ? ok.Id : 0;
+                var region = new RegionEntity
+                {
+                    WorldId = worldId, Name = s.Name, Province = s.Province, OwnerKingdomId = owner,
+                    Latitude = UzMap.X(s.Lon), Longitude = UzMap.Y(s.Lat),
+                    Development = Math.Clamp(15 + s.Population / 12, 15, 60), Stability = 60
+                };
                 db.Regions.Add(region);
                 await db.SaveChangesAsync();
-                db.Cities.Add(NewCity(ownerId, region.Id, s.City, s.Population, s.Housing, s.Jobs, first && ownerId != 0));
-                first = false;
+                bool capital = owner != 0 && capitalSet.Add(owner);
+                db.Cities.Add(NewCity(owner, region.Id, s.Name, s.Population, s.Population + 40 + s.Population / 5, Math.Max(20, s.Population * 7 / 10), capital));
+                names.Add(s.Name);
             }
             await db.SaveChangesAsync();
         }
+
+        private static IEnumerable<(string, int)> AiStock(string key) => key switch
+        {
+            "andijon" => new[] { ("Wheat", 600), ("Cotton", 300) },
+            "fargona" => new[] { ("Cotton", 500), ("Fruit", 400) },
+            "xiva" => new[] { ("Wheat", 400), ("Vegetable", 300) },
+            "buxoro" => new[] { ("Cotton", 400), ("Fruit", 300) },
+            "qoqon" => new[] { ("Wheat", 500), ("Fruit", 300) },
+            _ => Array.Empty<(string, int)>(),
+        };
 
         private static CityEntity NewCity(int kingdomId, int regionId, string name, int population, int housing, int jobs, bool capital) => new CityEntity
         {
@@ -109,23 +128,81 @@ namespace AndijonSaltanatlar.Server.Services
             GovernorName = "Hokim " + name.Split(' ')[0]
         };
 
-        /// <summary>O'yinchining o'z hududi va poytaxti (bo'lmasa yaratiladi).</summary>
+        // ------------------------------------------------------------------ O'yinchining boshlang'ich yurti
+        /// <summary>
+        /// Eski mijozlar uchun: saltanatning shahri bo'lmasa — avtomatik mustaqil hudud beriladi
+        /// (avval PreferredStarts, keyin Andijon viloyati, keyin boshqa mustaqil hududlar).
+        /// </summary>
         public static async Task EnsurePlayerHomeAsync(GameDbContext db, Kingdom k)
         {
             await Gate.WaitAsync();
-            try { await EnsurePlayerHomeCoreAsync(db, k); }
+            try
+            {
+                if (await db.Cities.AnyAsync(c => c.KingdomId == k.Id)) return;
+                var free = await db.Regions.Where(r => r.WorldId == k.WorldId && r.OwnerKingdomId == 0).ToListAsync();
+                RegionEntity pick = UzMap.PreferredStarts.Select(n => free.FirstOrDefault(r => r.Name == n)).FirstOrDefault(r => r != null)
+                    ?? free.Where(r => r.Province == "an").OrderBy(r => r.Id).FirstOrDefault()
+                    ?? free.OrderBy(r => r.Id).FirstOrDefault();
+                if (pick != null) await TakeRegionAsync(db, k, pick);
+                else await FoundNewRegionAsync(db, k);
+            }
             finally { Gate.Release(); }
         }
 
-        private static async Task EnsurePlayerHomeCoreAsync(GameDbContext db, Kingdom k)
+        /// <summary>
+        /// O'yinchi xaritadan tanlagan boshlang'ich hudud. Faqat mustaqil (hech kimga tegishli bo'lmagan) hudud
+        /// va faqat saltanatning hali shahri bo'lmasa. Natija: null — muvaffaqiyat, aks holda sabab (o'zbekcha).
+        /// </summary>
+        public static async Task<string> ChooseStartAsync(GameDbContext db, Kingdom k, int regionId)
         {
-            if (await db.Cities.AnyAsync(c => c.KingdomId == k.Id)) return;
-            var taken = await db.Regions.Where(r => r.WorldId == k.WorldId).Select(r => r.Name).ToListAsync();
-            var start = PlayerStarts.FirstOrDefault(p => !taken.Contains(p.Name));
-            string name = start.Name ?? ("Yangi yurt " + k.Id);
-            float x = start.Name != null ? start.X : 10 + (k.Id * 13 % 80);
-            float y = start.Name != null ? start.Y : 10 + (k.Id * 29 % 80);
-            var region = new RegionEntity { WorldId = k.WorldId, Name = name, OwnerKingdomId = k.Id, Latitude = x, Longitude = y, Development = 30, Stability = 70 };
+            await Gate.WaitAsync();
+            try
+            {
+                if (await db.Cities.AnyAsync(c => c.KingdomId == k.Id)) return "Saltanatingizning yurti allaqachon bor.";
+                RegionEntity r = await db.Regions.FirstOrDefaultAsync(x => x.Id == regionId && x.WorldId == k.WorldId);
+                if (r == null) return "Hudud topilmadi.";
+                if (r.OwnerKingdomId != 0) return r.Name + " band — boshqa mustaqil hududni tanlang.";
+                await TakeRegionAsync(db, k, r);
+                return null;
+            }
+            finally { Gate.Release(); }
+        }
+
+        private static async Task TakeRegionAsync(GameDbContext db, Kingdom k, RegionEntity r)
+        {
+            // Shartli yangilash: boshqa so'rov shu hududni oldinroq olgan bo'lsa — 0 qator.
+            int changed = await db.Regions.Where(x => x.Id == r.Id && x.OwnerKingdomId == 0)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.OwnerKingdomId, k.Id).SetProperty(x => x.Stability, 70));
+            if (changed == 0) throw new InvalidOperationException("Hudud band.");
+            db.Entry(r).State = EntityState.Detached;
+            var cities = await db.Cities.Where(c => c.RegionId == r.Id).OrderByDescending(c => c.Population).ToListAsync();
+            if (cities.Count == 0)
+                db.Cities.Add(NewCity(k.Id, r.Id, r.Name, 42, 60, 30, true));
+            else
+                for (int i = 0; i < cities.Count; i++)
+                {
+                    cities[i].KingdomId = k.Id;
+                    cities[i].IsCapital = i == 0;
+                    cities[i].GovernorName = "Hokim " + cities[i].Name.Split(' ')[0];
+                }
+            await db.SaveChangesAsync();
+        }
+
+        /// <summary>Bo'sh hudud qolmagan bo'lsa — mamlakat ichida yangi yurt (eng yaqin hududlardan uzoqroq joy).</summary>
+        private static async Task FoundNewRegionAsync(GameDbContext db, Kingdom k)
+        {
+            var taken = await db.Regions.Where(r => r.WorldId == k.WorldId).Select(r => new { r.Latitude, r.Longitude }).ToListAsync();
+            var rnd = new Random(k.Id * 7919);
+            float bx = 50, by = 50; double best = -1;
+            for (int i = 0; i < 400; i++)
+            {
+                float x = (float)(rnd.NextDouble() * 100), y = (float)(rnd.NextDouble() * 100);
+                if (!UzMap.InsideCountry(x, y)) continue;
+                double d = taken.Count == 0 ? 1000 : taken.Min(t => UzMap.DistanceKm(x, y, t.Latitude, t.Longitude));
+                if (d > best) { best = d; bx = x; by = y; }
+            }
+            string name = "Yangi yurt " + k.Id;
+            var region = new RegionEntity { WorldId = k.WorldId, Name = name, Province = UzMap.NearestProvince(bx, by), OwnerKingdomId = k.Id, Latitude = bx, Longitude = by, Development = 30, Stability = 70 };
             db.Regions.Add(region);
             await db.SaveChangesAsync();
             db.Cities.Add(NewCity(k.Id, region.Id, name, 42, 60, 30, true));
@@ -135,14 +212,17 @@ namespace AndijonSaltanatlar.Server.Services
         public static async Task<CityEntity> CapitalOfAsync(GameDbContext db, int kingdomId)
             => await db.Cities.AsNoTracking().Where(c => c.KingdomId == kingdomId).OrderByDescending(c => c.IsCapital).ThenBy(c => c.Id).FirstOrDefaultAsync();
 
+        /// <summary>Ikki shahar orasidagi masofa (km, O'zbekiston xaritasida).</summary>
         public static async Task<double> DistanceAsync(GameDbContext db, CityEntity a, CityEntity b)
         {
             if (a == null || b == null) return 0;
             var ra = await db.Regions.AsNoTracking().FirstOrDefaultAsync(r => r.Id == a.RegionId);
             var rb = await db.Regions.AsNoTracking().FirstOrDefaultAsync(r => r.Id == b.RegionId);
             if (ra == null || rb == null) return 0;
-            double dx = ra.Latitude - rb.Latitude, dy = ra.Longitude - rb.Longitude;
-            return Math.Sqrt(dx * dx + dy * dy);
+            return UzMap.DistanceKm(ra.Latitude, ra.Longitude, rb.Latitude, rb.Longitude);
         }
+
+        /// <summary>Saltanat bayrog'i (bo'sh/yaroqsiz bo'lsa — rangi asosidagi standart).</summary>
+        public static string FlagOf(Kingdom k) => k == null ? "" : FlagSpec.ParseOr(k.Flag, k.Id, k.ColorR, k.ColorG, k.ColorB).Encode();
     }
 }

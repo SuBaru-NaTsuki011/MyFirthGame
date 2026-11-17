@@ -59,7 +59,7 @@ namespace AndijonSaltanatlar.Tests
         {
             Kingdom k = await Player("asaka", 500);
             using GameDbContext db = NewDb();
-            Assert.Equal(2, await db.Kingdoms.CountAsync(x => x.IsAi));
+            Assert.Equal(AndijonSaltanatlar.Shared.Geo.UzMap.Kingdoms.Length, await db.Kingdoms.CountAsync(x => x.IsAi));
             CityEntity cap = await db.Cities.SingleAsync(c => c.KingdomId == k.Id);
             Assert.True(cap.IsCapital);
             Assert.Equal("Asaka", cap.Name);

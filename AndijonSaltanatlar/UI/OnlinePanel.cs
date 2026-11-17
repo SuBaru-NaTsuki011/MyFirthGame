@@ -6,6 +6,7 @@ using AndijonSaltanatlar.Core;
 using AndijonSaltanatlar.Core.Graphics;
 using AndijonSaltanatlar.Online;
 using AndijonSaltanatlar.Shared.DTOs;
+using AndijonSaltanatlar.Shared.War;
 using AndijonSaltanatlar.Shared.Farming;
 using AndijonSaltanatlar.UI.Design;
 using Microsoft.Xna.Framework;
@@ -21,12 +22,12 @@ namespace AndijonSaltanatlar.UI
     /// pastki navigatsiya, katta tugmalar va kattaroq shrift — PC interfeysi shunchaki kichraytirilmaydi.
     /// Panel hech narsani o'zi hisoblamaydi: barcha raqamlar server holatidan; har amal — server buyrug'i.
     /// </summary>
-    public sealed class OnlinePanel
+    public sealed partial class OnlinePanel
     {
-        private enum Section { Fields, Market, Caravans, Kingdom, Vizier }
-        private static readonly string[] SectionNames = { "Dalalar", "Bozor", "Karvonlar", "Saltanat", "Vazir" };
-        private static readonly string[] MarketTabs = { "Sotib olish", "Sotish", "Mening takliflarim", "Savdo tarixi" };
-        private static readonly string[] KingdomTabs = { "Umumiy", "Shaharlar", "Hududlar", "Aholi", "Iqtisodiyot", "Diplomatiya", "Hokimlar" };
+        private enum Section { Fields, Market, Caravans, Kingdom, War, Vizier }
+        private static readonly string[] SectionNames = { "Dalalar", "Bozor", "Karvonlar", "Saltanat", "Harbiy", "Vazir" };
+        private static readonly string[] MarketTabs = { "Sotib olish", "Sotish", "Takliflarim", "Savdo tarixi" };
+        private static readonly string[] KingdomTabs = { "Umumiy", "Shaharlar", "Hududlar", "Aholi", "Iqtisodiyot", "Diplomatiya", "Hokimlar", "Bayroq" };
 
         private readonly AssetManager _assets;
         private readonly OnlineClient _client;
@@ -106,7 +107,15 @@ namespace AndijonSaltanatlar.UI
                 case "economy": _sectionAfterLogin = Section.Kingdom; _kingdomTab = 4; break;
                 case "diplomacy": _sectionAfterLogin = Section.Kingdom; _kingdomTab = 5; break;
                 case "governors": _sectionAfterLogin = Section.Kingdom; _kingdomTab = 6; break;
+                case "flag": case "bayroq": _sectionAfterLogin = Section.Kingdom; _kingdomTab = 7; break;
+                case "start-flag": _startStep = 1; _startRegion = -2; break; // sinov: yurt tanlashning 2-qadami
                 case "vizier": case "vazir": _sectionAfterLogin = Section.Vizier; break;
+                case "war": case "harbiy": case "warmap": _sectionAfterLogin = Section.War; _warTab = 0; break;
+                case "armies": _sectionAfterLogin = Section.War; _warTab = 1; break;
+                case "army-units": _sectionAfterLogin = Section.War; _warTab = 3; break;
+                case "conflicts": _sectionAfterLogin = Section.War; _warTab = 5; break;
+                case "pvp": _sectionAfterLogin = Section.War; _warTab = 6; break;
+                case "battle": _sectionAfterLogin = Section.War; _warTab = 1; _openActiveBattle = true; break;
             }
             _section = _sectionAfterLogin;
         }
@@ -135,15 +144,28 @@ namespace AndijonSaltanatlar.UI
             if (kb != null && _pendingKeyboardField != null)
             {
                 if (_pendingKeyboardField == "server") _server = kb; else if (_pendingKeyboardField == "user") _user = kb; else if (_pendingKeyboardField == "pass") _pass = kb;
+                else if (_pendingKeyboardField == "kname") _nameDraft = kb;
                 _pendingKeyboard = null; _pendingKeyboardField = null;
             }
 
+            if (_client.OpenBattleRequest != 0)
+            {
+                int bid = _client.OpenBattleRequest;
+                _client.OpenBattleRequest = 0;
+                IsOpen = true;
+                _section = Section.War;
+                OpenBattle(bid);
+            }
+            // Yangi o'yinchi: yurt tanlanmaguncha oyna ochiq turadi (xaritadan boshlang'ich hududni tanlash).
+            if (_client.LoggedIn && _client.State?.NeedsHome == true && !IsOpen) IsOpen = true;
             if (!IsOpen) return;
             input.MouseOverUI = true;
+            if (BattleOpen && input.KeyPressed(Keys.Escape)) { _battleOpen = false; return; }
             if (input.KeyPressed(Keys.Escape))
             {
                 if (_confirm != null) _confirm = null;
                 else if (_ui.FocusId != null) _ui.FocusId = null;
+                else if (_client.State?.NeedsHome == true) { if (_startStep == 1) _startStep = 0; }
                 else Close();
             }
             if (!_client.LoggedIn && _ui.FocusId != null)
@@ -181,17 +203,24 @@ namespace AndijonSaltanatlar.UI
 
             if (!IsOpen)
             {
-                // Yuqori paneldagi "Online" tugmasi (UIManager sarlavhasi va VAZIR tugmasi orasida).
-                var lr = new Rectangle(Math.Min(452, Math.Max(8, vw - 130)), 5, 112, 26);
-                if (ui.Button(lr, _client.LoggedIn ? "Online •" : "Online", _client.LoggedIn ? ButtonKind.Primary : ButtonKind.Secondary, true, "Onlayn dunyo, bozor va saltanat (O)"))
-                    Open();
+                // "ONLINE" tugmasi endi UIManager yuqori panelida (joylashuvi ekran eniga moslashadi).
+                ui.Toast(_toast, _toastError, Math.Min(1f, _toastTimer));
+                ui.End();
+                return;
+            }
+
+            float dt = _lastDrawTime < 0 ? 0f : Math.Clamp(time - _lastDrawTime, 0f, 0.1f);
+            _lastDrawTime = time;
+            if (BattleOpen && _client.LoggedIn)
+            {
+                DrawBattleOverlay(vw, vh, dt);
                 ui.Toast(_toast, _toastError, Math.Min(1f, _toastTimer));
                 ui.End();
                 return;
             }
 
             ui.Fill(new Rectangle(0, 0, vw, vh), T.Scrim);
-            Rectangle win = ui.Compact ? new Rectangle(0, 0, vw, vh) : new Rectangle((vw - Math.Min(vw - 40, 1140)) / 2, (vh - Math.Min(vh - 40, 690)) / 2, Math.Min(vw - 40, 1140), Math.Min(vh - 40, 690));
+            Rectangle win = ui.Compact ? new Rectangle(0, 0, vw, vh) : new Rectangle((vw - Math.Min(vw - 40, 1240)) / 2, (vh - Math.Min(vh - 40, 690)) / 2, Math.Min(vw - 40, 1240), Math.Min(vh - 40, 690));
             if (ui.Compact) ui.Fill(win, T.Background); else ui.Panel(win);
 
             if (!_client.LoggedIn) DrawLogin(win);
@@ -205,6 +234,13 @@ namespace AndijonSaltanatlar.UI
         // ------------------------------------------------------------------
         // KIRISH + DUNYO TANLASH
         // ------------------------------------------------------------------
+        /// <summary>Google orqali qayta ulanish so'raldi (Game1 CloudSession tokeni bilan qayta ulaydi).</summary>
+        public Action ReconnectRequested;
+
+        /// <summary>
+        /// Kirish endi FAQAT Google orqali (o'yin boshida). Bu yerda login/parol formasi yo'q — faqat
+        /// onlayn dunyoga ulanish holati va "Qayta ulanish" tugmasi.
+        /// </summary>
         private void DrawLogin(Rectangle win)
         {
             UiKit ui = _ui; ThemeTokens T = ui.T;
@@ -213,31 +249,15 @@ namespace AndijonSaltanatlar.UI
 
             int cw = Math.Min(win.Width - 32, 520);
             int x = win.X + (win.Width - cw) / 2;
-            int y = win.Y + Math.Max(20, (win.Height - (9 * h + 10 * gap + 120)) / 2);
+            int y = win.Y + Math.Max(20, (win.Height - (3 * h + 4 * gap + 120)) / 2);
             ui.Text("ANDIJON: SALTANATLAR", new Vector2(x, y), TextStyle.ScreenTitle, T.Accent);
-            y += (int)ui.Type.LineHeight(TextStyle.ScreenTitle) + 2;
-            ui.Text("Onlayn dunyoga kirish — PC va telefon bitta serverda", new Vector2(x, y), TextStyle.Secondary, T.TextSecondary);
-            y += (int)ui.Type.LineHeight(TextStyle.Secondary) + gap * 2;
-
-            ui.Text("Server manzili", new Vector2(x, y), TextStyle.Secondary, T.TextSecondary); y += 20;
-            _server = ui.TextInput(new Rectangle(x, y, cw, h), "server", _server, "192.168.1.94:5080", false, () => AndroidKeyboard("server", "Server manzili", _server, false)); y += h + gap;
-            ui.Text("Login", new Vector2(x, y), TextStyle.Secondary, T.TextSecondary); y += 20;
-            _user = ui.TextInput(new Rectangle(x, y, cw, h), "user", _user, "foydalanuvchi nomi", false, () => AndroidKeyboard("user", "Login", _user, false)); y += h + gap;
-            ui.Text("Parol", new Vector2(x, y), TextStyle.Secondary, T.TextSecondary); y += 20;
-            _pass = ui.TextInput(new Rectangle(x, y, cw, h), "pass", _pass, "parol", true, () => AndroidKeyboard("pass", "Parol", _pass, true)); y += h + gap;
-
-            ui.Text("Dunyo", new Vector2(x, y), TextStyle.Secondary, T.TextSecondary); y += 20;
-            int chipW = (cw - 2 * gap) / 3;
-            for (int i = 1; i <= 3; i++)
-                if (ui.Chip(new Rectangle(x + (i - 1) * (chipW + gap), y, chipW, h - 6), i + "-dunyo" + (i == 1 ? " (asosiy)" : ""), _worldId == i, i == 1 ? T.Success : T.Secondary)) _worldId = i;
-            y += h + gap;
-
-            int bw = (cw - gap) / 2;
-            if (ui.Button(new Rectangle(x, y, bw, h), "Kirish", ButtonKind.Primary, !_client.Busy)) { ui.FocusId = null; LoginNow(false); }
-            if (ui.Button(new Rectangle(x + bw + gap, y, bw, h), "Ro'yxatdan o'tish", ButtonKind.Secondary, !_client.Busy)) { ui.FocusId = null; LoginNow(true); }
-            y += h + gap;
-            string status = _client.Busy ? "Server bilan aloqa…" : "Telefonda «localhost» emas, kompyuterning Wi-Fi manzilini yozing.";
-            ui.Paragraph(status, new Rectangle(x, y, cw, 60), TextStyle.Secondary, _client.Busy ? T.Accent : T.TextSecondary);
+            y += (int)ui.Type.LineHeight(TextStyle.ScreenTitle) + 4;
+            string status = _client.Busy ? "Onlayn dunyoga ulanmoqda…" : "Onlayn dunyoga ulanilmagan";
+            y += (int)ui.Paragraph(status, new Rectangle(x, y, cw, 60), TextStyle.Body, _client.Busy ? T.Accent : T.TextPrimary) + gap;
+            if (!string.IsNullOrEmpty(_client.Message) && _client.MessageIsError)
+                y += (int)ui.Paragraph(_client.Message, new Rectangle(x, y, cw, 80), TextStyle.Secondary, T.Danger) + gap;
+            if (ui.Button(new Rectangle(x, y, cw, h), "Qayta ulanish", ButtonKind.Primary, !_client.Busy))
+                ReconnectRequested?.Invoke();
         }
 
         // ------------------------------------------------------------------
@@ -249,11 +269,12 @@ namespace AndijonSaltanatlar.UI
             OnlineStateDto s = _client.State;
             int h = ui.ControlH;
             int pad = ui.Compact ? 12 : 20;
+            if (s.NeedsHome) { DrawStartChooser(win); return; }
 
             // Sarlavha
             int headH = (int)ui.Type.LineHeight(TextStyle.ScreenTitle) + 18;
             var head = new Rectangle(win.X + pad, win.Y + 10, win.Width - 2 * pad, headH);
-            string title = _section == Section.Market ? "Saltanatlar bozori" : _section == Section.Kingdom ? "Saltanat boshqaruvi" : _section == Section.Caravans ? "Savdo karvonlari" : _section == Section.Vizier ? "Donishmand Vazir" : "Ekin dalalari";
+            string title = _section == Section.War ? "Harbiy boshqaruv" : _section == Section.Market ? "Saltanatlar bozori" : _section == Section.Kingdom ? "Saltanat boshqaruvi" : _section == Section.Caravans ? "Savdo karvonlari" : _section == Section.Vizier ? "Donishmand Vazir" : "Ekin dalalari";
             ui.Text(title, new Vector2(head.X, head.Y + 4), TextStyle.ScreenTitle);
             if (ui.IconButton(new Rectangle(head.Right - h, head.Y, h, h), "×", "Yopish (Esc)")) { Close(); return; }
             if (!ui.Compact)
@@ -280,16 +301,16 @@ namespace AndijonSaltanatlar.UI
                 ui.Fill(nav, T.Surface);
                 ui.Fill(new Rectangle(nav.X, nav.Y, nav.Width, 1), T.Border);
                 navIndex = ui.NavList(new Rectangle(nav.X + 6, nav.Y + 4, nav.Width - 12, h), SectionNames, navIndex, true);
-                content = new Rectangle(win.X + pad, head.Bottom + 8, win.Width - 2 * pad, nav.Y - head.Bottom - 16);
-                // Telefonda resurslar sarlavha ostida, bitta qatorda
-                ui.Text(s.Coin + " tanga · " + s.Population + " aholi · " + s.CityCount + " shahar", new Vector2(head.X, head.Bottom - 8), TextStyle.Secondary, T.TextSecondary);
-                content.Y += 14; content.Height -= 14;
+                int rl = (int)ui.Type.LineHeight(TextStyle.Secondary);
+                // Telefonda resurslar sarlavha ostida, bitta qatorda (kontent undan keyin boshlanadi — ustma-ust tushmaydi)
+                ui.TextFit(s.Coin + " tanga · " + s.Population + " aholi · " + s.CityCount + " shahar", new Rectangle(head.X, head.Bottom, head.Width, rl), TextStyle.Secondary, T.TextSecondary);
+                content = new Rectangle(win.X + pad, head.Bottom + rl + 8, win.Width - 2 * pad, nav.Y - head.Bottom - rl - 16);
             }
             else
             {
                 var nav = new Rectangle(win.X + pad, head.Bottom + 12, 190, win.Bottom - head.Bottom - 70);
                 navIndex = ui.NavList(nav, SectionNames, navIndex, false);
-                string st = (_client.HubConnected ? "● Ulangan" : "○ Real vaqt yo'q") + "\n" + _client.Settings.ServerUrl.Replace("http://", "");
+                string st = (_client.HubConnected ? "● Ulangan" : "○ Real vaqt yo'q") + "\n" + _client.Settings.ServerUrl.Replace("https://", "").Replace("http://", "");
                 ui.Paragraph(st, new Rectangle(nav.X + 4, win.Bottom - 60, 190, 50), TextStyle.Caption, _client.HubConnected ? T.Success : T.Warning);
                 content = new Rectangle(nav.Right + 20, head.Bottom + 12, win.Right - nav.Right - 20 - pad, win.Bottom - head.Bottom - 32);
                 ui.Fill(new Rectangle(nav.Right + 10, head.Bottom + 12, 1, content.Height), T.Border);
@@ -302,6 +323,7 @@ namespace AndijonSaltanatlar.UI
                 case Section.Market: DrawMarket(content); break;
                 case Section.Caravans: DrawCaravans(content); break;
                 case Section.Kingdom: DrawKingdom(content); break;
+                case Section.War: DrawWar(content); break;
                 case Section.Vizier: DrawVizier(content); break;
             }
         }
@@ -336,10 +358,11 @@ namespace AndijonSaltanatlar.UI
             int h = ui.ControlH, gap = ui.Gap;
             int active = s.Fields.Count(f => f.State == RiceFieldState.Planted || f.State == RiceFieldState.Growing || f.State == RiceFieldState.Mature);
             int cap = s.WaterSources * RiceFarmingRules.FieldsPerWaterSource;
-            ui.Text("Suv: " + s.WaterSources + " ariq · " + active + "/" + cap + " maydon sug'orilmoqda · Maydonlar " + s.Fields.Count + "/" + RiceFarmingRules.MaxFieldsPerKingdom,
-                new Vector2(c.X, c.Y), TextStyle.Secondary, active >= cap ? T.Warning : T.TextSecondary);
-            int y = c.Y + 26;
-            int bw = Math.Min(240, (c.Width - gap) / 2);
+            int lh = (int)ui.Type.LineHeight(TextStyle.Secondary);
+            ui.TextFit("Suv: " + s.WaterSources + " ariq · " + active + "/" + cap + " maydon sug'orilmoqda · Maydonlar " + s.Fields.Count + "/" + RiceFarmingRules.MaxFieldsPerKingdom,
+                new Rectangle(c.X, c.Y, c.Width, lh), TextStyle.Secondary, active >= cap ? T.Warning : T.TextSecondary);
+            int y = c.Y + lh + 6;
+            int bw = Math.Min((int)ui.Type.Measure("Maydon qurish · 100", TextStyle.Button).X + 32, (c.Width - gap) / 2);
             if (ui.Button(new Rectangle(c.X, y, bw, h), "Maydon qurish · " + RiceFarmingRules.FieldBuildCost, ButtonKind.Secondary,
                 !_client.Busy && s.Fields.Count < RiceFarmingRules.MaxFieldsPerKingdom && s.Coin >= RiceFarmingRules.FieldBuildCost, "Yangi ekin maydoni (" + RiceFarmingRules.FieldBuildCost + " tanga)"))
                 _client.BuildField();
@@ -347,13 +370,15 @@ namespace AndijonSaltanatlar.UI
                 _client.BuildWater();
             y += h + gap;
 
-            ui.Text("Ekiladigan ekin:", new Vector2(c.X, y + 6), TextStyle.Secondary, T.TextSecondary);
-            int cx = c.X + 130, chipH = h - 8;
+            int chipH = h - 8;
+            int labelW = (int)ui.Type.Measure("Ekin:", TextStyle.Secondary).X + 12;
+            ui.TextFit("Ekin:", new Rectangle(c.X, y, labelW, chipH), TextStyle.Secondary, T.TextSecondary);
+            int cx = c.X + labelW;
             foreach (CropDef d in CropCatalog.All)
             {
                 string label = d.NameUz + " · " + d.MatureAtMinutes / 60 + " daq";
-                int w = (int)ui.Type.Measure(label, TextStyle.Secondary).X + 44;
-                if (cx + w > c.Right) { cx = c.X + 130; y += chipH + 6; }
+                int w = Math.Min(c.Width - labelW, (int)ui.Type.Measure(label, TextStyle.Secondary).X + 40);
+                if (cx + w > c.Right) { cx = c.X + labelW; y += chipH + 6; }
                 if (ui.Chip(new Rectangle(cx, y, w, chipH), label, _crop == d.Key, ProductColor(d.Key))) _crop = d.Key;
                 cx += w + 8;
             }
@@ -401,7 +426,13 @@ namespace AndijonSaltanatlar.UI
             }
         }
 
+        /// <summary>Qator balandligi (piksel shrift o'lchamiga qarab) — qattiq raqamlar o'rniga.</summary>
+        private int LH(TextStyle st) => (int)_ui.Type.LineHeight(st);
+        /// <summary>Tugma eni: yorliq to'liq sig'adigan qilib, maksimum bilan.</summary>
+        private int MeasureBtn(string label, int max) => Math.Min(max, (int)_ui.Type.Measure(label, TextStyle.Button).X + 36);
+
         private SpriteBatch _sbCache;
+        private float _lastDrawTime = -1f;
         private SpriteBatch _sbOf() => _sbCache;
 
         /// <summary>Dala: suvli tuproq + bosqichga mos o'simliklar (shamolda tebranadi).</summary>
@@ -460,12 +491,19 @@ namespace AndijonSaltanatlar.UI
             int icon = r.Height - 20;
             ProductIcon(new Rectangle(r.X + 10, r.Y + 10, icon, icon), o.Product);
             int tx = r.X + icon + 22;
-            int rightW = ui.Compact ? 150 : 200;
-            ui.TextFit(o.Quantity + " " + ProductName(o.Product).ToLowerInvariant(), new Rectangle(tx, r.Y + 8, r.Width - icon - rightW - 40, 26), TextStyle.PanelTitle);
+            // O'lchamlar matnga qarab (piksel shrift keng): tugma va narx o'z joyiga sig'adi, matnlar ustma-ust tushmaydi.
+            int rightW = (int)ui.Type.Measure("Bekor qilish", TextStyle.Button).X + 40;
+            string price = o.TotalPrice + " tanga";
+            int priceW = (int)ui.Type.Measure(price, TextStyle.PanelTitle).X + 16;
+            int textW = Math.Max(60, r.Right - rightW - priceW - 20 - tx);
+            int lt = (int)ui.Type.LineHeight(TextStyle.PanelTitle), ls = (int)ui.Type.LineHeight(TextStyle.Secondary);
+            int top = r.Y + Math.Max(4, (r.Height - lt - ls - 4) / 2);
+            ui.TextFit(o.Quantity + " " + ProductName(o.Product).ToLowerInvariant(), new Rectangle(tx, top, textW, lt), TextStyle.PanelTitle);
             ui.TextFit(o.SellerName + " · " + (o.TotalPrice / (float)Math.Max(1, o.Quantity)).ToString("0.##") + " tanga/birlik · " + extra,
-                new Rectangle(tx, r.Y + 36, r.Width - icon - rightW - 40, 22), TextStyle.Secondary, T.TextSecondary);
-            ui.Type.DrawRight(_sbOf(), o.TotalPrice + " tanga", new Vector2(r.Right - rightW - 10, r.Y + 12), TextStyle.PanelTitle, T.Accent);
-            return new Rectangle(r.Right - rightW, r.Y + (r.Height - ui.ControlH) / 2, rightW - 10, ui.ControlH);
+                new Rectangle(tx, top + lt + 4, textW, ls), TextStyle.Secondary, T.TextSecondary);
+            ui.Type.DrawFitted(_sbOf(), price, new Rectangle(r.Right - rightW - priceW - 6, r.Y, priceW, r.Height), TextStyle.PanelTitle, T.Accent, 2);
+            int bh = Math.Min(ui.ControlH, r.Height - 12);
+            return new Rectangle(r.Right - rightW, r.Y + (r.Height - bh) / 2, rightW - 10, bh);
         }
 
         private void DrawBuy(Rectangle c)
@@ -509,14 +547,14 @@ namespace AndijonSaltanatlar.UI
         {
             UiKit ui = _ui; ThemeTokens T = ui.T; OnlineStateDto s = _client.State;
             int h = ui.ControlH, gap = ui.Gap, y = c.Y;
-            ui.Text("Mahsulot", new Vector2(c.X, y), TextStyle.Secondary, T.TextSecondary); y += 22;
+            ui.TextFit("Mahsulot", new Rectangle(c.X, y, c.Width, LH(TextStyle.Secondary)), TextStyle.Secondary, T.TextSecondary); y += LH(TextStyle.Secondary) + 4;
             int cx = c.X;
             foreach (CropDef d in CropCatalog.All)
             {
                 int have = s.Inventory.TryGetValue(d.Key, out int v) ? v : 0;
                 string label = d.NameUz + " · " + have;
                 int w = (int)ui.Type.Measure(label, TextStyle.Secondary).X + 44;
-                if (cx + w > c.Right) { cx = c.X; y += h - 2; }
+                if (cx + w > c.Right) { cx = c.X; y += h; }
                 if (ui.Chip(new Rectangle(cx, y, w, h - 8), label, _sellProduct == d.Key, ProductColor(d.Key))) _sellProduct = d.Key;
                 cx += w + 8;
             }
@@ -528,26 +566,29 @@ namespace AndijonSaltanatlar.UI
             y = Stepper(c.X, y, "Umumiy narx", ref _price, new[] { -500, -50, 50, 500 }, MarketRules.MinPrice, MarketRules.MaxPrice, " tanga");
             float unit = _price / (float)Math.Max(1, _qty);
             ui.Paragraph("1 birlik = " + unit.ToString("0.##") + " tanga · tavsiya etilgan bozor narxi ≈ " + def.ReferencePrice + " tanga/birlik (" + def.ReferencePrice * _qty + " tanga)",
-                new Rectangle(c.X, y, c.Width, 50), TextStyle.Secondary, T.TextSecondary);
-            y += 46;
+                new Rectangle(c.X, y, c.Width, LH(TextStyle.Secondary) * 2 + 4), TextStyle.Secondary, T.TextSecondary, 2);
+            y += LH(TextStyle.Secondary) * 2 + 10;
             bool ok = stock >= _qty && MarketRules.Validate(_qty, _price) == null;
-            if (ui.Button(new Rectangle(c.X, y, Math.Min(320, c.Width), h), "Sotuvga qo'yish", ButtonKind.Primary, ok && !_client.Busy))
+            int sb = MeasureBtn("Sotuvga qo'yish", c.Width / 2);
+            if (ui.Button(new Rectangle(c.X, y, sb, h), "Sotuvga qo'yish", ButtonKind.Primary, ok && !_client.Busy))
                 _client.CreateOffer(_sellProduct, _qty, _price);
-            if (stock < _qty) ui.Text("Omborda buncha " + def.NameUz.ToLowerInvariant() + " yo'q (" + stock + ")", new Vector2(c.X + Math.Min(320, c.Width) + 16, y + 10), TextStyle.Secondary, T.Danger);
+            if (stock < _qty) ui.TextFit("Omborda buncha " + def.NameUz.ToLowerInvariant() + " yo'q (" + stock + ")", new Rectangle(c.X + sb + 16, y, c.Width - sb - 16, h), TextStyle.Secondary, T.Danger);
         }
 
         private int Stepper(int x, int y, string label, ref int value, int[] steps, int min, int max, string unit)
         {
             UiKit ui = _ui; int h = ui.ControlH, gap = 6;
-            ui.Text(label, new Vector2(x, y), TextStyle.Secondary, ui.T.TextSecondary);
-            y += 22;
-            int bw = ui.Compact ? 64 : 58;
+            int ls = LH(TextStyle.Secondary);
+            ui.TextFit(label, new Rectangle(x, y, 600, ls), TextStyle.Secondary, ui.T.TextSecondary);
+            y += ls + 4;
+            int bw = (int)ui.Type.Measure("+500", TextStyle.Button).X + 24;
+            int vw = (int)ui.Type.Measure("99999 tanga", TextStyle.Body).X + 24;
             int cx = x;
             for (int i = 0; i < 2; i++) { if (ui.Button(new Rectangle(cx, y, bw, h), steps[i].ToString(), ButtonKind.Secondary)) value = Math.Clamp(value + steps[i], min, max); cx += bw + gap; }
-            var vr = new Rectangle(cx, y, 150, h);
-            ui.RoundedBorder(vr, ui.T.Border, ui.T.Background, 8);
-            ui.Type.DrawCentered(_sbOf(), value + unit, vr, TextStyle.PanelTitle, ui.T.TextPrimary);
-            cx += 150 + gap;
+            var vr = new Rectangle(cx, y, vw, h);
+            ui.Frame(vr, ui.T.Background, ui.T.Border, 1, false);
+            ui.Type.DrawFitted(_sbOf(), value + unit, new Rectangle(vr.X + 6, vr.Y, vr.Width - 12, vr.Height), TextStyle.Body, ui.T.TextPrimary, 1);
+            cx += vw + gap;
             for (int i = 2; i < 4; i++) { if (ui.Button(new Rectangle(cx, y, bw, h), "+" + steps[i], ButtonKind.Secondary)) value = Math.Clamp(value + steps[i], min, max); cx += bw + gap; }
             return y + h + ui.Gap;
         }
@@ -638,6 +679,7 @@ namespace AndijonSaltanatlar.UI
                 case 3: DrawPopulation(body, k); break;
                 case 4: DrawEconomy(body, k); break;
                 case 5: DrawDiplomacy(body, k); break;
+                case 7: DrawFlagTab(body, k); break;
                 default: DrawGovernors(body, k); break;
             }
         }
@@ -647,8 +689,10 @@ namespace AndijonSaltanatlar.UI
             UiKit ui = _ui;
             ui.Card(r);
             ui.Rounded(new Rectangle(r.X, r.Y + 10, 4, r.Height - 20), accent, 2);
-            ui.TextFit(label, new Rectangle(r.X + 16, r.Y + 8, r.Width - 24, 20), TextStyle.Secondary, ui.T.TextSecondary);
-            ui.TextFit(value, new Rectangle(r.X + 16, r.Y + 30, r.Width - 24, 30), TextStyle.PanelTitle);
+            int ls = (int)ui.Type.LineHeight(TextStyle.Secondary), lp = (int)ui.Type.LineHeight(TextStyle.PanelTitle);
+            int top = r.Y + Math.Max(4, (r.Height - ls - lp - 2) / 2);
+            ui.TextFit(label, new Rectangle(r.X + 16, top, r.Width - 24, ls), TextStyle.Secondary, ui.T.TextSecondary);
+            ui.TextFit(value, new Rectangle(r.X + 16, top + ls + 2, r.Width - 24, lp), TextStyle.PanelTitle);
         }
 
         private void DrawOverview(Rectangle c, KingdomOverviewDto k)
@@ -661,20 +705,25 @@ namespace AndijonSaltanatlar.UI
                 ("Xazina", k.Coin + " tanga", T.Accent), ("Rivojlanish", k.DevelopmentScore.ToString(), T.Accent)
             };
             int cols = c.Width >= 760 ? 4 : 2, gap = ui.Gap;
-            int cw = (c.Width - (cols - 1) * gap) / cols, ch = 70;
+            int cw = (c.Width - (cols - 1) * gap) / cols;
+            int ch = Math.Max(70, (int)(ui.Type.LineHeight(TextStyle.Secondary) + ui.Type.LineHeight(TextStyle.PanelTitle)) + 18);
             for (int i = 0; i < stats.Length; i++)
                 StatCard(new Rectangle(c.X + (i % cols) * (cw + gap), c.Y + (i / cols) * (ch + gap), cw, ch), stats[i].Item1, stats[i].Item2, stats[i].Item3);
             int y = c.Y + ((stats.Length + cols - 1) / cols) * (ch + gap) + 6;
-            ui.Text("Vazir eslatmasi", new Vector2(c.X, y), TextStyle.PanelTitle);
+            int lpt = (int)ui.Type.LineHeight(TextStyle.PanelTitle);
+            ui.TextFit("Vazir eslatmasi", new Rectangle(c.X, y, c.Width, lpt), TextStyle.PanelTitle, T.Primary);
             string note = k.AdvisorNotes.Count > 0 ? k.AdvisorNotes[0].Split('|')[0] : "";
-            ui.Paragraph(note, new Rectangle(c.X, y + 30, c.Width, c.Bottom - y - 30), TextStyle.Body, T.TextSecondary, 4);
+            ui.Paragraph(note, new Rectangle(c.X, y + lpt + 6, c.Width, c.Bottom - y - lpt - 6), TextStyle.Body, T.TextSecondary, 4);
         }
 
         /// <summary>UICityCard.</summary>
         private void DrawCities(Rectangle c, KingdomOverviewDto k)
         {
             UiKit ui = _ui; ThemeTokens T = ui.T;
-            int ch = 150, gap = ui.Gap;
+            int lp = LH(TextStyle.PanelTitle), ls = LH(TextStyle.Secondary), lc = LH(TextStyle.Caption);
+            int mh = lc + 12, gap = ui.Gap;
+            int ch = Math.Max(150, 12 + lp + 4 + ls + 10 + mh + 10 + lc + 12);
+            int bw = MeasureBtn("Shaharni boshqarish", c.Width / 3);
             int scroll = ui.Scroll("cities", c, k.Cities.Count * (ch + gap));
             for (int i = 0; i < k.Cities.Count; i++)
             {
@@ -682,15 +731,17 @@ namespace AndijonSaltanatlar.UI
                 var r = new Rectangle(c.X, c.Y + i * (ch + gap) - scroll, c.Width - 8, ch);
                 if (!UiKit.InView(r, c)) continue;
                 ui.Card(r, city.Id == _selectedCity);
-                ui.TextFit(city.Name + (city.IsCapital ? " · poytaxt" : "") + " · " + city.Level + "-daraja", new Rectangle(r.X + 14, r.Y + 8, r.Width - 230, 26), TextStyle.PanelTitle);
-                ui.TextFit("Hudud: " + city.RegionName + " · Hokim: " + city.GovernorName + " (" + ModeName(city.GovernorMode) + ")", new Rectangle(r.X + 14, r.Y + 36, r.Width - 230, 20), TextStyle.Secondary, T.TextSecondary);
-                int colW = Math.Max(120, (r.Width - 260) / 3);
-                Metric(new Rectangle(r.X + 14, r.Y + 62, colW, 40), "Aholi", city.Population + " / " + city.HousingCapacity, city.Population / (float)Math.Max(1, city.HousingCapacity), T.Secondary);
-                Metric(new Rectangle(r.X + 24 + colW, r.Y + 62, colW, 40), "Mamnunlik", city.Happiness.ToString(), city.Happiness / 100f, T.Success);
-                Metric(new Rectangle(r.X + 34 + 2 * colW, r.Y + 62, colW, 40), "Ishonch", city.Trust.ToString(), city.Trust / 100f, city.Trust < 50 ? T.Warning : T.Primary);
+                int tw = r.Width - bw - 40, yy = r.Y + 12;
+                ui.TextFit(city.Name + (city.IsCapital ? " · poytaxt" : "") + " · " + city.Level + "-daraja", new Rectangle(r.X + 14, yy, tw, lp), TextStyle.PanelTitle); yy += lp + 4;
+                ui.TextFit("Hudud: " + city.RegionName + " · Hokim: " + city.GovernorName + " (" + ModeName(city.GovernorMode) + ")", new Rectangle(r.X + 14, yy, tw, ls), TextStyle.Secondary, T.TextSecondary); yy += ls + 10;
+                int colW = Math.Max(80, (tw - 20) / 3);
+                Metric(new Rectangle(r.X + 14, yy, colW, mh), "Aholi", city.Population + " / " + city.HousingCapacity, city.Population / (float)Math.Max(1, city.HousingCapacity), T.Secondary);
+                Metric(new Rectangle(r.X + 24 + colW, yy, colW, mh), "Mamnunlik", city.Happiness.ToString(), city.Happiness / 100f, T.Success);
+                Metric(new Rectangle(r.X + 34 + 2 * colW, yy, colW, mh), "Ishonch", city.Trust.ToString(), city.Trust / 100f, city.Trust < 50 ? T.Warning : T.Primary);
+                yy += mh + 10;
                 string problems = city.Problems.Count == 0 ? "Muammo yo'q" : string.Join(" · ", city.Problems);
-                ui.TextFit("Daromad " + city.DailyIncome + " / xarajat " + city.DailyExpense + " · " + problems, new Rectangle(r.X + 14, r.Y + 112, r.Width - 230, 22), TextStyle.Caption, city.Problems.Count == 0 ? T.Success : T.Warning);
-                if (ui.Button(new Rectangle(r.Right - 210, r.Y + (ch - ui.ControlH) / 2, 196, ui.ControlH), "Shaharni boshqarish", ButtonKind.Primary))
+                ui.TextFit("Daromad " + city.DailyIncome + " / xarajat " + city.DailyExpense + " · " + problems, new Rectangle(r.X + 14, yy, tw, lc), TextStyle.Caption, city.Problems.Count == 0 ? T.Success : T.Warning);
+                if (ui.Button(new Rectangle(r.Right - bw - 14, r.Y + (ch - ui.ControlH) / 2, bw, ui.ControlH), "Shaharni boshqarish", ButtonKind.Primary))
                 { _selectedCity = city.Id; _kingdomTab = 6; }
             }
         }
@@ -698,40 +749,88 @@ namespace AndijonSaltanatlar.UI
         private void Metric(Rectangle r, string label, string value, float bar, Color color)
         {
             UiKit ui = _ui;
-            ui.TextFit(label + ": " + value, new Rectangle(r.X, r.Y, r.Width, 20), TextStyle.Caption, ui.T.TextSecondary);
-            ui.ProgressBar(new Rectangle(r.X, r.Y + 24, r.Width, 6), bar, color);
+            int lc = LH(TextStyle.Caption);
+            ui.TextFit(label + ": " + value, new Rectangle(r.X, r.Y, r.Width, lc), TextStyle.Caption, ui.T.TextSecondary);
+            ui.ProgressBar(new Rectangle(r.X, r.Y + lc + 3, r.Width, 6), bar, color);
         }
 
         private static string ModeName(GovernorMode m) => m == GovernorMode.Manual ? "qo'lda" : m == GovernorMode.Advisory ? "maslahat" : "tasdiqlangan avtomatika";
 
-        /// <summary>HUDUDLAR: dunyo xaritasi (hudud egasi rangida) + tanlangan hudud kartasi.</summary>
+        private UzMapCanvas _regionCanvas;
+
+        /// <summary>HUDUDLAR: O'zbekiston xaritasi (hududlar egasi rangida, bayroqlari bilan) + tanlangan hudud kartasi.</summary>
         private void DrawRegions(Rectangle c, KingdomOverviewDto k)
         {
             UiKit ui = _ui; ThemeTokens T = ui.T;
             bool side = c.Width >= 760;
-            var map = side ? new Rectangle(c.X, c.Y, c.Width - 330, c.Height) : new Rectangle(c.X, c.Y, c.Width, c.Height / 2);
-            var info = side ? new Rectangle(map.Right + 14, c.Y, 316, c.Height) : new Rectangle(c.X, map.Bottom + 10, c.Width, c.Height - map.Height - 10);
-            ui.RoundedBorder(map, T.Border, Color.Lerp(T.Background, new Color(120, 140, 90), 0.12f), 10);
-            ui.Text("Farg'ona vodiysi", new Vector2(map.X + 12, map.Y + 8), TextStyle.Secondary, T.TextSecondary);
+            int infoW = side ? Math.Min((int)(330 * Math.Max(1f, ui.Type.UiScale)), c.Width * 2 / 5) : c.Width;
+            var map = side ? new Rectangle(c.X, c.Y, c.Width - infoW - 14, c.Height) : new Rectangle(c.X, c.Y, c.Width, c.Height * 55 / 100);
+            var info = side ? new Rectangle(map.Right + 14, c.Y, infoW, c.Height) : new Rectangle(c.X, map.Bottom + 10, c.Width, c.Height - map.Height - 10);
 
-            int nodeR = ui.IsTouch ? 22 : 16;
-            foreach (RegionDto r in k.Regions)
+            _regionCanvas ??= new UzMapCanvas(ui);
+            UzMapCanvas cv = _regionCanvas;
+            RegionDto home = k.Regions.FirstOrDefault(r => r.IsMine && r.Name == k.Capital) ?? k.Regions.FirstOrDefault(r => r.IsMine);
+            if (!cv.Focused && home != null) cv.FocusOn(home.MapX, home.MapY, 3.5f);
+            cv.Begin(map);
+            _cellBuf.Clear();
+            foreach (RegionDto r in k.Regions) _cellBuf.Add(new MapCell(r.Id, r.MapX, r.MapY, r.OwnerKingdomId, new Color(r.ColorR, r.ColorG, r.ColorB), r.Province, r.IsMine));
+            cv.DrawBase(_cellBuf, _selectedRegion, T.Focus);
+
+            float sc = cv.MarkerScale;
+            foreach (RegionDto r in k.Regions.OrderBy(x => x.MapY))
             {
-                int px = map.X + 20 + (int)((map.Width - 40) * r.MapX / 100f);
-                int py = map.Y + 30 + (int)((map.Height - 50) * r.MapY / 100f);
-                var node = new Rectangle(px - nodeR, py - nodeR, nodeR * 2, nodeR * 2);
+                Vector2 p = cv.ToScreen(r.MapX, r.MapY);
+                if (!cv.InView(p, 40)) continue;
                 var col = new Color(r.ColorR, r.ColorG, r.ColorB);
-                bool sel = r.Id == _selectedRegion;
                 bool pulse = r.Id == _client.LastTransferredRegionId && _territoryPulse > 0f;
-                if (pulse) { int g = (int)(6 + 6 * MathF.Sin(ui.Time * 8)); ui.Rounded(new Rectangle(node.X - g, node.Y - g, node.Width + 2 * g, node.Height + 2 * g), T.Accent * 0.5f, nodeR + g); }
-                if (sel || r.IsMine) ui.Rounded(new Rectangle(node.X - 3, node.Y - 3, node.Width + 6, node.Height + 6), sel ? T.Focus : T.Primary, nodeR + 3);
-                ui.Rounded(node, col, nodeR);
-                string label = r.Name;
-                Vector2 m = ui.Type.Measure(label, TextStyle.Caption);
-                ui.Rounded(new Rectangle(px - (int)m.X / 2 - 6, node.Bottom + 3, (int)m.X + 12, (int)ui.Type.LineHeight(TextStyle.Caption) + 4), T.Surface * 0.9f, 6);
-                ui.Text(label, new Vector2(px - m.X / 2, node.Bottom + 5), TextStyle.Caption, r.IsMine ? T.Primary : T.TextPrimary);
-                if (ui.Clicked(new Rectangle(node.X - 6, node.Y - 6, node.Width + 12, node.Height + 30))) _selectedRegion = r.Id;
+                if (pulse) { int g = (int)(10 * sc + 6 + 6 * MathF.Sin(ui.Time * 8)); ui.Rounded(new Rectangle((int)p.X - g, (int)p.Y - g, 2 * g, 2 * g), T.Accent * 0.5f, g); }
+                int d = Math.Max(4, (int)(7 * sc));
+                ui.Rounded(new Rectangle((int)p.X - d, (int)p.Y - d / 2, d * 2, d), Ink, d / 2);
+                ui.Rounded(new Rectangle((int)p.X - d + 2, (int)p.Y - d / 2 + 1, d * 2 - 4, d - 2), r.OwnerKingdomId == 0 ? new Color(236, 220, 180) : col, d / 2);
+                if (r.OwnerKingdomId != 0)
+                    FlagRenderer.DrawOnPole(ui, p, (int)(26 * sc), (int)(22 * sc), FlagRenderer.Spec(r.Flag, col), ui.Time, r.Id);
             }
+            bool showAll = cv.Zoom >= 2.4f;
+            foreach (RegionDto r in k.Regions.OrderByDescending(x => x.Id == _selectedRegion).ThenByDescending(x => x.IsMine).ThenByDescending(x => x.Population))
+            {
+                if (!showAll && r.Id != _selectedRegion && !r.IsMine) continue;
+                Vector2 p = cv.ToScreen(r.MapX, r.MapY);
+                if (!cv.InView(p)) continue;
+                cv.Label(r.Name, p + new Vector2(0, 6), r.IsMine ? new Color(40, 70, 130) : Ink, r.IsMine ? new Color(30, 60, 120) : Ink, r.Id == _selectedRegion);
+            }
+
+            // PROMPT 25: qo'shinlarim (bayroqcha + birliklar soni) — bosilsa Harbiy bo'limga o'tadi
+            WarOverviewDto war = _client.War;
+            if (war != null)
+            {
+                if (war.ActiveBattle != null)
+                {
+                    RegionDto br = k.Regions.FirstOrDefault(x => x.Id == war.ActiveBattle.RegionId);
+                    if (br != null)
+                    {
+                        Vector2 bp = cv.ToScreen(br.MapX, br.MapY);
+                        int g = (int)(16 * sc + 8 + 5 * MathF.Sin(ui.Time * 6));
+                        ui.Rounded(new Rectangle((int)bp.X - g, (int)bp.Y - g, 2 * g, 2 * g), T.Danger * 0.35f, g);
+                    }
+                }
+                Color myColor = k.Color != null && k.Color.Length >= 3 ? new Color(k.Color[0], k.Color[1], k.Color[2]) : T.Primary;
+                var myFlag = FlagRenderer.Spec(k.Flag, myColor);
+                for (int i = 0; i < war.Armies.Count; i++)
+                {
+                    ArmyDto a = war.Armies[i];
+                    RegionDto ar = k.Regions.FirstOrDefault(x => x.Id == a.RegionId);
+                    if (ar == null) continue;
+                    Vector2 p = cv.ToScreen(ar.MapX, ar.MapY) + new Vector2(14 * sc + i * 18 * sc, 6 * sc);
+                    if (!cv.InView(p)) continue;
+                    FlagRenderer.DrawOnPole(ui, p, (int)(20 * sc), (int)(16 * sc), myFlag, ui.Time, 100 + i);
+                    ui.Text(a.UnitCount.ToString(), new Vector2(p.X + 2, p.Y - 6 * sc), TextStyle.Caption, Ink);
+                    if (ui.Clicked(new Rectangle((int)p.X - 4, (int)(p.Y - 22 * sc), (int)(22 * sc) + 8, (int)(26 * sc)))) { _warArmy = a.Id; _section = Section.War; _warTab = 1; }
+                }
+            }
+
+            int picked = cv.PickNearest(k.Regions.Select(r => (r.Id, cv.ToScreen(r.MapX, r.MapY))), 30 * sc + 14);
+            if (picked >= 0) _selectedRegion = picked;
+            cv.DrawOverlay("O'zbekiston");
 
             RegionDto s = k.Regions.FirstOrDefault(x => x.Id == _selectedRegion);
             ui.Card(info);
@@ -739,6 +838,7 @@ namespace AndijonSaltanatlar.UI
             if (s == null) { ui.Paragraph("Xaritadan hududni tanlang. O'z hududlaringiz ko'k halqa bilan belgilangan.", new Rectangle(x, y, w, 120), TextStyle.Body); return; }
             ui.TextFit(s.Name, new Rectangle(x, y, w, 28), TextStyle.PanelTitle); y += 32;
             void Line(string a, string b) { ui.TextFit(a + ": " + b, new Rectangle(x, y, w, 22), TextStyle.Secondary, T.TextSecondary); y += 24; }
+            Line("Viloyat", AndijonSaltanatlar.Shared.Geo.UzMap.ProvinceName(s.Province));
             Line("Egasi", s.OwnerName);
             Line("Aholi", s.Population.ToString());
             Line("Shaharlar", string.Join(", ", s.Cities));
@@ -765,17 +865,21 @@ namespace AndijonSaltanatlar.UI
         private void DrawPopulation(Rectangle c, KingdomOverviewDto k)
         {
             UiKit ui = _ui; ThemeTokens T = ui.T;
-            ui.Paragraph("Saltanat aholisi — unga tegishli shaharlar aholisi yig'indisi (har bir fuqaro bir marta). Hudud qo'shilganda aholi o'z uyi, oilasi va ishi bilan yangi boshqaruvga o'tadi.",
-                new Rectangle(c.X, c.Y, c.Width, 60), TextStyle.Secondary, T.TextSecondary);
-            int y = c.Y + 58, rh = 44;
+            float ph = ui.Paragraph("Saltanat aholisi — unga tegishli shaharlar aholisi yig'indisi (har bir fuqaro bir marta). Hudud qo'shilganda aholi o'z uyi, oilasi va ishi bilan yangi boshqaruvga o'tadi.",
+                new Rectangle(c.X, c.Y, c.Width, LH(TextStyle.Secondary) * 3 + 8), TextStyle.Secondary, T.TextSecondary, 3);
+            int y = c.Y + (int)ph + 10, rh = Math.Max(44, LH(TextStyle.Body) + 16);
             foreach (CityDto city in k.Cities)
             {
                 var r = new Rectangle(c.X, y, c.Width - 8, rh);
                 ui.Card(r);
-                ui.TextFit(city.Name, new Rectangle(r.X + 12, r.Y, 180, rh), TextStyle.Body);
-                int bx = r.X + 200, bw = Math.Max(80, r.Width - 480);
+                // Eni matn o'lchamiga qarab: nom — chapda, raqamlar — o'ngda, chiziq — o'rtadagi qolgan joyda.
+                string stats = city.Population + " kishi · " + city.Households + " oila · " + city.Jobs + " ish o'rni";
+                int nameW = Math.Min(r.Width / 4, (int)ui.Type.Measure(city.Name, TextStyle.Body).X + 24);
+                int statW = Math.Min(r.Width / 2, (int)ui.Type.Measure(stats, TextStyle.Secondary).X + 16);
+                ui.TextFit(city.Name, new Rectangle(r.X + 12, r.Y, nameW, rh), TextStyle.Body);
+                int bx = r.X + 12 + nameW + 8, bw = Math.Max(40, r.Right - 12 - statW - 12 - bx);
                 ui.ProgressBar(new Rectangle(bx, r.Center.Y - 4, bw, 8), city.Population / (float)Math.Max(1, k.Population), T.Secondary);
-                ui.TextFit(city.Population + " kishi · " + city.Households + " oila · " + city.Jobs + " ish o'rni", new Rectangle(bx + bw + 14, r.Y, 260, rh), TextStyle.Secondary, T.TextSecondary);
+                ui.TextFit(stats, new Rectangle(r.Right - 12 - statW, r.Y, statW, rh), TextStyle.Secondary, T.TextSecondary);
                 y += rh + 6;
                 if (y > c.Bottom - rh) break;
             }
@@ -787,21 +891,24 @@ namespace AndijonSaltanatlar.UI
             UiKit ui = _ui; ThemeTokens T = ui.T;
             int income = k.Cities.Sum(x => x.DailyIncome), expense = k.Cities.Sum(x => x.DailyExpense);
             int gap = ui.Gap, cw = (c.Width - 2 * gap) / 3;
-            StatCard(new Rectangle(c.X, c.Y, cw, 70), "Xazina", k.Coin + " tanga", T.Accent);
-            StatCard(new Rectangle(c.X + cw + gap, c.Y, cw, 70), "Shaharlar daromadi (kunlik)", "+" + income, T.Success);
-            StatCard(new Rectangle(c.X + 2 * (cw + gap), c.Y, cw, 70), "Xarajatlar (kunlik)", "−" + expense, T.Danger);
-            int y = c.Y + 90;
-            ui.Text("Ombor", new Vector2(c.X, y), TextStyle.PanelTitle); y += 32;
+            int sh = Math.Max(70, LH(TextStyle.Secondary) + LH(TextStyle.PanelTitle) + 18);
+            StatCard(new Rectangle(c.X, c.Y, cw, sh), "Xazina", k.Coin + " tanga", T.Accent);
+            StatCard(new Rectangle(c.X + cw + gap, c.Y, cw, sh), "Daromad (kunlik)", "+" + income, T.Success);
+            StatCard(new Rectangle(c.X + 2 * (cw + gap), c.Y, cw, sh), "Xarajat (kunlik)", "−" + expense, T.Danger);
+            int y = c.Y + sh + 14;
+            ui.TextFit("Ombor", new Rectangle(c.X, y, c.Width, LH(TextStyle.PanelTitle)), TextStyle.PanelTitle, T.Primary); y += LH(TextStyle.PanelTitle) + 6;
+            int rh = Math.Max(40, LH(TextStyle.Body) + 12);
             foreach (CropDef d in CropCatalog.All)
             {
                 int have = k.Inventory.TryGetValue(d.Key, out int v) ? v : 0;
-                var r = new Rectangle(c.X, y, c.Width - 8, 40);
+                var r = new Rectangle(c.X, y, c.Width - 8, rh);
                 ui.Card(r);
-                ProductIcon(new Rectangle(r.X + 6, r.Y + 5, 30, 30), d.Key);
-                ui.TextFit(d.NameUz, new Rectangle(r.X + 46, r.Y, 200, 40), TextStyle.Body);
-                ui.Type.DrawRight(_sbOf(), have + " birlik · ≈" + have * d.ReferencePrice + " tanga", new Vector2(r.Right - 12, r.Y + 10), TextStyle.Secondary, T.TextSecondary);
-                y += 46;
-                if (y > c.Bottom - 40) break;
+                int ic = rh - 10;
+                ProductIcon(new Rectangle(r.X + 6, r.Y + 5, ic, ic), d.Key);
+                ui.TextFit(d.NameUz, new Rectangle(r.X + ic + 16, r.Y, r.Width / 2 - ic - 16, rh), TextStyle.Body);
+                ui.Type.DrawFitted(_sbOf(), have + " birlik · ≈" + have * d.ReferencePrice + " tanga", new Rectangle(r.X + r.Width / 2, r.Y, r.Width / 2 - 12, rh), TextStyle.Secondary, T.TextSecondary, 2);
+                y += rh + 6;
+                if (y > c.Bottom - rh) break;
             }
         }
 
@@ -824,23 +931,27 @@ namespace AndijonSaltanatlar.UI
         private void DrawDiplomacyRelations(Rectangle c, KingdomOverviewDto k, UiKit ui)
         {
             ThemeTokens T = ui.T;
-            int y = c.Y, rh = 64;
+            int lb = (int)ui.Type.LineHeight(TextStyle.Body), lc = (int)ui.Type.LineHeight(TextStyle.Caption);
+            int y = c.Y, rh = Math.Max(64, lb + lc + 18);
+            int valW = (int)ui.Type.Measure("-100", TextStyle.Body).X + 20, barW = Math.Min(180, c.Width / 5);
             foreach (KingdomRelationDto r in k.Relations)
             {
                 var card = new Rectangle(c.X, y, c.Width - 8, rh);
                 ui.Card(card);
-                ui.TextFit(r.Name + (r.IsAi ? " · AI saltanat" : " · o'yinchi"), new Rectangle(card.X + 14, card.Y + 6, card.Width - 200, 26), TextStyle.Body);
-                ui.TextFit(r.Regions + " hudud", new Rectangle(card.X + 14, card.Y + 34, 200, 20), TextStyle.Caption, T.TextSecondary);
-                var bar = new Rectangle(card.Right - 260, card.Center.Y - 4, 180, 8);
+                int textW = card.Width - barW - valW - 50;
+                ui.TextFit(r.Name + (r.IsAi ? " · AI saltanat" : " · o'yinchi"), new Rectangle(card.X + 14, card.Y + 8, textW, lb), TextStyle.Body);
+                ui.TextFit(r.Regions + " hudud", new Rectangle(card.X + 14, card.Y + 10 + lb, textW, lc), TextStyle.Caption, T.TextSecondary);
+                var bar = new Rectangle(card.Right - valW - barW - 20, card.Center.Y - 4, barW, 8);
                 ui.Rounded(bar, T.Disabled, 4);
                 int mid = bar.X + bar.Width / 2, len = (int)(bar.Width / 2f * Math.Abs(r.Value) / 100f);
                 ui.Rounded(r.Value >= 0 ? new Rectangle(mid, bar.Y, Math.Max(2, len), 8) : new Rectangle(mid - len, bar.Y, Math.Max(2, len), 8), r.Value >= 0 ? T.Success : T.Danger, 4);
-                ui.Type.DrawRight(_sbOf(), (r.Value > 0 ? "+" : "") + r.Value, new Vector2(card.Right - 14, card.Y + 20), TextStyle.Body, r.Value >= 0 ? T.Success : T.Danger);
+                ui.Type.DrawFitted(_sbOf(), (r.Value > 0 ? "+" : "") + r.Value, new Rectangle(card.Right - valW - 10, card.Y, valW, card.Height), TextStyle.Body, r.Value >= 0 ? T.Success : T.Danger, 2);
                 y += rh + 8;
                 if (y > c.Bottom - rh) break;
             }
+            int ph = lc * 2 + 6;
             ui.Paragraph("Munosabatni oshirish: Hududlar xaritasida hududni tanlab, elchi yuboring. Ittifoq va kelishuvlar — Ittifoqlar bo'limida.",
-                new Rectangle(c.X, Math.Min(y + 4, c.Bottom - 44), c.Width, 44), TextStyle.Caption, T.TextSecondary);
+                new Rectangle(c.X, Math.Min(y + 4, c.Bottom - ph), c.Width, ph), TextStyle.Caption, T.TextSecondary);
         }
 
         private void DrawAlliances(Rectangle c, UiKit ui)
@@ -982,36 +1093,38 @@ namespace AndijonSaltanatlar.UI
             foreach (CityDto city in k.Cities)
             {
                 int w = (int)ui.Type.Measure(city.Name, TextStyle.Secondary).X + 36;
-                if (cx + w > c.Right) { cx = c.X; y += h - 2; }
+                if (cx + w > c.Right) { cx = c.X; y += h; }
                 if (ui.Chip(new Rectangle(cx, y, w, h - 8), city.Name, city.Id == _selectedCity, city.PendingPlan != null ? T.Accent : (Color?)null)) _selectedCity = city.Id;
                 cx += w + 8;
             }
             y += h + gap;
             CityDto sel = k.Cities.First(x => x.Id == _selectedCity);
-            ui.Text(sel.GovernorName + " — " + sel.Name + " hokimi", new Vector2(c.X, y), TextStyle.PanelTitle);
-            y += 32;
-            ui.Text("Boshqaruv rejimi", new Vector2(c.X, y), TextStyle.Secondary, T.TextSecondary); y += 22;
-            string[] modes = { "Qo'lda (Manual)", "Maslahat (Advisory)", "Tasdiqlangan avtomatika" };
-            int newMode = ui.TabBar(new Rectangle(c.X, y, Math.Min(c.Width, 640), h), modes, (int)sel.GovernorMode);
+            ui.TextFit(sel.GovernorName + " — " + sel.Name + " hokimi", new Rectangle(c.X, y, c.Width, LH(TextStyle.PanelTitle)), TextStyle.PanelTitle, T.Primary);
+            y += LH(TextStyle.PanelTitle) + 6;
+            ui.TextFit("Boshqaruv rejimi", new Rectangle(c.X, y, c.Width, LH(TextStyle.Secondary)), TextStyle.Secondary, T.TextSecondary); y += LH(TextStyle.Secondary) + 4;
+            string[] modes = { "Qo'lda", "Maslahat", "Avtomatika" };
+            int newMode = ui.TabBar(new Rectangle(c.X, y, Math.Min(c.Width, (int)ui.Type.Measure("Avtomatika", TextStyle.Button).X * 3 + 120), h), modes, (int)sel.GovernorMode);
             if (newMode != (int)sel.GovernorMode && !_client.Busy) _client.SetGovernorMode(sel.Id, (GovernorMode)newMode);
             y += h + 8;
             string explain = sel.GovernorMode == GovernorMode.Manual ? "Siz hamma narsani o'zingiz qilasiz. Hokim tahlil qilmaydi."
                            : sel.GovernorMode == GovernorMode.Advisory ? "Hokim shaharni tahlil qilib reja tavsiya qiladi; bajarish uchun «Tasdiqlangan avtomatika» kerak."
                            : "Hokim siz tasdiqlagan rejalarni bajaradi. Ruxsatsiz katta xarajat qilmaydi (limit: " + sel.GovernorSpendLimit + " tanga).";
-            y += (int)ui.Paragraph(explain, new Rectangle(c.X, y, c.Width, 60), TextStyle.Secondary, T.TextSecondary, 2) + 8;
-            if (ui.Button(new Rectangle(c.X, y, Math.Min(300, c.Width), h), "Shaharni tahlil qilish", ButtonKind.Secondary, sel.GovernorMode != GovernorMode.Manual && !_client.Busy))
+            y += (int)ui.Paragraph(explain, new Rectangle(c.X, y, c.Width, LH(TextStyle.Secondary) * 2 + 4), TextStyle.Secondary, T.TextSecondary, 2) + 8;
+            if (ui.Button(new Rectangle(c.X, y, MeasureBtn("Shaharni tahlil qilish", c.Width), h), "Shaharni tahlil qilish", ButtonKind.Secondary, sel.GovernorMode != GovernorMode.Manual && !_client.Busy))
                 _client.GovernorAnalyze(sel.Id);
             y += h + gap;
 
             GovernorPlanDto p = sel.PendingPlan;
             if (p == null) { ui.Paragraph(sel.Problems.Count == 0 ? "Hozircha reja yo'q — shahar barqaror." : "Muammolar: " + string.Join(" · ", sel.Problems), new Rectangle(c.X, y, c.Width, 60), TextStyle.Body, T.TextSecondary); return; }
-            var card = new Rectangle(c.X, y, c.Width - 8, Math.Min(170, c.Bottom - y));
+            int lpp = LH(TextStyle.PanelTitle), lss = LH(TextStyle.Secondary), lbb = LH(TextStyle.Body);
+            var card = new Rectangle(c.X, y, c.Width - 8, Math.Min(12 + lpp + 4 + lss + 6 + lbb + 12 + h + 12, c.Bottom - y));
             ui.Card(card, true);
-            ui.TextFit(p.TitleUz, new Rectangle(card.X + 14, card.Y + 10, card.Width - 28, 26), TextStyle.PanelTitle);
-            ui.TextFit(p.ReasonUz, new Rectangle(card.X + 14, card.Y + 40, card.Width - 28, 22), TextStyle.Secondary, T.TextSecondary);
+            int cy2 = card.Y + 12;
+            ui.TextFit(p.TitleUz, new Rectangle(card.X + 14, cy2, card.Width - 28, lpp), TextStyle.PanelTitle); cy2 += lpp + 4;
+            ui.TextFit(p.ReasonUz, new Rectangle(card.X + 14, cy2, card.Width - 28, lss), TextStyle.Secondary, T.TextSecondary); cy2 += lss + 6;
             ui.TextFit(p.Houses + " uy · " + p.Markets + " bozor · " + p.Gardens + " bog'  =  " + p.Cost + " tanga" + (p.Cost > sel.GovernorSpendLimit ? " (limitdan katta — alohida tasdiq)" : ""),
-                new Rectangle(card.X + 14, card.Y + 68, card.Width - 28, 24), TextStyle.Body, p.Cost > sel.GovernorSpendLimit ? T.Warning : T.TextPrimary);
-            int bw = Math.Min(220, (card.Width - 40) / 2), by = card.Bottom - h - 12;
+                new Rectangle(card.X + 14, cy2, card.Width - 28, lbb), TextStyle.Body, p.Cost > sel.GovernorSpendLimit ? T.Warning : T.TextPrimary);
+            int bw = Math.Min(MeasureBtn("Tasdiqlash · 9999", (card.Width - 40) / 2), (card.Width - 40) / 2), by = card.Bottom - h - 12;
             if (ui.Button(new Rectangle(card.X + 14, by, bw, h), "Tasdiqlash · " + p.Cost, ButtonKind.Primary,
                 sel.GovernorMode == GovernorMode.ApprovedAutomation && _client.State.Coin >= p.Cost && !_client.Busy,
                 sel.GovernorMode != GovernorMode.ApprovedAutomation ? "Avval «Tasdiqlangan avtomatika» rejimini tanlang" : null))
@@ -1027,17 +1140,18 @@ namespace AndijonSaltanatlar.UI
             UiKit ui = _ui; ThemeTokens T = ui.T; KingdomOverviewDto k = _client.Kingdom;
             if (k == null) return;
             int y = c.Y, h = ui.ControlH;
+            int bw = Math.Min(c.Width / 3, (int)ui.Type.Measure("Karvonlarni ko'rish", TextStyle.Button).X + 40);
             foreach (string raw in k.AdvisorNotes)
             {
                 string[] parts = raw.Split('|');
                 string text = parts[0], action = parts.Length > 1 ? parts[1] : "";
-                float th = ui.Type.Wrap(text, c.Width - 260, TextStyle.Body).Count * (ui.Type.LineHeight(TextStyle.Body) + 2);
+                float th = ui.Type.Wrap(text, c.Width - bw - 50, TextStyle.Body).Count * (ui.Type.LineHeight(TextStyle.Body) + 2);
                 var card = new Rectangle(c.X, y, c.Width - 8, (int)Math.Max(h + 24, th + 28));
                 if (card.Bottom > c.Bottom) break;
                 ui.Card(card);
                 ui.Rounded(new Rectangle(card.X, card.Y + 10, 4, card.Height - 20), T.Accent, 2);
-                ui.Paragraph(text, new Rectangle(card.X + 16, card.Y + 12, card.Width - 260, card.Height - 16), TextStyle.Body, T.TextPrimary);
-                var br = new Rectangle(card.Right - 236, card.Y + (card.Height - h) / 2, 222, h);
+                ui.Paragraph(text, new Rectangle(card.X + 16, card.Y + 12, card.Width - bw - 50, card.Height - 16), TextStyle.Body, T.TextPrimary);
+                var br = new Rectangle(card.Right - bw - 14, card.Y + (card.Height - h) / 2, bw, h);
                 if (action.StartsWith("city:") && int.TryParse(action.Substring(5), out int cityId))
                 {
                     string name = k.Cities.FirstOrDefault(x => x.Id == cityId)?.Name ?? "Shahar";

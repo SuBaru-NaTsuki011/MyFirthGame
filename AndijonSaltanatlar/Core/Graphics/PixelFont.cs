@@ -39,9 +39,14 @@ namespace AndijonSaltanatlar.Core.Graphics
             _atlas = canvas.ToTexture(gd);
         }
 
+        /// <summary>Bir belgidan ko'p glifga yoyiladigan belgilar ("…" → "...").</summary>
+        public static string Prepare(string text)
+            => string.IsNullOrEmpty(text) || text.IndexOf('…') < 0 ? text : text.Replace("…", "...");
+
         /// <summary>Matn o'lchami (piksel) berilgan masshtabda.</summary>
         public Vector2 Measure(string text, int scale = 2, int tracking = 1)
         {
+            text = Prepare(text);
             int n = string.IsNullOrEmpty(text) ? 0 : text.Length;
             int adv = (GW + tracking) * scale;
             float w = n > 0 ? n * adv - tracking * scale : 0;
@@ -52,6 +57,7 @@ namespace AndijonSaltanatlar.Core.Graphics
         public float Draw(SpriteBatch sb, string text, Vector2 pos, Color color, int scale = 2, int tracking = 1)
         {
             if (string.IsNullOrEmpty(text)) return 0f;
+            text = Prepare(text);
             float x = pos.X;
             int adv = (GW + tracking) * scale;
             foreach (char ch in text)
@@ -86,6 +92,8 @@ namespace AndijonSaltanatlar.Core.Graphics
                 case '—': case '–': case '−': return '-';
                 case '…': return '.';
                 case '×': return 'X';
+                case '•': return '·';
+                case '„': return '"';
                 case ' ': return ' ';
             }
             if (c >= 'a' && c <= 'z') return (char)(c - 32);
@@ -157,6 +165,25 @@ namespace AndijonSaltanatlar.Core.Graphics
             G(d, '@', ".###.", "#...#", "#.###", "#.#.#", "#.###", "#....", ".###.");
             G(d, '=', ".....", ".....", "#####", ".....", "#####", ".....", ".....");
             G(d, '>', ".#...", "..#..", "...#.", "....#", "...#.", "..#..", ".#...");
+            // UI belgilari (menyu, xarita, jang paneli)
+            G(d, '<', "...#.", "..#..", ".#...", "#....", ".#...", "..#..", "...#.");
+            G(d, '·', ".....", ".....", ".....", "..#..", ".....", ".....", ".....");
+            G(d, '→', ".....", "..#..", "...#.", "#####", "...#.", "..#..", ".....");
+            G(d, '↔', ".....", ".#.#.", "#...#", "#####", "#...#", ".#.#.", ".....");
+            G(d, '≈', ".....", ".##.#", "#..#.", ".....", ".##.#", "#..#.", ".....");
+            G(d, '«', ".....", "..#.#", ".#.#.", "#.#..", ".#.#.", "..#.#", ".....");
+            G(d, '»', ".....", "#.#..", ".#.#.", "..#.#", ".#.#.", "#.#..", ".....");
+            G(d, '●', ".....", ".###.", "#####", "#####", "#####", ".###.", ".....");
+            G(d, '○', ".....", ".###.", "#...#", "#...#", "#...#", ".###.", ".....");
+            G(d, '★', "..#..", "..#..", "#####", ".###.", ".###.", "#.#.#", ".....");
+            G(d, '☆', "..#..", "..#..", "##.##", ".#.#.", ".#.#.", "#.#.#", ".....");
+            G(d, '|', "..#..", "..#..", "..#..", "..#..", "..#..", "..#..", "..#..");
+            G(d, '[', ".###.", ".#...", ".#...", ".#...", ".#...", ".#...", ".###.");
+            G(d, ']', ".###.", "...#.", "...#.", "...#.", "...#.", "...#.", ".###.");
+            G(d, '&', ".##..", "#..#.", ".##..", ".#...", "#.#.#", "#..#.", ".##.#");
+            G(d, '$', "..#..", ".####", "#.#..", ".###.", "..#.#", "####.", "..#..");
+            G(d, '~', ".....", ".....", ".#...", "#.#.#", "...#.", ".....", ".....");
+            G(d, '^', "..#..", ".#.#.", "#...#", ".....", ".....", ".....", ".....");
 
             return d;
         }

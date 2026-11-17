@@ -179,7 +179,7 @@ namespace AndijonSaltanatlar.AdvancedEconomy
             _buildingDistrict.Clear();
             _unconnectedHouses.Clear();
 
-            DistrictStats central = new DistrictStats { Id = CentralId, NameUz = CentralName, CenterX = 32, CenterY = 32 };
+            DistrictStats central = new DistrictStats { Id = CentralId, NameUz = CentralName, CenterX = GameConfig.CityCenter, CenterY = GameConfig.CityCenter };
             _districts.Add(central);
             if (land != null)
                 foreach (LandParcel p in land.Parcels)

@@ -40,6 +40,39 @@ namespace AndijonSaltanatlar.Server.Controllers
             return Ok(await _svc.StateAsync(k));
         }
 
+        /// <summary>Boshlang'ich yurt tanlash xaritasi: barcha hududlar, bo'sh/band holati bilan.</summary>
+        [HttpGet("start-regions")]
+        public async Task<IActionResult> StartRegions()
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            return Ok(await _svc.StartRegionsAsync(k));
+        }
+
+        /// <summary>Yurtni tanlash (faqat mustaqil hudud, faqat bir marta) + saltanat nomi va bayrog'i.</summary>
+        [HttpPost("start")]
+        public async Task<IActionResult> ChooseStart([FromBody] ChooseStartRequest req)
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            string err = await _svc.ChooseStartAsync(k, req);
+            if (err != null) return Conflict(new { messageUz = err });
+            await _hub.Clients.Group(GameHub.WorldGroup(k.WorldId)).SendAsync("PlayersChanged", k.WorldId);
+            return Ok(await _svc.StateAsync(k));
+        }
+
+        /// <summary>Saltanat bayrog'ini o'zgartirish.</summary>
+        [HttpPost("flag")]
+        public async Task<IActionResult> SetFlag([FromBody] SetFlagRequest req)
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            string err = await _svc.SetFlagAsync(k, req);
+            if (err != null) return BadRequest(new { messageUz = err });
+            await _hub.Clients.Group(GameHub.WorldGroup(k.WorldId)).SendAsync("PlayersChanged", k.WorldId);
+            return Ok(await _svc.StateAsync(k));
+        }
+
         [HttpGet("state")]
         public async Task<IActionResult> State()
         {

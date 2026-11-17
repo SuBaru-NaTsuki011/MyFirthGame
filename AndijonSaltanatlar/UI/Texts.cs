@@ -28,7 +28,7 @@ namespace AndijonSaltanatlar.UI
         public const string TabState = "DAVLAT";
         public const string TabArmy = "QO'SHIN";
         public const string TabSettings = "SOZLAMALAR";
-        public const string TabCivilization = "SIVILIZATSIYA";
+        public const string TabCivilization = "TARAQQIYOT";
 
         // Amallar
         public const string Build = "Qurish";

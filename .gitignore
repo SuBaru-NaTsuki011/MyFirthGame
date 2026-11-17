@@ -17,3 +17,9 @@ _backup_*/
 tools/e2e_last_state.json
 **/smoke_test_result.txt
 *.log
+
+# Playwright MCP vaqtinchalik fayllari
+.playwright-mcp/
+
+# Google OAuth maxfiy kalitlari (mahalliy)
+google.local.json

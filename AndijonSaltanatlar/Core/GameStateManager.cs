@@ -55,6 +55,9 @@ public sealed class GameStateManager
 
 	public CityLandExpansionManager Land { get; } = new CityLandExpansionManager();
 
+	/// <summary>Yer ochildi — bulutga darhol saqlash kerak (Game1 tekshiradi va tushiradi).</summary>
+	public bool LandChanged { get; set; }
+
 	public AdvisorManager Advisor { get; } = new AdvisorManager();
 
 	public WeatherManager Weather { get; } = new WeatherManager();
@@ -195,6 +198,11 @@ public sealed class GameStateManager
 	{
 		if (Selected is LandParcel { State: not LandParcelState.Open } landParcel)
 		{
+			if (!Land.CanUnlockRing(landParcel))
+			{
+				ShowMessage("Avval " + (landParcel.Ring - 1) + "-halqaning 4 tomonini oching", isError: true);
+				return;
+			}
 			if (Population < landParcel.RequiredPopulation)
 			{
 				ShowMessage("Aholi yetarli emas (kerak: " + landParcel.RequiredPopulation + ")", isError: true);
@@ -207,7 +215,12 @@ public sealed class GameStateManager
 			}
 			Coins -= landParcel.UnlockCost;
 			Land.Unlock(landParcel);
-			ShowMessage("YANGI HUDUD OCHILDI: " + landParcel.NameUz);
+			Land.RefreshStates(Population);
+			if (Land.LastCompletedRing > 0 && Land.LastCompletedRing < Land.RingCount)
+				ShowMessage(Land.LastCompletedRing + "-HALQA TO'LIQ OCHILDI! " + (Land.LastCompletedRing + 1) + "-halqada 4 ta yangi yer paydo bo'ldi");
+			else
+				ShowMessage("YANGI HUDUD OCHILDI: " + landParcel.NameUz);
+			LandChanged = true;
 			Story?.NotifyLandUnlocked();
 			Advisor.Analyze(this);
 		}

@@ -21,7 +21,13 @@ namespace AndijonSaltanatlar.World
     /// </summary>
     public static class CityGenerator
     {
-        private const int W0 = 14, W1 = 49; // devor halqasi
+        private const int W0 = 14, W1 = 49; // devor halqasi (shahar bloki koordinatalarida)
+        /// <summary>Shahar bloki xaritada shu qadar siljigan (tashqi yer halqalari uchun joy).</summary>
+        private const int O = GameConfig.CityOffset;
+
+        // Shahar bloki koordinatalaridan (0..63) xarita koordinatalariga o'tkazish.
+        private static Point P(int x, int y) => new Point(x + O, y + O);
+        private static void Fill(MapManager map, int x0, int y0, int x1, int y1, TileType t) => map.FillRect(x0 + O, y0 + O, x1 + O, y1 + O, t);
 
         public static void Generate(MapManager map, BuildingManager buildings, UnitManager units, int seed)
         {
@@ -34,7 +40,7 @@ namespace AndijonSaltanatlar.World
             ScatterNature(map, rng);
         }
 
-        private static bool InsideWalls(int x, int y) => x > W0 && x < W1 && y > W0 && y < W1;
+        private static bool InsideWalls(int x, int y) => x - O > W0 && x - O < W1 && y - O > W0 && y - O < W1;
 
         // ------------------------------------------------------------------
         // 1. Yer: tuproq, yashil hududlar, suv, ko'chalar, maydonlar
@@ -54,31 +60,31 @@ namespace AndijonSaltanatlar.World
             for (int y = 0; y < map.Height; y++)
                 for (int x = 0; x < map.Width; x++)
                 {
-                    bool nearCity = x >= 10 && x <= 53 && y >= 10 && y <= 53;
+                    bool nearCity = x - O >= 10 && x - O <= 53 && y - O >= 10 && y - O <= 53;
                     float n = Noise(x / 6f + 3.7f, y / 6f + 9.2f) * 0.7f + Noise(x / 2.5f, y / 2.5f) * 0.3f;
                     map.SetTile(x, y, !nearCity && n > 0.44f ? TileType.Grass : TileType.Ground);
                 }
 
             // Shahar ichidagi yashil hududlar
-            map.FillRect(43, 15, 48, 20, TileType.Grass);  // shimoli-sharqiy bog' mahallasi
-            map.FillRect(33, 43, 41, 48, TileType.Grass);  // janubiy bog'
-            map.FillRect(33, 38, 37, 41, TileType.Grass);  // choyxona
-            map.FillRect(15, 47, 20, 48, TileType.Grass);
-            map.FillRect(15, 27, 25, 27, TileType.Grass);  // ariq bo'ylari
-            map.FillRect(15, 29, 25, 29, TileType.Grass);
-            map.FillRect(38, 27, 48, 27, TileType.Grass);
-            map.FillRect(38, 29, 48, 29, TileType.Grass);
+            Fill(map, 43, 15, 48, 20, TileType.Grass);  // shimoli-sharqiy bog' mahallasi
+            Fill(map, 33, 43, 41, 48, TileType.Grass);  // janubiy bog'
+            Fill(map, 33, 38, 37, 41, TileType.Grass);  // choyxona
+            Fill(map, 15, 47, 20, 48, TileType.Grass);
+            Fill(map, 15, 27, 25, 27, TileType.Grass);  // ariq bo'ylari
+            Fill(map, 15, 29, 25, 29, TileType.Grass);
+            Fill(map, 38, 27, 48, 27, TileType.Grass);
+            Fill(map, 38, 29, 48, 29, TileType.Grass);
 
             // Soy (janubda, egri-bugri)
-            Vector2[] river = { new Vector2(-1, 53), new Vector2(8, 56), new Vector2(20, 57.5f), new Vector2(31, 56.5f),
-                                new Vector2(44, 58.5f), new Vector2(55, 56.5f), new Vector2(64, 58) };
+            Vector2[] river = { new Vector2(-1 - O, 53), new Vector2(8, 56), new Vector2(20, 57.5f), new Vector2(31, 56.5f),
+                                new Vector2(44, 58.5f), new Vector2(55, 56.5f), new Vector2(64 + O, 58) };
             for (int i = 0; i + 1 < river.Length; i++)
             {
                 Vector2 a = river[i], b = river[i + 1];
                 int steps = (int)(Vector2.Distance(a, b) * 3);
                 for (int s = 0; s <= steps; s++)
                 {
-                    Vector2 p = Vector2.Lerp(a, b, s / (float)steps);
+                    Vector2 p = Vector2.Lerp(a, b, s / (float)steps) + new Vector2(O, O);
                     for (int dy = -1; dy <= 1; dy++)
                         for (int dx = -1; dx <= 1; dx++)
                             if (new Vector2(dx, dy).Length() <= 1.2f)
@@ -86,35 +92,35 @@ namespace AndijonSaltanatlar.World
                 }
             }
             // Ariqlar: shimoldan keladi, shahar ichidan o'tib soyga quyiladi
-            map.FillRect(8, 0, 8, 56, TileType.Water);
-            map.FillRect(55, 0, 55, 57, TileType.Water);
-            map.FillRect(8, 28, 25, 28, TileType.Water);
-            map.FillRect(38, 28, 55, 28, TileType.Water);
+            map.FillRect(8 + O, 0, 8 + O, 56 + O, TileType.Water);
+            map.FillRect(55 + O, 0, 55 + O, 57 + O, TileType.Water);
+            Fill(map, 8, 28, 25, 28, TileType.Water);
+            Fill(map, 38, 28, 55, 28, TileType.Water);
 
             // --- Ko'chalar (suvdan keyin: suv ustidan o'tgan joy ko'prik bo'ladi) ---
-            map.FillRect(0, 31, 63, 32, TileType.Road);   // sharq-g'arb bosh ko'chasi
-            map.FillRect(31, 0, 32, 63, TileType.Road);   // shimol-janub bosh ko'chasi
+            map.FillRect(0, 31 + O, map.Width - 1, 32 + O, TileType.Road);   // sharq-g'arb bosh ko'chasi
+            map.FillRect(31 + O, 0, 32 + O, map.Height - 1, TileType.Road);   // shimol-janub bosh ko'chasi
             // Saroy atrofidagi halqa
-            map.FillRect(27, 18, 36, 19, TileType.Road);
-            map.FillRect(27, 18, 28, 25, TileType.Road);
-            map.FillRect(35, 18, 36, 25, TileType.Road);
+            Fill(map, 27, 18, 36, 19, TileType.Road);
+            Fill(map, 27, 18, 28, 25, TileType.Road);
+            Fill(map, 35, 18, 36, 25, TileType.Road);
             // Mahalla ko'chalari
-            map.FillRect(21, 15, 21, 48, TileType.Road);
-            map.FillRect(42, 15, 42, 30, TileType.Road);
-            map.FillRect(42, 42, 42, 48, TileType.Road);
-            map.FillRect(15, 21, 26, 21, TileType.Road);
-            map.FillRect(37, 21, 48, 21, TileType.Road);
-            map.FillRect(15, 42, 48, 42, TileType.Road);
+            Fill(map, 21, 15, 21, 48, TileType.Road);
+            Fill(map, 42, 15, 42, 30, TileType.Road);
+            Fill(map, 42, 42, 42, 48, TileType.Road);
+            Fill(map, 15, 21, 26, 21, TileType.Road);
+            Fill(map, 37, 21, 48, 21, TileType.Road);
+            Fill(map, 15, 42, 48, 42, TileType.Road);
             // Qal'a atrofidagi aylanma yo'l
-            map.FillRect(11, 11, 52, 11, TileType.Road);
-            map.FillRect(11, 52, 52, 52, TileType.Road);
-            map.FillRect(11, 11, 11, 52, TileType.Road);
-            map.FillRect(52, 11, 52, 52, TileType.Road);
+            Fill(map, 11, 11, 52, 11, TileType.Road);
+            Fill(map, 11, 52, 52, 52, TileType.Road);
+            Fill(map, 11, 11, 11, 52, TileType.Road);
+            Fill(map, 52, 11, 52, 52, TileType.Road);
 
             // --- Maydonlar ---
-            map.FillRect(26, 26, 37, 37, TileType.Plaza); // markaziy maydon
-            map.FillRect(38, 33, 47, 41, TileType.Plaza); // bozor maydoni
-            map.FillRect(29, 20, 34, 25, TileType.Plaza); // saroy ostidagi to'shama
+            Fill(map, 26, 26, 37, 37, TileType.Plaza); // markaziy maydon
+            Fill(map, 38, 33, 47, 41, TileType.Plaza); // bozor maydoni
+            Fill(map, 29, 20, 34, 25, TileType.Plaza); // saroy ostidagi to'shama
         }
 
         // ------------------------------------------------------------------
@@ -122,8 +128,8 @@ namespace AndijonSaltanatlar.World
         // ------------------------------------------------------------------
         private static void PlaceFortifications(BuildingManager bm)
         {
-            void Tower(int x, int y) => bm.Add(new Tower(new Point(x, y)), false);
-            void Gate(int x, int y, bool alongY) => bm.Add(new Gate(new Point(x, y), alongY), false);
+            void Tower(int x, int y) => bm.Add(new Tower(P(x, y)), false);
+            void Gate(int x, int y, bool alongY) => bm.Add(new Gate(P(x, y), alongY), false);
 
             // Burchak minoralari
             Tower(W0 - 1, W0 - 1); Tower(W1, W0 - 1); Tower(W0 - 1, W1); Tower(W1, W1);
@@ -136,10 +142,10 @@ namespace AndijonSaltanatlar.World
             // Devor bo'laklari (band bo'lmagan joylarga)
             for (int i = W0; i <= W1; i++)
             {
-                bm.Add(new Wall(new Point(i, W0)), false);
-                bm.Add(new Wall(new Point(i, W1)), false);
-                bm.Add(new Wall(new Point(W0, i)), false);
-                bm.Add(new Wall(new Point(W1, i)), false);
+                bm.Add(new Wall(P(i, W0)), false);
+                bm.Add(new Wall(P(i, W1)), false);
+                bm.Add(new Wall(P(W0, i)), false);
+                bm.Add(new Wall(P(W1, i)), false);
             }
         }
 
@@ -151,23 +157,23 @@ namespace AndijonSaltanatlar.World
             int houseIndex = 0;
             void House(int x, int y)
             {
-                var h = new House(new Point(x, y), houseIndex);
+                var h = new House(P(x, y), houseIndex);
                 h.Flipped = houseIndex % 3 == 2;
                 houseIndex++;
                 bm.Add(h, false);
             }
 
             // Markaz
-            bm.Add(new MainHall(new Point(29, 20)), false);
+            bm.Add(new MainHall(P(29, 20)), false);
 
             // Katta sharqona binolar
-            bm.Add(new Madrasa(new Point(16, 23)), false);
-            bm.Add(new Mosque(new Point(44, 23)), false);
-            bm.Add(new Caravanserai(new Point(16, 35)), false);
-            bm.Add(new Market(new Point(43, 35)), false);
-            bm.Add(new Barracks(new Point(16, 16)), false);
-            bm.Add(new Garden(new Point(44, 16)), false);
-            bm.Add(new Garden(new Point(34, 44)), false);
+            bm.Add(new Madrasa(P(16, 23)), false);
+            bm.Add(new Mosque(P(44, 23)), false);
+            bm.Add(new Caravanserai(P(16, 35)), false);
+            bm.Add(new Market(P(43, 35)), false);
+            bm.Add(new Barracks(P(16, 16)), false);
+            bm.Add(new Garden(P(44, 16)), false);
+            bm.Add(new Garden(P(34, 44)), false);
 
             // Mahallalar (uylar orasida doim kamida 1 tile ochiq joy)
             House(22, 16); House(25, 16); House(24, 19);        // shimoli-g'arb
@@ -189,7 +195,7 @@ namespace AndijonSaltanatlar.World
         // ------------------------------------------------------------------
         private static void PlaceUnits(MapManager map, UnitManager um)
         {
-            Vector2 V(float x, float y) => new Vector2(x, y);
+            Vector2 V(float x, float y) => new Vector2(x + O, y + O);
             void Guard(Unit u)
             {
                 um.Add(u);
@@ -227,7 +233,7 @@ namespace AndijonSaltanatlar.World
         // ------------------------------------------------------------------
         private static void PlaceDecorations(MapManager map)
         {
-            void D(DecorationType t, int x, int y, int v = 0) => map.AddDecoration(t, x, y, v);
+            void D(DecorationType t, int x, int y, int v = 0) => map.AddDecoration(t, x + O, y + O, v);
 
             // Markaziy maydon: hovuz, chinorlar, bayroqlar
             D(DecorationType.Hovuz, 31, 31);
@@ -311,9 +317,9 @@ namespace AndijonSaltanatlar.World
             // Bosh ko'chalar bo'ylab teraklar xiyoboni
             for (int i = 0; i < map.Width; i += 2)
             {
-                bool inner = i > W0 + 1 && i < W1 - 1;
+                bool inner = i - O > W0 + 1 && i - O < W1 - 1;
                 var kind = inner ? DecorationType.TreePoplar : (i % 4 == 0 ? DecorationType.TreePoplar : DecorationType.TreeChinor);
-                foreach (var (x, y) in new[] { (30, i), (33, i), (i, 30), (i, 33) })
+                foreach (var (x, y) in new[] { (30 + O, i), (33 + O, i), (i, 30 + O), (i, 33 + O) })
                     if (Free(x, y) && !NextToBuilding(x, y)) map.AddDecoration(kind, x, y);
             }
 
@@ -324,7 +330,7 @@ namespace AndijonSaltanatlar.World
                     TileType t = map.GetTile(x, y);
                     double r = rng.NextDouble();
                     bool inside = InsideWalls(x, y);
-                    bool nearWall = x >= W0 - 3 && x <= W1 + 3 && y >= W0 - 3 && y <= W1 + 3 && !inside;
+                    bool nearWall = x - O >= W0 - 3 && x - O <= W1 + 3 && y - O >= W0 - 3 && y - O <= W1 + 3 && !inside;
 
                     if (NearWater(x, y))
                     {

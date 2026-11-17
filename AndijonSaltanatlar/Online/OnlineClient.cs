@@ -28,8 +28,7 @@ namespace AndijonSaltanatlar.Online
         public string Username { get; set; } = "";
         public int WorldId { get; set; } = 1;
 
-        private static string FilePath => Path.Combine(
-            System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "AndijonSaltanatlar", "online.json");
+        private static string FilePath => AndijonSaltanatlar.Core.AppPaths.File("online.json");
 
         public static OnlineSettings Load()
         {
@@ -90,6 +89,16 @@ namespace AndijonSaltanatlar.Online
         public int TerritorySerial { get; private set; }
         public int LastTransferredRegionId { get; private set; }
 
+        /// <summary>PROMPT 25: harbiy boshqaruv holati (qo'shinlar, sarkardalar, janglar, PvP takliflari).</summary>
+        public WarOverviewDto War { get; private set; }
+        /// <summary>Hozir ko'rsatilayotgan jang (server holati). Jang sahnasi shuni chizadi.</summary>
+        public BattleDto Battle { get; private set; }
+        /// <summary>Jang sahnasi ochilishi kerak bo'lgan jang (yangi jang boshlanganda / taklif qabul qilinganda).</summary>
+        public int OpenBattleRequest { get; set; }
+        /// <summary>Har jang holati yangilanganda oshadi (sahna animatsiyasi uchun).</summary>
+        public int BattleSerial { get; private set; }
+        public bool WarBusy { get; private set; }
+
         public bool Busy { get; private set; }
         public bool LoggedIn => _token != null && State != null;
         public bool HubConnected => _hub != null && _hub.State == HubConnectionState.Connected;
@@ -137,13 +146,7 @@ namespace AndijonSaltanatlar.Online
 
         private static string Short(string s) => string.IsNullOrEmpty(s) ? "" : (s.Length > 70 ? s.Substring(0, 70) : s);
 
-        private static string NormalizeUrl(string url)
-        {
-            url = (url ?? "").Trim().TrimEnd('/');
-            if (url.Length > 0 && !url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-                url = "http://" + url;
-            return url;
-        }
+        private static string NormalizeUrl(string url) => CloudSession.NormalizeUrl(url);
 
         // ------------------------------------------------------------------
         // Login va dunyoga qo'shilish
@@ -174,7 +177,7 @@ namespace AndijonSaltanatlar.Online
                 _token = auth.Token;
                 _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
 
-                HttpResponseMessage join = await _http.PostAsJsonAsync("api/online/join", new JoinWorldRequest { WorldId = Settings.WorldId });
+                HttpResponseMessage join = await _http.PostAsJsonAsync("api/online/join", new JoinWorldRequest { WorldId = Settings.WorldId, ChooseStart = true });
                 if (!join.IsSuccessStatusCode) { SetMessage(await ErrorText(join, "Dunyoga qo'shilib bo'lmadi"), true); return; }
                 OnlineStateDto state = await join.Content.ReadFromJsonAsync<OnlineStateDto>(Json);
                 await LoadMarketAsync();
@@ -186,6 +189,36 @@ namespace AndijonSaltanatlar.Online
                     Settings.Save();
                 });
                 SetMessage("Xush kelibsiz, " + auth.Username + "! Dunyo: " + state.WorldName, false);
+                await ConnectHubAsync(url, state.WorldId);
+            });
+        }
+
+        /// <summary>
+        /// Google orqali olingan token bilan onlayn dunyoga ulanadi (parol so'ralmaydi).
+        /// CloudSession kirgandan keyin Game1 shu metodni chaqiradi.
+        /// </summary>
+        public void LoginWithToken(string serverUrl, string token, string username)
+        {
+            string url = NormalizeUrl(serverUrl);
+            if (url.Length == 0 || string.IsNullOrEmpty(token)) return;
+            Run(async () =>
+            {
+                await DisconnectAsync();
+                _http = new HttpClient { BaseAddress = new Uri(url + "/"), Timeout = TimeSpan.FromSeconds(12) };
+                _token = token;
+                _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+
+                HttpResponseMessage join = await _http.PostAsJsonAsync("api/online/join", new JoinWorldRequest { WorldId = Settings.WorldId, ChooseStart = true });
+                if (!join.IsSuccessStatusCode) { SetMessage(await ErrorText(join, "Dunyoga qo'shilib bo'lmadi"), true); return; }
+                OnlineStateDto state = await join.Content.ReadFromJsonAsync<OnlineStateDto>(Json);
+                await LoadMarketAsync();
+                Post(() =>
+                {
+                    ApplyState(state);
+                    Settings.ServerUrl = url;
+                    Settings.Username = username ?? "";
+                    Settings.Save();
+                });
                 await ConnectHubAsync(url, state.WorldId);
             });
         }
@@ -231,6 +264,30 @@ namespace AndijonSaltanatlar.Online
                     QueueRefresh();
                 });
                 _hub.On<int, int>("AllianceProjectUpdated", (_, __) => QueueRefresh());
+                // PROMPT 25: urush hodisalari — faqat o'zimizga tegishlilari ko'rsatiladi, holat serverdan qayta o'qiladi.
+                _hub.On<int, int, int, string>("BattleInvitationCreated", (_, from, to, fromName) =>
+                {
+                    if (War != null && to == War.KingdomId) Post(() => Notification = fromName + " sizni PvP jangiga taklif qildi");
+                    LoadWar();
+                });
+                _hub.On<int, int, int>("BattleInvitationDeclined", (_, from, __) => { if (War != null && from == War.KingdomId) Post(() => Notification = "PvP taklifingiz rad etildi"); LoadWar(); });
+                _hub.On<int, int, int, int>("BattleInvitationAccepted", (_, battleId, from, __) =>
+                {
+                    if (War != null && from == War.KingdomId) Post(() => { Notification = "PvP taklifingiz qabul qilindi - jang boshlandi!"; OpenBattleRequest = battleId; });
+                    LoadWar();
+                });
+                _hub.On<int, int, int>("BattleStarted", (battleId, a, d) => { if (War != null && (a == War.KingdomId || d == War.KingdomId)) Post(() => OpenBattleRequest = battleId); LoadWar(); });
+                _hub.On<int, int, int>("BattleDecisionSubmitted", (battleId, _, __) => { if (Battle != null && Battle.Id == battleId) LoadBattle(battleId); });
+                _hub.On<int, int, bool>("BattleRoundResolved", (battleId, _, __) => { if (Battle != null && Battle.Id == battleId) LoadBattle(battleId); });
+                _hub.On<int, int, bool>("BattleCompleted", (battleId, _, __) => { if (Battle != null && Battle.Id == battleId) LoadBattle(battleId); LoadWar(); });
+                _hub.On<int, int, int>("TerritoryOwnershipUpdated", (_, __, ___) => QueueRefresh());
+                _hub.On<int, int>("PeaceAgreed", (_, __) => LoadWar());
+                _hub.On<int, int, int, string, int, string>("ArmyMarching", (_, attacker, defender, region, seconds, attackerName) =>
+                {
+                    if (War != null && defender == War.KingdomId) Post(() => Notification = "DIQQAT! " + attackerName + " qo'shini " + region + " qasringizga yurish boshladi — " + seconds + " soniyada yetib keladi");
+                    LoadWar();
+                });
+                _hub.On<int, string>("WarNotice", (kid, msg) => { if (War != null && kid == War.KingdomId) Post(() => Notification = msg); LoadWar(); });
                 _hub.Reconnected += async _ => { await _hub.InvokeAsync("JoinWorld", worldId); QueueRefresh(); };
                 await _hub.StartAsync();
                 await _hub.InvokeAsync("JoinWorld", worldId);
@@ -294,6 +351,7 @@ namespace AndijonSaltanatlar.Online
                 {
                     OnlineStateDto s = await _http.GetFromJsonAsync<OnlineStateDto>("api/online/state", Json);
                     await LoadMarketAsync();
+                    try { WarOverviewDto w = await _http.GetFromJsonAsync<WarOverviewDto>("api/war/overview", WarJson); Post(() => War = w); } catch { }
                     Post(() => ApplyState(s));
                 }
                 catch { }
@@ -371,6 +429,137 @@ namespace AndijonSaltanatlar.Online
                 await LoadMarketAsync();
                 Post(() => ApplyState(r.State));
                 SetMessage(r.MessageUz, !r.Success);
+            });
+        }
+
+        // ---- PROMPT 25: urush tizimi ----
+        private static readonly JsonSerializerOptions WarJson = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+
+        /// <summary>Harbiy holatni serverdan yuklaydi (fonda).</summary>
+        public void LoadWar()
+        {
+            if (_http == null) return;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    WarOverviewDto w = await _http.GetFromJsonAsync<WarOverviewDto>("api/war/overview", WarJson);
+                    Post(() =>
+                    {
+                        War = w;
+                        if (w?.ActiveBattle != null && (Battle == null || Battle.Id == w.ActiveBattle.Id)) { Battle = w.ActiveBattle; BattleSerial++; }
+                    });
+                }
+                catch { }
+            });
+        }
+
+        public void LoadBattle(int battleId)
+        {
+            if (_http == null) return;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    BattleDto b = await _http.GetFromJsonAsync<BattleDto>("api/war/battle/" + battleId, WarJson);
+                    Post(() => { if (b != null) { Battle = b; BattleSerial++; } });
+                }
+                catch { }
+            });
+        }
+
+        public void CloseBattle() => Battle = null;
+
+        private void WarCommand(string path, Func<string, object> body)
+        {
+            if (!LoggedIn) { SetMessage("Avval serverga kiring", true); return; }
+            if (WarBusy) return;
+            WarBusy = true;
+            string commandId = Guid.NewGuid().ToString("N");
+            Task.Run(async () =>
+            {
+                try
+                {
+                    HttpResponseMessage resp;
+                    try { resp = await _http.PostAsJsonAsync(path, body(commandId), WarJson); }
+                    catch (HttpRequestException) { resp = await _http.PostAsJsonAsync(path, body(commandId), WarJson); } // xavfsiz takror (idempotent)
+                    if (!resp.IsSuccessStatusCode) { SetMessage(await ErrorText(resp, "Buyruq bajarilmadi"), true); return; }
+                    WarActionResultDto r = await resp.Content.ReadFromJsonAsync<WarActionResultDto>(WarJson);
+                    BattleDto battle = null;
+                    if (r.Success && r.BattleId > 0)
+                    {
+                        try { battle = await _http.GetFromJsonAsync<BattleDto>("api/war/battle/" + r.BattleId, WarJson); } catch { }
+                    }
+                    Post(() =>
+                    {
+                        if (r.Overview != null) War = r.Overview;
+                        if (battle != null) { Battle = battle; BattleSerial++; if (path.EndsWith("battle/start") || path.EndsWith("pvp/respond")) OpenBattleRequest = battle.Id; }
+                    });
+                    SetMessage(r.MessageUz, !r.Success);
+                }
+                catch (Exception ex) { SetMessage("Xato: " + Short(ex.Message), true); }
+                finally { Post(() => WarBusy = false); }
+            });
+        }
+
+        public void Recruit(int armyId, Shared.War.UnitLine line, int count) => WarCommand("api/war/recruit", id => new RecruitRequest { CommandId = id, ArmyId = armyId, Line = line, Count = count });
+        public void UpgradeUnits(int armyId, Shared.War.UnitLine line, int fromLevel, int count) => WarCommand("api/war/upgrade", id => new UpgradeUnitsRequest { CommandId = id, ArmyId = armyId, Line = line, FromLevel = fromLevel, Count = count });
+        public void BuildFacility(Shared.War.FacilityKind kind) => WarCommand("api/war/facility", id => new FacilityRequest { CommandId = id, Kind = kind });
+        public void HireCommander() => WarCommand("api/war/commander/hire", id => new CommanderRequest { CommandId = id });
+        public void AssignCommander(int commanderId, int armyId) => WarCommand("api/war/commander/assign", id => new CommanderRequest { CommandId = id, CommanderId = commanderId, ArmyId = armyId });
+        public void CreateArmy(string name) => WarCommand("api/war/army/create", id => new CreateArmyRequest { CommandId = id, Name = name });
+        public void StartBattle(int armyId, int regionId) => WarCommand("api/war/battle/start", id => new StartBattleRequest { CommandId = id, ArmyId = armyId, RegionId = regionId });
+        public void SubmitDecision(int battleId, int round, Shared.War.BattleDecision d) => WarCommand("api/war/decision", id => new BattleDecisionRequest { CommandId = id, BattleId = battleId, Round = round, Decision = d });
+        public void March(int armyId, int regionId) => WarCommand("api/war/march", id => new MarchRequest { CommandId = id, ArmyId = armyId, RegionId = regionId });
+        public void ProposePeace(int kingdomId) => WarCommand("api/war/peace", id => new PeaceRequest { CommandId = id, KingdomId = kingdomId });
+        public void InvitePvp(int toKingdomId, int armyId, int stakeRegionId) => WarCommand("api/war/pvp/invite", id => new PvpInviteRequest { CommandId = id, ToKingdomId = toKingdomId, ArmyId = armyId, StakeRegionId = stakeRegionId });
+        public void RespondPvp(int invitationId, bool accept, int armyId) => WarCommand("api/war/pvp/respond", id => new PvpRespondRequest { CommandId = id, InvitationId = invitationId, Accept = accept, ArmyId = armyId });
+        public void SetPvp(bool accepts) => WarCommand("api/war/pvp/setting", id => new PvpSettingRequest { CommandId = id, AcceptsPvp = accepts });
+
+        // ---- Boshlang'ich yurt (xaritadan tanlash) va bayroq ----
+        /// <summary>Yurt tanlash xaritasi (barcha hududlar, bo'sh/band holati bilan).</summary>
+        public StartRegionsDto StartRegions { get; private set; }
+
+        public void LoadStartRegions()
+        {
+            if (_http == null) return;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    StartRegionsDto d = await _http.GetFromJsonAsync<StartRegionsDto>("api/online/start-regions", Json);
+                    Post(() => { if (d != null) StartRegions = d; });
+                }
+                catch { }
+            });
+        }
+
+        /// <summary>Tanlangan mustaqil hududda saltanat qurish (nom va bayroq bilan).</summary>
+        public void ChooseStart(int regionId, string kingdomName, string flag)
+            => StateCommand("api/online/start", new ChooseStartRequest { CommandId = Guid.NewGuid().ToString("N"), RegionId = regionId, KingdomName = kingdomName ?? "", Flag = flag ?? "" },
+                "Saltanatingiz qurildi! Xush kelibsiz.", reloadStarts: true);
+
+        /// <summary>Bayroqni o'zgartirish.</summary>
+        public void SetFlag(string flag)
+            => StateCommand("api/online/flag", new SetFlagRequest { CommandId = Guid.NewGuid().ToString("N"), Flag = flag ?? "" }, "Bayroq saqlandi.", reloadStarts: false);
+
+        private void StateCommand(string path, object body, string okMessage, bool reloadStarts)
+        {
+            if (!LoggedIn) { SetMessage("Avval serverga kiring", true); return; }
+            Run(async () =>
+            {
+                HttpResponseMessage resp = await _http.PostAsJsonAsync(path, body);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    SetMessage(await ErrorText(resp, "Bajarilmadi"), true);
+                    if (reloadStarts) LoadStartRegions();
+                    return;
+                }
+                OnlineStateDto st = await resp.Content.ReadFromJsonAsync<OnlineStateDto>(Json);
+                await LoadMarketAsync();
+                try { WarOverviewDto w = await _http.GetFromJsonAsync<WarOverviewDto>("api/war/overview", WarJson); Post(() => War = w); } catch { }
+                Post(() => ApplyState(st));
+                SetMessage(okMessage, false);
             });
         }
 

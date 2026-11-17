@@ -53,7 +53,9 @@ namespace AndijonSaltanatlar.UI
             ui.Fill(new Rectangle(0, 0, vw, vh), T.Scrim);
 
             int h = ui.ControlH + (ui.IsTouch ? 4 : 6), gap = ui.Gap;
-            int cardW = Math.Min(vw - 32, ui.Compact && vw > vh ? 760 : 460);
+            // Karta eni sarlavhaga moslashadi (piksel shrift keng) — sarlavha kartadan chiqmaydi.
+            int titleW = (int)ui.Type.Measure("ANDIJON: SALTANATLAR", TextStyle.MainTitle).X + 64;
+            int cardW = Math.Min(vw - 32, Math.Max(titleW, ui.Compact && vw > vh ? 760 : 520));
             bool twoCols = ui.Compact && vw > vh && cardW >= 700;
             int rows = twoCols ? (_items.Length + 1) / 2 : _items.Length;
             int titleH = (int)ui.Type.LineHeight(TextStyle.MainTitle) + (int)ui.Type.LineHeight(TextStyle.Body) + 40;
@@ -63,9 +65,9 @@ namespace AndijonSaltanatlar.UI
             ui.Rounded(new Rectangle(card.X, card.Y, card.Width, 6), T.Accent, 3);
 
             int x = card.X + 28, y = card.Y + 26, w = card.Width - 56;
-            ui.Type.DrawCentered(sb, "ANDIJON: SALTANATLAR", new Rectangle(card.X, y, card.Width, (int)ui.Type.LineHeight(TextStyle.MainTitle)), TextStyle.MainTitle, T.Accent);
+            ui.Type.DrawFitted(sb, "ANDIJON: SALTANATLAR", new Rectangle(card.X + 16, y, card.Width - 32, (int)ui.Type.LineHeight(TextStyle.MainTitle)), TextStyle.MainTitle, T.Primary, 1);
             y += (int)ui.Type.LineHeight(TextStyle.MainTitle) + 4;
-            ui.Type.DrawCentered(sb, "Bir shahardan buyuk saltanat sari", new Rectangle(card.X, y, card.Width, (int)ui.Type.LineHeight(TextStyle.Body)), TextStyle.Body, T.TextSecondary);
+            ui.Type.DrawFitted(sb, "Bir shahardan buyuk saltanat sari", new Rectangle(card.X + 16, y, card.Width - 32, (int)ui.Type.LineHeight(TextStyle.Body)), TextStyle.Body, T.TextSecondary, 1);
             y += (int)ui.Type.LineHeight(TextStyle.Body) + 24;
 
             int colW = twoCols ? (w - gap) / 2 : w;
@@ -77,9 +79,10 @@ namespace AndijonSaltanatlar.UI
             }
 
             // Mavzu almashtirgich (Sozlamalar): tungi / yorug'
-            var tr = new Rectangle(card.Right - 180, card.Bottom - 46, 160, 32);
+            int tbw = Math.Min(card.Width / 2 - 28, (int)ui.Type.Measure("Mavzu: Yorug'", TextStyle.Button).X + 30);
+            var tr = new Rectangle(card.Right - 20 - tbw, card.Bottom - 46, tbw, 32);
             if (ui.Button(tr, "Mavzu: " + ThemeManager.Current.Name, ButtonKind.Ghost, true, "Interfeys mavzusini almashtirish")) ThemeManager.Toggle();
-            ui.Text("v0.19 · Noto Sans · Oʻzbekcha", new Vector2(card.X + 28, card.Bottom - 40), TextStyle.Caption, T.TextSecondary);
+            ui.TextFit("v0.25 · Oʻzbekcha", new Rectangle(card.X + 24, card.Bottom - 46, tr.X - card.X - 36, 32), TextStyle.Caption, T.TextSecondary);
             ui.End();
         }
     }

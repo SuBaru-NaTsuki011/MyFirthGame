@@ -293,7 +293,7 @@ namespace AndijonSaltanatlar.AdvancedEconomy
                 int members = hh.MemberIds.Count;
                 if (members == 0) { hh.FedRatio = 1f; hh.Comfort = 0f; continue; }
 
-                (int hx, int hy) = hh.HomeBuildingId.HasValue && homePos.TryGetValue(hh.HomeBuildingId.Value, out var hp) ? hp : (32, 32);
+                (int hx, int hy) = hh.HomeBuildingId.HasValue && homePos.TryGetValue(hh.HomeBuildingId.Value, out var hp) ? hp : (GameConfig.CityCenter, GameConfig.CityCenter);
                 comparer.X = hx; comparer.Y = hy;
                 markets.Sort(comparer);
 

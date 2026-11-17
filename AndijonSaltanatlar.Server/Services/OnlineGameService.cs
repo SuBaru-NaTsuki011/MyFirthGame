@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using AndijonSaltanatlar.Shared.Heraldry;
 using AndijonSaltanatlar.Server.Data;
 using AndijonSaltanatlar.Server.Hubs;
 using AndijonSaltanatlar.Shared.DTOs;
@@ -79,7 +80,8 @@ namespace AndijonSaltanatlar.Server.Services
                 {
                     await EnsureWorldAsync(existing.WorldId);
                     await EnsureResourcesAsync(existing.Id);
-                    await WorldSeeder.EnsurePlayerHomeAsync(_db, existing);
+                    // Yangi mijoz yurtni xaritadan o'zi tanlaydi; eski mijozga avtomatik joy beriladi.
+                    if (req?.ChooseStart != true) await WorldSeeder.EnsurePlayerHomeAsync(_db, existing);
                     return existing;
                 }
             }
@@ -96,6 +98,7 @@ namespace AndijonSaltanatlar.Server.Services
             _db.Kingdoms.Add(kingdom);
             await _db.SaveChangesAsync();
             _db.KingdomResources.Add(new KingdomResource { KingdomId = kingdom.Id });
+            kingdom.Flag = FlagSpec.ForKingdom(kingdom.Id, r, g, b).Encode();
             await _db.SaveChangesAsync();
             // Akkaunt ↔ saltanat bog'lanishi to'g'ridan-to'g'ri UPDATE bilan: dunyo yaratishdagi parallel to'qnashuvda
             // ChangeTracker tozalangan bo'lsa ham (user obyekti kuzatilmaydi) bog'lanish yo'qolmaydi.
@@ -103,8 +106,67 @@ namespace AndijonSaltanatlar.Server.Services
             await _db.Users.Where(u => u.Id == uid).ExecuteUpdateAsync(s => s.SetProperty(u => u.KingdomId, kid));
             user.KingdomId = kid;
             await EnsureResourcesAsync(kingdom.Id);
-            await WorldSeeder.EnsurePlayerHomeAsync(_db, kingdom);
+            if (req?.ChooseStart != true) await WorldSeeder.EnsurePlayerHomeAsync(_db, kingdom);
             return kingdom;
+        }
+
+        // ------------------------------------------------------------------
+        // Boshlang'ich yurt (xaritadan tanlash) va bayroq
+        // ------------------------------------------------------------------
+        /// <summary>Butun O'zbekiston xaritasi: qaysi hududlar bo'sh (mustaqil), qaysilari band.</summary>
+        public async Task<StartRegionsDto> StartRegionsAsync(Kingdom me)
+        {
+            await EnsureWorldAsync(me.WorldId);
+            var regions = await _db.Regions.AsNoTracking().Where(r => r.WorldId == me.WorldId).OrderBy(r => r.Id).ToListAsync();
+            var kingdoms = await _db.Kingdoms.AsNoTracking().Where(k => k.WorldId == me.WorldId).ToDictionaryAsync(k => k.Id);
+            var pops = await _db.Cities.AsNoTracking().Where(c => regions.Select(r => r.Id).Contains(c.RegionId))
+                .GroupBy(c => c.RegionId).Select(g => new { g.Key, Pop = g.Sum(c => c.Population) }).ToDictionaryAsync(x => x.Key, x => x.Pop);
+            var dto = new StartRegionsDto
+            {
+                SuggestedName = me.Name, Flag = WorldSeeder.FlagOf(me), Color = new[] { me.ColorR, me.ColorG, me.ColorB }
+            };
+            foreach (RegionEntity r in regions)
+            {
+                kingdoms.TryGetValue(r.OwnerKingdomId, out Kingdom o);
+                dto.Regions.Add(new StartRegionDto
+                {
+                    RegionId = r.Id, Name = r.Name, Province = r.Province, MapX = (float)r.Latitude, MapY = (float)r.Longitude,
+                    Population = pops.GetValueOrDefault(r.Id), Free = r.OwnerKingdomId == 0,
+                    OwnerKingdomId = r.OwnerKingdomId, OwnerName = o?.Name ?? "Mustaqil", OwnerIsAi = o?.IsAi ?? true,
+                    Color = o == null ? new[] { 150, 150, 150 } : new[] { o.ColorR, o.ColorG, o.ColorB }, Flag = WorldSeeder.FlagOf(o)
+                });
+            }
+            return dto;
+        }
+
+        /// <summary>Yurt tanlash: saltanat nomi va bayrog'i ham shu yerda o'rnatiladi. Natija: null — muvaffaqiyat, aks holda sabab.</summary>
+        public async Task<string> ChooseStartAsync(Kingdom me, ChooseStartRequest req)
+        {
+            if (req == null) return "So'rov bo'sh.";
+            string name = (req.KingdomName ?? "").Trim();
+            if (name.Length > 0 && (name.Length < 3 || name.Length > 40)) return "Saltanat nomi 3–40 harf bo'lsin.";
+            if (!string.IsNullOrEmpty(req.Flag) && !FlagSpec.TryParse(req.Flag, out _)) return "Bayroq noto'g'ri.";
+            string err;
+            try { err = await WorldSeeder.ChooseStartAsync(_db, me, req.RegionId); }
+            catch (InvalidOperationException) { err = "Bu hudud hozirgina band bo'ldi — boshqasini tanlang."; }
+            if (err != null) return err;
+            await _db.Kingdoms.Where(k => k.Id == me.Id).ExecuteUpdateAsync(s => s
+                .SetProperty(k => k.Name, k => name.Length > 0 ? name : k.Name)
+                .SetProperty(k => k.Flag, k => !string.IsNullOrEmpty(req.Flag) ? req.Flag : k.Flag)
+                .SetProperty(k => k.StateVersion, k => k.StateVersion + 1));
+            if (name.Length > 0) me.Name = name;
+            if (!string.IsNullOrEmpty(req.Flag)) me.Flag = req.Flag;
+            return null;
+        }
+
+        /// <summary>Bayroqni o'zgartirish (istalgan payt). Natija: null — muvaffaqiyat.</summary>
+        public async Task<string> SetFlagAsync(Kingdom me, SetFlagRequest req)
+        {
+            if (req == null || !FlagSpec.TryParse(req.Flag, out FlagSpec f)) return "Bayroq noto'g'ri.";
+            string flag = f.Encode();
+            await _db.Kingdoms.Where(k => k.Id == me.Id).ExecuteUpdateAsync(s => s.SetProperty(k => k.Flag, flag).SetProperty(k => k.StateVersion, k => k.StateVersion + 1));
+            me.Flag = flag;
+            return null;
         }
 
         private async Task EnsureResourcesAsync(int kingdomId)
@@ -183,7 +245,8 @@ namespace AndijonSaltanatlar.Server.Services
                 Coin = res.Coin, Rice = res.Rice, RiceReserved = res.RiceReserved, WaterSources = res.WaterSources,
                 ServerGameMinute = now, Day = (int)(now / (24 * 60)) + 1, StateVersion = version,
                 PlayersOnline = GameHub.OnlinePlayers(w.Id),
-                CityCount = cities.Count, Population = cities.Sum(c => c.Population)
+                CityCount = cities.Count, Population = cities.Sum(c => c.Population),
+                NeedsHome = cities.Count == 0, Flag = WorldSeeder.FlagOf(k), Color = new[] { k.ColorR, k.ColorG, k.ColorB }
             };
             dto.Inventory[Rice] = res.Rice;
             dto.Reserved[Rice] = res.RiceReserved;

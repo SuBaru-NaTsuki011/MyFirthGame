@@ -14,6 +14,9 @@ namespace AndijonSaltanatlar.Shared.DTOs
         public int ColorR { get; set; }
         public int ColorG { get; set; }
         public int ColorB { get; set; }
+        /// <summary>Egasining bayrog'i (FlagSpec matni) va viloyat kaliti.</summary>
+        public string Flag { get; set; } = "";
+        public string Province { get; set; } = "";
         /// <summary>Xarita koordinatasi (0..100).</summary>
         public float MapX { get; set; }
         public float MapY { get; set; }
@@ -72,6 +75,9 @@ namespace AndijonSaltanatlar.Shared.DTOs
         public string Name { get; set; } = "";
         public string Ruler { get; set; } = "";
         public string Capital { get; set; } = "";
+        /// <summary>Saltanat bayrog'i (FlagSpec matni) va rangi.</summary>
+        public string Flag { get; set; } = "";
+        public int[] Color { get; set; } = { 128, 128, 128 };
         public int Coin { get; set; }
         /// <summary>Saltanatga tegishli shaharlar aholisi yig'indisi (har bir fuqaro bir marta).</summary>
         public int Population { get; set; }

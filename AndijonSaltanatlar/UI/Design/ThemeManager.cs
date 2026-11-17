@@ -47,10 +47,26 @@ namespace AndijonSaltanatlar.UI.Design
             Disabled = Hex("26364A"), DisabledText = Hex("5E7186"), Scrim = new Color(4, 8, 14, 150), Shadow = new Color(0, 0, 0, 90)
         };
 
-        /// <summary>Joriy mavzu (standart — tungi: o'yin dunyosi fonida yaxshi o'qiladi).</summary>
-        public static ThemeTokens Current { get; private set; } = Dark;
+        /// <summary>
+        /// O'yin uslubi: shahar HUD'i bilan bir xil — to'q jigarrang panellar, oltin ramka, krem matn.
+        /// Barcha menyu, onlayn panel, harbiy bo'lim va jang sahnasi shu ranglardan foydalanadi.
+        /// </summary>
+        public static readonly ThemeTokens Game = new ThemeTokens
+        {
+            Name = "O'yin",
+            Background = new Color(22, 18, 14), Surface = new Color(32, 26, 20, 248), SurfaceAlt = new Color(52, 43, 33),
+            Primary = new Color(226, 186, 104), PrimaryHover = new Color(242, 206, 132), PrimaryPressed = new Color(194, 156, 82),
+            Secondary = new Color(150, 116, 66), Accent = new Color(214, 150, 72),
+            TextPrimary = new Color(236, 226, 204), TextSecondary = new Color(178, 162, 136), TextOnPrimary = new Color(36, 26, 14),
+            Border = new Color(150, 116, 66), Focus = new Color(240, 204, 128),
+            Success = new Color(120, 206, 128), Warning = new Color(232, 182, 92), Danger = new Color(214, 96, 80),
+            Disabled = new Color(58, 49, 40), DisabledText = new Color(124, 110, 90), Scrim = new Color(0, 0, 0, 160), Shadow = new Color(0, 0, 0, 110)
+        };
 
-        public static void Toggle() => Current = Current == Dark ? Light : Dark;
-        public static void Set(bool dark) => Current = dark ? Dark : Light;
+        /// <summary>Joriy mavzu (standart — o'yin uslubi).</summary>
+        public static ThemeTokens Current { get; private set; } = Game;
+
+        public static void Toggle() => Current = Current == Game ? Light : Game;
+        public static void Set(bool dark) => Current = dark ? Game : Light;
     }
 }

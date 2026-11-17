@@ -17,6 +17,8 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="8.0.*" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.*" />
+    <!-- Telefondagi Google akkaunt tanlash oynasidan kelgan ID tokenni Google kalitlari bilan tekshirish. -->
+    <PackageReference Include="Google.Apis.Auth" Version="1.78.0" />
   </ItemGroup>
 
   <ItemGroup>

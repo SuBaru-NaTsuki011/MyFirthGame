@@ -78,6 +78,22 @@ public sealed class Game1 : Game
 
 	private AndijonSaltanatlar.UI.Design.UiKit _uiKit;
 
+	// Doimiy onlayn: Google orqali kirish + bulutdagi saqlash (o'yin qolgan joyidan davom etadi).
+	private AndijonSaltanatlar.Online.CloudSession _cloud;
+
+	private GoogleLoginScreen _loginScreen;
+
+	private bool _loginMode;
+
+	private bool _loadingCloud;
+
+	private bool _autoLoginStarted;
+
+	private float _autosaveTimer;
+
+	/// <summary>Avtomatik saqlash oralig'i (soniya). Yer ochilganda darhol saqlanadi.</summary>
+	private const float AutosaveSeconds = 30f;
+
 	private bool _questMode;
 
 	private StoryOverlay _storyOverlay;
@@ -130,6 +146,8 @@ public sealed class Game1 : Game
 			_graphics.PreferredBackBufferWidth = _opt.WindowSize.Value.X;
 			_graphics.PreferredBackBufferHeight = _opt.WindowSize.Value.Y;
 		}
+		// Oyna yopilganda oxirgi holat serverga yuboriladi (qisqa kutish bilan).
+		Exiting += (s, e) => FlushCloudSaveBlocking();
 #if ANDROID
 		// Telefon: to'liq ekran, gorizontal holat.
 		_graphics.IsFullScreen = true;
@@ -159,7 +177,8 @@ public sealed class Game1 : Game
 			_exitRequested = true;
 			return;
 		}
-		_input = new InputManager();
+		_input = new InputManager { ForceTouchUi = _opt.Phone };
+		if (_opt.DataDir != null) AppPaths.Root = _opt.DataDir;
 #if !ANDROID
 		// PC: klaviaturadan matn (login maydonlari uchun). Android'da ekran klaviaturasi ishlatiladi.
 		Window.TextInput += (object s, TextInputEventArgs e) => _input.PushText(e.Character);
@@ -172,10 +191,15 @@ public sealed class Game1 : Game
 		_renderer = new WorldRenderer(_assets);
 		_glow = BuildGlow();
 		_mainMenu = new MainMenuScreen(_assets, _font) { Ui = _uiKit };
+		_cloud = new AndijonSaltanatlar.Online.CloudSession { LoginUrlFile = _opt.LoginUrlFile };
+		_cloud.NativeAccountPicker = NativeAccountPicker;
+		_cloud.SignedIn = OnCloudSignedIn;
+		_cloud.SaveConflict = OnCloudConflict;
+		_onlinePanel.ReconnectRequested = ConnectOnlineWorld;
 		_pendingStoryMode = _opt.Story || _opt.SmokeLog != null;
 		NewGame(_currentSeed);
-		Vector2 startWorld = (_opt.CenterTile.HasValue ? IsoMath.TileToWorld(_opt.CenterTile.Value) : IsoMath.TileToWorld(new Vector2(32f, 32f)));
-		_camera = new CameraManager(GraphicsDevice.Viewport, startWorld, _opt.Zoom ?? 0.8f);
+		Vector2 startWorld = (_opt.CenterTile.HasValue ? IsoMath.TileToWorld(_opt.CenterTile.Value) : IsoMath.TileToWorld(new Vector2(GameConfig.CityCenter, GameConfig.CityCenter)));
+		_camera = new CameraManager(GraphicsDevice.Viewport, startWorld, _opt.Zoom ?? StartZoom());
 		if (_opt.SmokeLog != null)
 		{
 			RunSmokeTest(_opt.SmokeLog);
@@ -272,7 +296,15 @@ public sealed class Game1 : Game
 				}
 			}
 		}
-		_menuMode = _opt.Menu || (_opt.ScreenshotPath == null && _opt.Tab == null && !_opt.Map && !_opt.Civ && !_opt.Story && !_opt.QuestJournal && !_opt.Online);
+		// Oddiy ishga tushirish: avval Google bilan kirish (o'yin doimiy onlayn). Sinov parametrlari bilan — to'g'ridan-to'g'ri.
+		bool testLaunch = _opt.ScreenshotPath != null || _opt.Tab != null || _opt.Map || _opt.Civ || _opt.Story || _opt.QuestJournal || _opt.Online || _opt.Menu;
+		_menuMode = _opt.Menu;
+		_loginMode = _opt.Login || !testLaunch;
+		if (_loginMode)
+		{
+			_cloud.TryResume(DefaultServer());
+			_loginScreen = new GoogleLoginScreen(_cloud, _cloud.ServerUrl.Length > 0 ? _cloud.ServerUrl : DefaultServer()) { Ui = _uiKit };
+		}
 		if (_opt.Online)
 		{
 			_onlinePanel.Prefill(_opt.OnlineServer, _opt.OnlineUser, _opt.OnlinePass);
@@ -312,7 +344,7 @@ public sealed class Game1 : Game
 	private void NewGame(int seed, AIGovernorSaveState governorSave = null)
 	{
 		_currentSeed = seed;
-		_map = new MapManager(_assets, 64, 64);
+		_map = new MapManager(_assets, GameConfig.MapSize, GameConfig.MapSize);
 		_buildings = new BuildingManager(_map, _assets);
 		_units = new UnitManager(_assets);
 		_state = new GameStateManager();
@@ -336,7 +368,9 @@ public sealed class Game1 : Game
 		_ui = new UIManager(_assets, _font, _state, _buildings, _units, _governor)
 		{
 			OnSave = DoSave,
-			OnLoad = DoLoad
+			OnLoad = DoLoad,
+			OnLogout = DoLogout,
+			AccountName = _cloud != null && _cloud.State == AndijonSaltanatlar.Online.CloudLoginState.SignedIn ? _cloud.AccountLabel : ""
 		};
 		if (_ui.GovernorPanel != null)
 		{
@@ -360,7 +394,7 @@ public sealed class Game1 : Game
 		StringBuilder sb = new StringBuilder();
 		int pass = 0;
 		int fail = 0;
-		sb.AppendLine("ANDIJON: SALTANATLAR — SMOKE TEST");
+		sb.AppendLine("ANDIJON: SALTANATLAR вЂ” SMOKE TEST");
 		sb.AppendLine("Vaqt: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 		sb.AppendLine("Seed: " + _currentSeed);
 		sb.AppendLine(new string('-', 60));
@@ -580,8 +614,8 @@ public sealed class Game1 : Game
 
 	private Point? FindBuildableTile(int size, int parcelId)
 	{
-		int num = 32;
-		for (int i = 0; i <= 40; i++)
+		int num = GameConfig.CityCenter;
+		for (int i = 0; i <= GameConfig.MapSize / 2; i++)
 		{
 			for (int j = -i; j <= i; j++)
 			{
@@ -593,7 +627,7 @@ public sealed class Game1 : Game
 					}
 					int num2 = num + k;
 					int num3 = num + j;
-					if (num2 < 1 || num3 < 1 || num2 >= 64 - size || num3 >= 64 - size)
+					if (num2 < 1 || num3 < 1 || num2 >= GameConfig.MapSize - size || num3 >= GameConfig.MapSize - size)
 					{
 						continue;
 					}
@@ -672,6 +706,7 @@ public sealed class Game1 : Game
 		SaveGameData saveGameData = new SaveGameData
 		{
 			Seed = _currentSeed,
+			MapOffset = GameConfig.CityOffset,
 			Coins = _state.Coins,
 			Food = _state.Food,
 			Day = _state.Clock.Day,
@@ -724,20 +759,181 @@ public sealed class Game1 : Game
 		return saveGameData;
 	}
 
+	/// <summary>Android: telefondagi Google akkaunt tanlash oynasi (Activity1 o'rnatadi; Windows'da null — brauzer).</summary>
+	public System.Func<string, System.Threading.Tasks.Task<string>> NativeAccountPicker { get; set; }
+
+	private bool CloudSignedIn => _cloud != null && _cloud.State == AndijonSaltanatlar.Online.CloudLoginState.SignedIn;
+
+	private string DefaultServer()
+	{
+		if (!string.IsNullOrEmpty(_opt.Server)) return _opt.Server;
+		if (!string.IsNullOrEmpty(_opt.OnlineServer)) return _opt.OnlineServer;
+		return _online?.Settings?.ServerUrl ?? "";
+	}
+
+	/// <summary>Saqlash: kirilgan bo'lsa serverga (bulut), aks holda lokal faylga (sinov rejimi).</summary>
 	private void DoSave()
 	{
+		if (CloudSignedIn)
+		{
+			UploadNow(showMessage: true);
+			return;
+		}
 		bool flag = SaveManager.Save(SaveManager.DefaultPath, BuildSave());
 		_state.ShowMessage(flag ? "O'yin saqlandi" : "Saqlab bo'lmadi", !flag);
 	}
 
+	/// <summary>Yuklash: kirilgan bo'lsa serverdagi eng so'nggi holat, aks holda lokal fayl.</summary>
 	private void DoLoad()
 	{
+		if (CloudSignedIn)
+		{
+			ReloadFromCloud("O'yin serverdan yuklandi");
+			return;
+		}
 		SaveGameData saveGameData = SaveManager.Load(SaveManager.DefaultPath);
 		if (saveGameData == null)
 		{
 			_state.ShowMessage("Saqlangan o'yin topilmadi", isError: true);
 			return;
 		}
+		ApplySave(saveGameData, "O'yin yuklandi");
+	}
+
+	/// <summary>O'yin holatini serverga yuboradi (fonda). Zaxira nusxa qurilmada ham qoladi.</summary>
+	private void UploadNow(bool showMessage)
+	{
+		if (!CloudSignedIn) return;
+		SaveGameData data = BuildSave();
+		string json = SaveManager.ToJson(data);
+		SaveManager.Save(AppPaths.File("cloud_backup.json"), data);
+		_cloud.UploadSave(json, ok =>
+		{
+			if (showMessage) _state.ShowMessage(ok ? "O'yin serverga saqlandi" : "Serverga saqlab bo'lmadi — avtomatik qayta urinadi", !ok);
+		});
+	}
+
+	/// <summary>Ilova yopilayotganda: oxirgi holatni serverga sinxron yuborish.</summary>
+	private void FlushCloudSaveBlocking()
+	{
+		try
+		{
+			if (CloudSignedIn && !_loginMode && _state != null && _camera != null)
+				_cloud.UploadSaveBlocking(SaveManager.ToJson(BuildSave()));
+		}
+		catch (Exception)
+		{
+		}
+	}
+
+	/// <summary>Android: ilova fonga o'tganda (OnPause) chaqiriladi — progress yo'qolmasin.</summary>
+	public void SaveNowInBackground()
+	{
+		if (CloudSignedIn && !_loginMode && _state != null && _camera != null) UploadNow(showMessage: false);
+	}
+
+	/// <summary>Google orqali kirildi: serverdagi saltanatni yuklaymiz (yo'q bo'lsa yangi saltanat).</summary>
+	private void OnCloudSignedIn()
+	{
+		if (_loadingCloud) return;
+		_loadingCloud = true;
+		if (_loginScreen != null) _loginScreen.Busy = "Saltanat yuklanmoqda";
+		_cloud.LoadSave((json, err) =>
+		{
+			_loadingCloud = false;
+			if (_loginScreen != null) _loginScreen.Busy = null;
+			if (err == "unauthorized")
+			{
+				_cloud.SignOut();
+				return;
+			}
+			if (err != null)
+			{
+				_cloud.ReportError(err);
+				return;
+			}
+			SaveGameData data = SaveManager.FromJson(json);
+			if (data != null)
+			{
+				ApplySave(data, "Xush kelibsiz, " + _cloud.DisplayName + "! Saltanat qolgan joyidan davom etmoqda");
+			}
+			else
+			{
+				_pendingStoryMode = true;
+				_pendingStory = null;
+				NewGame(_currentSeed);
+				_camera.Jump(IsoMath.TileToWorld(new Vector2(GameConfig.CityCenter, GameConfig.CityCenter)), StartZoom());
+				_state.ShowMessage("Xush kelibsiz, " + _cloud.DisplayName + "! Yangi saltanat boshlandi");
+				UploadNow(showMessage: false);
+			}
+			_ui.AccountName = _cloud.AccountLabel;
+			_loginMode = false;
+			_menuMode = false;
+			_frames = 0;
+			_autosaveTimer = 0f;
+			ConnectOnlineWorld();
+			if (_opt.OnlineTab != null) { _onlinePanel.ShowTab(_opt.OnlineTab); _onlinePanel.Open(); }
+			if (_opt.UnlockParcelAfterLogin.HasValue) RunUnlockParcelTest(_opt.UnlockParcelAfterLogin.Value);
+		});
+	}
+
+	/// <summary>Sinov: berilgan uchastkani ochadi (resurs/aholi talabini chetlab) va darhol serverga saqlaydi.</summary>
+	private void RunUnlockParcelTest(int parcelId)
+	{
+		LandParcel parcel = _state.Land.Parcels.FirstOrDefault((LandParcel p) => p.Id == parcelId);
+		if (parcel == null) return;
+		_state.Land.Unlock(parcel);
+		_state.Land.RefreshStates(_state.Population);
+		_state.ShowMessage("Sinov: " + parcel.NameUz + " ochildi");
+		Point c = parcel.GridBounds.Center;
+		_camera.Jump(IsoMath.TileToWorld(new Vector2(c.X, c.Y)), 0.5f);
+		UploadNow(showMessage: false);
+	}
+
+	/// <summary>Onlayn dunyo (bozor, ittifoq, saltanat) — Google tokeni bilan, parolsiz.</summary>
+	private void ConnectOnlineWorld()
+	{
+		if (CloudSignedIn) _online.LoginWithToken(_cloud.ServerUrl, _cloud.Token, _cloud.Username);
+	}
+
+	/// <summary>Boshqa qurilma yangiroq saqlagan: eng so'nggi holatni yuklaymiz (eski holat ustidan yozilmaydi).</summary>
+	private void OnCloudConflict()
+	{
+		ReloadFromCloud("O'yin boshqa qurilmada davom ettirilgan — eng so'nggi holat yuklandi");
+	}
+
+	private void ReloadFromCloud(string message)
+	{
+		if (!CloudSignedIn) return;
+		_cloud.LoadSave((json, err) =>
+		{
+			SaveGameData data = err == null ? SaveManager.FromJson(json) : null;
+			if (data == null)
+			{
+				_state.ShowMessage(err ?? "Serverda saqlangan o'yin yo'q", isError: true);
+				return;
+			}
+			ApplySave(data, message);
+			_ui.AccountName = _cloud.AccountLabel;
+		});
+	}
+
+	/// <summary>Google hisobidan chiqish: progress serverga saqlanadi, so'ng kirish ekrani.</summary>
+	private void DoLogout()
+	{
+		FlushCloudSaveBlocking();
+		_online.Logout();
+		_cloud.SignOut();
+		_onlinePanel.Close();
+		NewGame(_currentSeed);
+		_loginScreen = new GoogleLoginScreen(_cloud, _cloud.ServerUrl) { Ui = _uiKit };
+		_loginMode = true;
+	}
+
+	/// <summary>Saqlangan holatni o'yinga qo'llaydi (lokal fayl yoki bulut).</summary>
+	private void ApplySave(SaveGameData saveGameData, string message)
+	{
+		SaveManager.MigrateLayout(saveGameData, GameConfig.CityOffset, GameConfig.HalfTileH);
 		_pendingStory = saveGameData.Story;
 		_pendingStoryMode = saveGameData.Story != null && saveGameData.Story.StoryModeActive;
 		NewGame(saveGameData.Seed, saveGameData.Governor);
@@ -793,9 +989,10 @@ public sealed class Game1 : Game
 				}
 			}
 		}
+		_state.Land.RefreshStates(_state.Population);
 		_camera.Jump(new Vector2(saveGameData.CameraX, saveGameData.CameraY), saveGameData.Zoom);
 		_governor?.Analyze();
-		_state.ShowMessage("O'yin yuklandi");
+		_state.ShowMessage(message);
 	}
 
 	protected override void Update(GameTime gameTime)
@@ -811,6 +1008,31 @@ public sealed class Game1 : Game
 		}
 		float num = (float)gameTime.ElapsedGameTime.TotalSeconds;
 		_input.Update(IsActive);
+		_cloud?.Pump();
+		if (_loginMode)
+		{
+			_loginScreen.Update(_input);
+			// Sinov: login manzili faylga yoziladi va Playwright Google sahifasini o'zi to'ldiradi.
+			if (_opt.LoginUrlFile != null && !_autoLoginStarted && _cloud.State == AndijonSaltanatlar.Online.CloudLoginState.SignedOut)
+			{
+				_autoLoginStarted = true;
+				_cloud.StartGoogleLogin(DefaultServer());
+			}
+			_onlinePanel.Update(_input, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height, num);
+			_units.Update(num * 0.6f);
+			_map.Update(num);
+			_dayNight.Update(_state.Clock.DayFraction);
+			_time += num;
+			_frames++;
+			if (_opt.ScreenshotPath != null && !_opt.ScreenshotAfterLogin && _frames >= (_opt.ScreenshotFrames ?? 6))
+			{
+				_captureNextDraw = true;
+			}
+			_perf?.EndUpdate();
+			_perf?.EndFrame();
+			base.Update(gameTime);
+			return;
+		}
 		if (_menuMode)
 		{
 			Viewport viewport = GraphicsDevice.Viewport;
@@ -866,7 +1088,10 @@ public sealed class Game1 : Game
 		}
 		else if (_strategicMode)
 		{
-			_strategic.Update(_input, viewport2.Width, viewport2.Height);
+			Point sv = LegacyUiSize(out float ss);
+			_input.PointerScale = ss;
+			_strategic.Update(_input, sv.X, sv.Y);
+			_input.PointerScale = 1f;
 			if (_strategic.BackRequested)
 			{
 				_strategic.BackRequested = false;
@@ -880,7 +1105,10 @@ public sealed class Game1 : Game
 		}
 		else if (_civMode)
 		{
-			_civ.Update(_input, viewport2.Width, viewport2.Height);
+			Point cv = LegacyUiSize(out float cs);
+			_input.PointerScale = cs;
+			_civ.Update(_input, cv.X, cv.Y);
+			_input.PointerScale = 1f;
 			if (_civ.BackRequested)
 			{
 				_civ.BackRequested = false;
@@ -889,7 +1117,10 @@ public sealed class Game1 : Game
 		}
 		else if (_questMode)
 		{
-			_quest.Update(_input, viewport2.Width, viewport2.Height);
+			Point qv = LegacyUiSize(out float qs);
+			_input.PointerScale = qs;
+			_quest.Update(_input, qv.X, qv.Y);
+			_input.PointerScale = 1f;
 			if (_quest.FocusMapRequested)
 			{
 				_quest.FocusMapRequested = false;
@@ -904,9 +1135,19 @@ public sealed class Game1 : Game
 		else
 		{
 			bool flag = _storyOverlay != null && _storyOverlay.DialogueOpen;
-			_storyOverlay?.Update(_input, num, viewport2.Width, viewport2.Height);
-			_ui.Update(_input, viewport2.Width, viewport2.Height);
-			_onlinePanel.UpdateLauncher(_input, viewport2.Width);
+			// Eski piksel-shriftli UI virtual o'lchamda (telefonda 720p) — kursor ham shu masshtabga o'giriladi.
+			Point uv = LegacyUiSize(out float us);
+			_ui.Touch = _input.IsTouch || _opt.Phone;
+			_input.PointerScale = us;
+			_storyOverlay?.Update(_input, num, uv.X, uv.Y);
+			_ui.Update(_input, uv.X, uv.Y);
+			_input.PointerScale = 1f;
+			if (_ui.OpenOnlineRequested)
+			{
+				_ui.OpenOnlineRequested = false;
+				_onlinePanel.Open();
+				if (CloudSignedIn && !_online.LoggedIn && !_online.Busy) ConnectOnlineWorld();
+			}
 			if (_ui.OpenCivRequested)
 			{
 				_ui.OpenCivRequested = false;
@@ -979,6 +1220,22 @@ public sealed class Game1 : Game
 		_time += num;
 		_dayNight.Update(_state.Clock.DayFraction);
 		_ui.PhaseName = _dayNight.PhaseName;
+		// Avtomatik saqlash: har 30 soniyada va yer ochilganda darhol (o'yin doim serverda).
+		if (CloudSignedIn)
+		{
+			_autosaveTimer += num;
+			if (_state.LandChanged || _autosaveTimer >= AutosaveSeconds)
+			{
+				_state.LandChanged = false;
+				_autosaveTimer = 0f;
+				UploadNow(showMessage: false);
+			}
+			_ui.CloudOk = !_cloud.LastSaveFailed;
+		}
+		else
+		{
+			_ui.CloudOk = false;
+		}
 		_frames++;
 		if (_opt.ScreenshotPath != null && _frames >= (_opt.ScreenshotFrames ?? 6))
 		{
@@ -1035,6 +1292,10 @@ public sealed class Game1 : Game
 			{
 				_civMode = false;
 			}
+			else if (_questMode)
+			{
+				_questMode = false;
+			}
 			else if (_strategicMode)
 			{
 				_strategicMode = false;
@@ -1042,6 +1303,9 @@ public sealed class Game1 : Game
 			else if (_ui.PetitionOpen)
 			{
 				_ui.ClosePetition();
+			}
+			else if (_ui.CloseOpenPanel())
+			{
 			}
 			else if (_state.ShowHelp)
 			{
@@ -1114,7 +1378,7 @@ public sealed class Game1 : Game
 			}
 			if (_input.KeyPressed(Keys.Home))
 			{
-				_camera.Jump(IsoMath.TileToWorld(new Vector2(32f, 32f)), _camera.Zoom);
+				_camera.Jump(IsoMath.TileToWorld(new Vector2(GameConfig.CityCenter, GameConfig.CityCenter)), _camera.Zoom);
 			}
 		}
 	}
@@ -1153,7 +1417,11 @@ public sealed class Game1 : Game
 			DrawAmbient();
 			DrawGlows();
 			DrawWeather();
-			if (_menuMode)
+			if (_loginMode)
+			{
+				DrawLoginScreen();
+			}
+			else if (_menuMode)
 			{
 				DrawMenu();
 			}
@@ -1304,38 +1572,78 @@ public sealed class Game1 : Game
 		return canvas.ToTexture(GraphicsDevice);
 	}
 
+	/// <summary>
+	/// Eski (piksel-shriftli) panellar uchun masshtab: telefonda ekran balandligi 720 virtual pikselga keltiriladi —
+	/// shunda tugmalar barmoq uchun yetarli katta va joylashuv har qanday telefonda bir xil. PC'da 1 (katta monitorlarda 1.5/2).
+	/// </summary>
+	private float LegacyUiScale()
+	{
+		float h = GraphicsDevice.Viewport.Height;
+		bool phone = _opt.Phone;
+#if ANDROID
+		phone = true;
+#endif
+		// Telefon: 540 virtual piksel balandlik — 1080p ekranda 2x (tugmalar barmoq uchun yetarli katta).
+		if (phone) return MathHelper.Clamp(h / 540f, 1f, 4f);
+		return h >= 1080f ? (float)Math.Floor(h / 720f * 2f) / 2f : 1f;
+	}
+
+	/// <summary>Boshlang'ich kamera yaqinligi: telefonda kattaroq (binolar barmoq bilan tanlashga qulay).</summary>
+	private float StartZoom()
+	{
+		float s = LegacyUiScale();
+		return MathHelper.Clamp(GameConfig.StartZoom * (s > 1f ? s * 0.8f : 1f), GameConfig.MinZoom, GameConfig.MaxZoom);
+	}
+
+	private Point LegacyUiSize(out float scale)
+	{
+		scale = LegacyUiScale();
+		Viewport vp = GraphicsDevice.Viewport;
+		return new Point((int)(vp.Width / scale), (int)(vp.Height / scale));
+	}
+
+	private void BeginLegacyUi(out Point size)
+	{
+		size = LegacyUiSize(out float s);
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, null, Matrix.CreateScale(s, s, 1f));
+	}
+
 	private void DrawUI()
+	{
+		BeginLegacyUi(out Point v);
+		_ui.Draw(_sb, v.X, v.Y);
+		_sb.End();
+	}
+
+	private void DrawLoginScreen()
 	{
 		Viewport viewport = GraphicsDevice.Viewport;
 		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
-		_ui.Draw(_sb, viewport.Width, viewport.Height);
+		_loginScreen.Draw(_sb, viewport.Width, viewport.Height, _time);
 		_sb.End();
 	}
 
 	private void DrawStrategic()
 	{
 		GraphicsDevice.Clear(new Color(18, 22, 30));
-		Viewport viewport = GraphicsDevice.Viewport;
-		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
-		_strategic.Draw(_sb, viewport.Width, viewport.Height);
+		BeginLegacyUi(out Point v);
+		_strategic.Draw(_sb, v.X, v.Y);
 		_sb.End();
 	}
 
 	private void DrawCiv()
 	{
 		GraphicsDevice.Clear(new Color(16, 20, 34));
-		Viewport viewport = GraphicsDevice.Viewport;
-		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
-		_civ.Draw(_sb, viewport.Width, viewport.Height);
+		BeginLegacyUi(out Point v);
+		_civ.Draw(_sb, v.X, v.Y);
 		_sb.End();
 	}
 
 	private void DrawQuest()
 	{
 		GraphicsDevice.Clear(new Color(18, 20, 28));
-		Viewport viewport = GraphicsDevice.Viewport;
-		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
-		_quest.Draw(_sb, viewport.Width, viewport.Height);
+		BeginLegacyUi(out Point v);
+		_quest.Draw(_sb, v.X, v.Y);
 		_sb.End();
 	}
 
@@ -1343,9 +1651,9 @@ public sealed class Game1 : Game
 	{
 		if (_storyOverlay != null)
 		{
-			Viewport viewport = GraphicsDevice.Viewport;
-			_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
-			_storyOverlay.Draw(_sb, viewport.Width, viewport.Height);
+			BeginLegacyUi(out Point v);
+			_storyOverlay.RightInset = _state.Selected != null ? 248 : 0;
+			_storyOverlay.Draw(_sb, v.X, v.Y);
 			_sb.End();
 		}
 	}
@@ -1354,7 +1662,7 @@ public sealed class Game1 : Game
 	{
 		Viewport viewport = GraphicsDevice.Viewport;
 		// LinearClamp: TTF shrift atlasi silliq (xira emas) chiziladi; piksel-art dunyo alohida PointClamp bilan.
-		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp);
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
 		_onlinePanel.DrawLauncher(_sb, viewport.Width);
 		_onlinePanel.Draw(_sb, viewport.Width, viewport.Height, _time);
 		_sb.End();
@@ -1363,7 +1671,7 @@ public sealed class Game1 : Game
 	private void DrawMenu()
 	{
 		Viewport viewport = GraphicsDevice.Viewport;
-		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp);
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
 		_mainMenu.Draw(_sb, viewport.Width, viewport.Height);
 		_sb.End();
 	}
