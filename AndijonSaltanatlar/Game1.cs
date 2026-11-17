@@ -88,6 +88,7 @@ public sealed class Game1 : Game
 
 	private StrategicView _strategic;
 	private ArenaController _arena;
+	private bool _arenaFromMap;
 	private readonly FarmWorkController _farmWork = new FarmWorkController();
 
 	private bool _strategicMode;
@@ -271,6 +272,11 @@ public sealed class Game1 : Game
 		{
 			_state.Farming.Seeds = 0;
 			_state.Farming.EndDay(_state.Day, Math.Max(1, _buildings.Count(BuildingType.Farm)), _state.Season);
+		}
+		if (_opt.MarchRegion.HasValue)
+		{
+			_strategicMode = true;
+			_strategic.StartMarch(_opt.MarchRegion.Value);
 		}
 		if (_opt.Arena)
 		{
@@ -1401,6 +1407,12 @@ public sealed class Game1 : Game
 		{
 			HandleHotkeys();
 		}
+		if (_arenaFromMap && !_arena.Active)
+		{
+			// Yurish jangi tugadi — saltanat xaritasiga qaytamiz
+			_arenaFromMap = false;
+			_strategicMode = true;
+		}
 		if (onlineOpen)
 		{
 			// O'yin dunyosi orqada yashashda davom etadi (pastdagi simulyatsiya), lekin bosishlar panelga tegishli.
@@ -1416,6 +1428,12 @@ public sealed class Game1 : Game
 			_input.PointerScale = ss;
 			_strategic.Update(_input, sv.X, sv.Y);
 			_input.PointerScale = 1f;
+			if (_strategic.MarchArrivedRegion >= 0)
+			{
+				int rid = _strategic.MarchArrivedRegion;
+				_strategic.MarchArrivedRegion = -1;
+				if (_arena.StartCampaign(rid)) { _strategicMode = false; _arenaFromMap = true; }
+			}
 			if (_strategic.BackRequested)
 			{
 				_strategic.BackRequested = false;
@@ -1465,8 +1483,11 @@ public sealed class Game1 : Game
 			Point uv = LegacyUiSize(out float us);
 			_ui.Touch = _input.IsTouch || _opt.Phone;
 			_input.PointerScale = us;
+			if (_storyOverlay != null) _storyOverlay.HideTracker = _ui.BlocksTracker;
 			_storyOverlay?.Update(_input, num, uv.X, uv.Y);
 			if (!inHouse) _ui.Update(_input, uv.X, uv.Y);
+			// Missiya kartasi ustidagi bosish orqadagi xaritaga o'tmasin
+			if (_storyOverlay != null && _storyOverlay.PointerOverTracker) _input.MouseOverUI = true;
 			_input.PointerScale = 1f;
 			if (!inHouse && _ui.OpenOnlineRequested)
 			{
@@ -1478,6 +1499,12 @@ public sealed class Game1 : Game
 			{
 				_ui.OpenCivRequested = false;
 				_civMode = true;
+			}
+			if (_ui.OpenMissionsRequested || (_storyOverlay != null && _storyOverlay.JournalRequested))
+			{
+				_ui.OpenMissionsRequested = false;
+				if (_storyOverlay != null) _storyOverlay.JournalRequested = false;
+				_questMode = true;
 			}
 			if (_ui.OpenWorldRequested)
 			{
@@ -2273,6 +2300,7 @@ public sealed class Game1 : Game
 		{
 			BeginLegacyUi(out Point v);
 			_storyOverlay.RightInset = _state.Selected != null ? 248 : 0;
+			_storyOverlay.HideTracker = _ui.BlocksTracker;
 			_storyOverlay.Draw(_sb, v.X, v.Y);
 			_sb.End();
 		}

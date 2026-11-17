@@ -8,10 +8,24 @@ namespace AndijonSaltanatlar.Progression
     /// </summary>
     public static class BuildingUpgradeSystem
     {
-        public const int MaxLevel = 3;
+        /// <summary>Har bir bino 5-darajagacha kattalashadi (ko'rinishi ham o'zgaradi).</summary>
+        public const int MaxLevel = 5;
 
-        public static bool CanUpgrade(Building b) => b != null && b.Level < MaxLevel;
-        public static int UpgradeCost(Building b) => 60 * b.Level;
+        public static bool CanUpgrade(Building b) => b != null && b.Level < MaxLevel && b.BuildProgress >= 1f;
+        /// <summary>Narx bino narxi va darajasiga bog'liq: qimmat bino — qimmatroq kattalashtirish.</summary>
+        public static int UpgradeCost(Building b) => System.Math.Max(60, b.Cost / 2) * b.Level;
+
+        public static string LevelName(int level)
+        {
+            switch (level)
+            {
+                case 1: return "Oddiy";
+                case 2: return "Bezatilgan";
+                case 3: return "Boy";
+                case 4: return "Hashamatli";
+                default: return "Saltanat";
+            }
+        }
 
         public static bool Apply(Building b)
         {

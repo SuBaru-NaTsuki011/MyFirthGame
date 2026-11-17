@@ -103,21 +103,20 @@ namespace AndijonSaltanatlar.Core
             {
                 int v = i;
                 Register(SpriteKeys.House + "_" + i, () => BuildingArt.House(v));
-                // Darajali ko'rinishlar: key_l2, key_l3 (WorldRenderer bino darajasiga qarab tanlaydi)
-                Register(LevelKey(SpriteKeys.House + "_" + i, 2), () => BuildingArt.House(v, 2));
-                Register(LevelKey(SpriteKeys.House + "_" + i, 3), () => BuildingArt.House(v, 3));
+                // Darajali ko'rinishlar: key_l2..key_l5 (WorldRenderer bino darajasiga qarab tanlaydi)
+                RegisterLevels(SpriteKeys.House + "_" + i, 2, l => BuildingArt.House(v, l), 3);
             }
             Register(SpriteKeys.Tower, () => BuildingArt.Tower());
             Register(SpriteKeys.Wall, () => BuildingArt.Wall());
             Register(SpriteKeys.Gate, () => BuildingArt.Gate());
-            for (int lv = 2; lv <= 3; lv++)
-            {
-                int l = lv;
-                Register(LevelKey(SpriteKeys.Tower, l), () => BuildingArt.Tower(l));
-                Register(LevelKey(SpriteKeys.Wall, l), () => BuildingArt.Wall(l));
-                Register(LevelKey(SpriteKeys.Gate, l), () => BuildingArt.Gate(l));
-            }
+            RegisterLevels(SpriteKeys.Tower, 2, l => BuildingArt.Tower(l), 3);
+            RegisterLevels(SpriteKeys.Wall, 1, l => BuildingArt.Wall(l), 3);
+            RegisterLevels(SpriteKeys.Gate, 1, l => BuildingArt.Gate(l), 3);
+            // Saroy: 3-daraja — maxsus rasm; 2, 4, 5 — umumiy daraja bezaklari
+            Register(LevelKey(SpriteKeys.MainHall, 2), () => LevelArt.Compose(BuildingArt.MainHall(1), 6, 2));
             Register(LevelKey(SpriteKeys.MainHall, 3), () => BuildingArt.MainHall(3));
+            Register(LevelKey(SpriteKeys.MainHall, 4), () => LevelArt.Compose(BuildingArt.MainHall(3), 6, 4));
+            Register(LevelKey(SpriteKeys.MainHall, 5), () => LevelArt.Compose(BuildingArt.MainHall(3), 6, 5));
             Register(SpriteKeys.Market, BuildingArt.Market);
             Register(SpriteKeys.MainHall, () => BuildingArt.MainHall());
             Register(SpriteKeys.Barracks, BuildingArt.Barracks);
@@ -127,6 +126,15 @@ namespace AndijonSaltanatlar.Core
             Register(SpriteKeys.Madrasa, BuildingArt.Madrasa);
             Register(SpriteKeys.Mosque, BuildingArt.Mosque);
             Register(SpriteKeys.Caravanserai, BuildingArt.Caravanserai);
+            // Qolgan barcha binolar ham 5-darajagacha kattalashadi
+            RegisterLevels(SpriteKeys.Market, 4, _ => BuildingArt.Market());
+            RegisterLevels(SpriteKeys.Barracks, 3, _ => BuildingArt.Barracks());
+            RegisterLevels(SpriteKeys.Garden, 3, _ => BuildingArt.Garden());
+            RegisterLevels(SpriteKeys.Farm, 4, _ => BuildingArt.Farm());
+            RegisterLevels(SpriteKeys.GladiatorArena, 5, _ => BuildingArt.GladiatorArena());
+            RegisterLevels(SpriteKeys.Madrasa, 4, _ => BuildingArt.Madrasa());
+            RegisterLevels(SpriteKeys.Mosque, 4, _ => BuildingArt.Mosque());
+            RegisterLevels(SpriteKeys.Caravanserai, 4, _ => BuildingArt.Caravanserai());
 
             Register(SpriteKeys.TreePoplar, () => DecorArt.Tree(0));
             Register(SpriteKeys.TreeChinor, () => DecorArt.Tree(1));
@@ -186,6 +194,22 @@ namespace AndijonSaltanatlar.Core
                     int aa = a, pp = ph;
                     Register(AttackKey(key, aa, pp), () => UnitArt.AttackFrame(kind, aa, pp));
                 }
+        }
+
+        /// <summary>Bino ko'rinishi uchun eng yuqori daraja.</summary>
+        public const int MaxArtLevel = 5;
+
+        /// <summary>
+        /// key_l2..key_l5: bespokeMax gacha — binoning o'z rasmi (baseOf(daraja)), undan yuqori — o'sha rasm
+        /// ustiga umumiy daraja bezaklari (LevelArt: poydevor, minoralar, bayroqlar, chiroqlar).
+        /// </summary>
+        private void RegisterLevels(string key, int size, Func<int, Canvas> baseOf, int bespokeMax = 1)
+        {
+            for (int lv = 2; lv <= MaxArtLevel; lv++)
+            {
+                int l = lv;
+                Register(LevelKey(key, l), () => l <= bespokeMax ? baseOf(l) : LevelArt.Compose(baseOf(bespokeMax), size, l));
+            }
         }
 
         /// <summary>Bino darajasi ko'rinishi kaliti (masalan "house_2_l3").</summary>

@@ -1,5 +1,11 @@
 using System.Linq;
+using AndijonSaltanatlar.Buildings;
 using AndijonSaltanatlar.Core;
+using AndijonSaltanatlar.Core.Graphics;
+using AndijonSaltanatlar.Interiors;
+using AndijonSaltanatlar.Progression;
+using AndijonSaltanatlar.Units;
+using Microsoft.Xna.Framework;
 using AndijonSaltanatlar.Economy;
 using AndijonSaltanatlar.Environment;
 using AndijonSaltanatlar.Military;
@@ -99,6 +105,61 @@ namespace AndijonSaltanatlar.Tests
             Assert.Equal(10_000 - cost, coins);
             Assert.Equal(amount, f.Seeds);
             Assert.Null(f.Active);
+        }
+
+        [Fact]
+        public void EveryBuilding_UpgradesToLevel5_CostGrows_AndArtGetsBigger()
+        {
+            foreach (BuildingType t in System.Enum.GetValues(typeof(BuildingType)))
+            {
+                Building b = BuildingFactory.Create(t, Point.Zero);
+                b.BuildProgress = 1f;
+                int lastCost = 0, hp = b.MaxHitPoints;
+                while (BuildingUpgradeSystem.CanUpgrade(b))
+                {
+                    int cost = BuildingUpgradeSystem.UpgradeCost(b);
+                    Assert.True(cost > lastCost, t + " narxi oshmadi");
+                    lastCost = cost;
+                    b.Upgrade();
+                }
+                Assert.Equal(5, b.Level);
+                Assert.True(b.MaxHitPoints > hp);
+            }
+            Canvas basic = BuildingArt.Market();
+            Canvas l5 = LevelArt.Compose(basic, 4, 5);
+            Assert.Equal(basic.Width, l5.Width);
+            Assert.True(l5.Height > basic.Height + 20, "5-daraja balandroq bo'lishi kerak");
+        }
+
+        [Fact]
+        public void Palace_OnlyGuardsMayEnter()
+        {
+            Building hall = BuildingFactory.Create(BuildingType.MainHall, Point.Zero);
+            Building house = BuildingFactory.Create(BuildingType.House, Point.Zero);
+            var citizen = new CitizenUnit(new[] { Vector2.Zero, Vector2.One }, 0);
+            var guard = new SwordsmanUnit(new[] { Vector2.Zero, Vector2.One });
+            Assert.False(HouseInterior.MayEnter(hall, citizen));
+            Assert.True(HouseInterior.MayEnter(hall, guard));
+            Assert.True(HouseInterior.MayEnter(house, citizen));
+        }
+
+        [Fact]
+        public void Campaign_BattleResultChangesWorld_AndArmyKeepsSurvivors()
+        {
+            var s = new GameStateManager();
+            s.Military.Initialize(1, 1);
+            var W = s.World;
+            var target = W.Regions.Regions.First(r => r.OwnerKingdomId != 0 && r.OwnerKingdomId != W.Kingdoms.PlayerKingdomId);
+            int historyBefore = W.Battles.History.Count;
+            var arena = new ArenaController(null, s);
+            Assert.True(arena.StartCampaign(target.Id));
+            Assert.True(arena.IsCampaign);
+            for (int i = 0; i < 10 && arena.Battle.Status != BattleStatus.Completed; i++) arena.Resolve(BattleDecision.Faol);
+            Assert.Equal(BattleStatus.Completed, arena.Battle.Status);
+            Assert.Equal(historyBefore + 1, W.Battles.History.Count);
+            Assert.True(s.Military.TotalUnits >= 1);
+            bool won = arena.Battle.WinnerKingdomId == 1;
+            Assert.Equal(won, target.OwnerKingdomId == W.Kingdoms.PlayerKingdomId);
         }
 
         [Fact]

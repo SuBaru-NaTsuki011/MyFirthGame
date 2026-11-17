@@ -114,8 +114,14 @@ namespace AndijonSaltanatlar.Interiors
         // ==================================================================
 
         /// <summary>Har kadr: boshqarilayotgan odam yonida kirsa bo'ladigan bino bormi (null — tekshirmaslik).</summary>
+        private Unit _nearbyWho;
+
+        /// <summary>Saroyga faqat soqchilar, jangchilar va shoh kiradi — oddiy fuqaro kira olmaydi.</summary>
+        public static bool MayEnter(Building b, Unit who) => !(b != null && b.Type == BuildingType.MainHall && who is CitizenUnit);
+
         public void UpdateNearby(Unit who)
         {
+            _nearbyWho = who;
             NearbyHouse = null;
             if (who == null || who.IsDown) return;
             float best = 0.9f;
@@ -136,6 +142,11 @@ namespace AndijonSaltanatlar.Interiors
         public void Enter(Building building, Unit avatar)
         {
             if (building == null || avatar == null) return;
+            if (!MayEnter(building, avatar))
+            {
+                _state.ShowMessage("Saroyga faqat soqchilar va jangchilar kira oladi!", true);
+                return;
+            }
             House = building;
             _avatar = avatar;
             _palace = building.Type == BuildingType.MainHall;
@@ -876,7 +887,9 @@ namespace AndijonSaltanatlar.Interiors
             if (Active || NearbyHouse == null) return;
             Building h = NearbyHouse;
             Vector2 top = cam.WorldToScreen(IsoMath.TileToWorld(new Vector2(h.Position.X + h.Size.X, h.Position.Y + h.Size.Y)) + new Vector2(0, -h.Texture.Height - 6));
-            string t = h.Type == BuildingType.MainHall ? "[ENTER] SAROYGA KIRISH"
+            bool denied = !MayEnter(h, _nearbyWho);
+            string t = denied ? "SAROYGA FAQAT SOQCHILAR KIRADI"
+                : h.Type == BuildingType.MainHall ? "[ENTER] SAROYGA KIRISH"
                 : h.Type == BuildingType.GladiatorArena ? "[ENTER] JANG MAYDONIGA KIRISH"
                 : "[ENTER] " + h.Name.ToUpperInvariant() + "GA KIRISH";
             Vector2 s = font.Measure(t, 2);
@@ -885,7 +898,7 @@ namespace AndijonSaltanatlar.Interiors
             r.Y = Math.Clamp(r.Y, 44, vh - r.Height - 140);
             sb.Draw(px, new Rectangle(r.X - 2, r.Y - 2, r.Width + 4, r.Height + 4), new Color(216, 167, 83, 230));
             sb.Draw(px, r, new Color(28, 22, 18, 235));
-            font.DrawCentered(sb, t, r.Center.ToVector2(), new Color(255, 214, 90), 2);
+            font.DrawCentered(sb, t, r.Center.ToVector2(), denied ? new Color(255, 130, 110) : new Color(255, 214, 90), 2);
         }
     }
 

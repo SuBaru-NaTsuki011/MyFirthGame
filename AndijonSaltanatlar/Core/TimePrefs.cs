@@ -21,6 +21,8 @@ namespace AndijonSaltanatlar.Core
         public int SeasonView { get; set; } = -1;
         /// <summary>Effektlar sifati: 0 past, 1 o'rta, 2 yuqori.</summary>
         public int Quality { get; set; } = 1;
+        /// <summary>Yon tomondagi missiya kartasi yashirilgan (o'rnida kichik "MISSIYA" tugmasi qoladi).</summary>
+        public bool QuestTrackerHidden { get; set; }
 
         public static readonly int[] DayPresets = { 10, 30, 60, 120 };
 

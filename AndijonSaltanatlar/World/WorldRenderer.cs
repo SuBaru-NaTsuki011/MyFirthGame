@@ -117,7 +117,7 @@ namespace AndijonSaltanatlar.World
                 Vector2 pos = o.DrawPosition;
                 if (bb != null && bb.Level >= 2 && bb.BuildProgress >= 1f)
                 {
-                    Texture2D lt = _assets.TryGet(AssetManager.LevelKey(bb.SpriteKey, System.Math.Min(bb.Level, 3)));
+                    Texture2D lt = _assets.TryGet(AssetManager.LevelKey(bb.SpriteKey, System.Math.Min(bb.Level, AssetManager.MaxArtLevel)));
                     if (lt != null) { tex = lt; pos = WorldObjectExtensions.AnchorBottomCenter(lt, bb.Position, bb.Size.X); }
                 }
 

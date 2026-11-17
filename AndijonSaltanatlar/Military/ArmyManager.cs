@@ -83,6 +83,23 @@ namespace AndijonSaltanatlar.Military
         }
 
         public int TotalUnits => Units.Count;
+
+        /// <summary>Urushda halok bo'lganlar: avval eng past darajalilar. Necha kishi olib tashlangani qaytadi.</summary>
+        public int RemoveCasualties(int count)
+        {
+            if (count <= 0) return 0;
+            var dead = new List<MilitaryUnit>(Units);
+            dead.Sort((a, b) => a.Level != b.Level ? a.Level.CompareTo(b.Level) : a.Strength.CompareTo(b.Strength));
+            int n = 0;
+            foreach (MilitaryUnit u in dead)
+            {
+                if (n >= count) break;
+                Units.Remove(u);
+                foreach (Army a in Armies) a.UnitIds.Remove(u.Id);
+                n++;
+            }
+            return n;
+        }
         public int TotalUpkeep => MilitaryEconomy.DailyUpkeep(Units);
 
         public int TotalStrength

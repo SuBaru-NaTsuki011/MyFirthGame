@@ -36,6 +36,15 @@ namespace AndijonSaltanatlar.UI
         private readonly List<Rectangle> _choiceRects = new();
         private Rectangle _continueRect;
 
+        // Missiya kartasi: X — yashirish, yashirilganda "MISSIYA" tugmasi, kartani bosish — MISSIYALAR ro'yxati
+        private Rectangle _trackerBox, _trackerClose, _trackerPill;
+        /// <summary>Kursor missiya kartasi/tugmasi ustida — orqadagi xaritaga bosish o'tmaydi.</summary>
+        public bool PointerOverTracker { get; private set; }
+        /// <summary>MISSIYALAR ro'yxatini ochish so'raldi (Game1 ochadi).</summary>
+        public bool JournalRequested { get; set; }
+        /// <summary>Katta oyna ochiq — missiya kartasi chizilmaydi va bosilmaydi.</summary>
+        public bool HideTracker { get; set; }
+
         // yutuq bildirishnomasi
         private AchievementDefinition _toast;
         private float _toastTimer;
@@ -62,7 +71,17 @@ namespace AndijonSaltanatlar.UI
                 if (_toastTimer <= 0) _toast = null;
             }
 
-            if (!DialogueOpen) return;
+            if (!DialogueOpen)
+            {
+                Point mp = input.MousePosition;
+                PointerOverTracker = !HideTracker && (_trackerBox.Contains(mp) || _trackerPill.Contains(mp));
+                if (!input.LeftPressed || !PointerOverTracker) return;
+                if (_trackerClose.Contains(mp)) { TimePrefs.Current.QuestTrackerHidden = true; TimePrefs.Save(); }
+                else if (_trackerPill.Contains(mp)) { TimePrefs.Current.QuestTrackerHidden = false; TimePrefs.Save(); }
+                else JournalRequested = true;
+                return;
+            }
+            PointerOverTracker = false;
             input.MouseOverUI = true; // dialog ochiq — orqadagi bosishlar o'tmaydi
             if (!input.LeftPressed) return;
             Point m = input.MousePosition;
@@ -83,16 +102,28 @@ namespace AndijonSaltanatlar.UI
         {
             if (Story == null) return;
             if (DialogueOpen) DrawDialogue(sb, vw, vh);
-            else DrawTracker(sb, vw, vh);
+            else if (!HideTracker) DrawTracker(sb, vw, vh);
+            else _trackerBox = _trackerClose = _trackerPill = Rectangle.Empty;
             DrawToast(sb, vw, vh);
         }
 
         private void DrawTracker(SpriteBatch sb, int vw, int vh)
         {
+            _trackerBox = _trackerClose = _trackerPill = Rectangle.Empty;
             var q = Story.Quests.TopTrackedQuest();
             if (q == null) return;
             var prog = Story.Quests.ProgressOf(q.QuestId);
             if (prog == null) return;
+
+            // Yashirilgan: faqat kichik "MISSIYA" tugmasi (bosilsa karta qaytadi)
+            if (TimePrefs.Current.QuestTrackerHidden)
+            {
+                _trackerPill = new Rectangle(vw - 16 - 132 - RightInset, 92, 132, 30);
+                Panel(sb, _trackerPill, PanelBg, Gold, 1);
+                Fill(sb, new Rectangle(_trackerPill.X + 10, _trackerPill.Y + 11, 8, 8), Gold);
+                _font.Draw(sb, "MISSIYA", new Vector2(_trackerPill.X + 26, _trackerPill.Y + 8), Gold, 2, 1);
+                return;
+            }
 
             // O'ng tomonda tanlangan obyekt paneli ochiq bo'lsa, vazifa kartasi uning chap tomoniga suriladi (ustma-ust tushmaydi).
             // Vazifa nomi ikki qatorgacha o'raladi (so'z o'rtasida kesilmaydi); karta balandligi shunga moslashadi
@@ -100,8 +131,12 @@ namespace AndijonSaltanatlar.UI
             if (titleLines.Count > 2) { titleLines = titleLines.GetRange(0, 2); titleLines[1] = Fit(titleLines[1], 20); }
             int extra = (System.Math.Max(1, titleLines.Count) - 1) * 20;
             var box = new Rectangle(vw - 300 - RightInset, 92, 284, 84 + extra);
+            _trackerBox = box;
             Panel(sb, box, PanelBg, Border, 1);
-            _font.Draw(sb, "JORIY VAZIFA", new Vector2(box.X + 10, box.Y + 8), Gold, 2, 1);
+            _font.Draw(sb, "JORIY MISSIYA", new Vector2(box.X + 10, box.Y + 8), Gold, 2, 1);
+            _trackerClose = new Rectangle(box.Right - 28, box.Y + 4, 24, 22);
+            Panel(sb, _trackerClose, new Color(40, 33, 26), Border, 1);
+            _font.DrawCentered(sb, "X", _trackerClose.Center.ToVector2(), Cream, 2, 1);
             for (int li = 0; li < titleLines.Count; li++)
                 _font.Draw(sb, titleLines[li], new Vector2(box.X + 10, box.Y + 28 + li * 20), Cream, 2, 1);
 
@@ -113,7 +148,7 @@ namespace AndijonSaltanatlar.UI
                 Fill(sb, bar, Track);
                 float p = o0.TargetAmount > 0 ? (float)cur / o0.TargetAmount : 1f;
                 Fill(sb, new Rectangle(bar.X, bar.Y, (int)(bar.Width * Clamp01(p)), bar.Height), Green);
-                string bt = cur + " / " + o0.TargetAmount + "  (J — ro'yxat)";
+                string bt = cur + " / " + o0.TargetAmount + "  (bosing — ro'yxat)";
                 if (_font.Measure(bt, 2, 1).X > bar.Width - 8) bt = cur + " / " + o0.TargetAmount;
                 _font.DrawCentered(sb, bt, bar.Center.ToVector2(), new Color(20, 24, 20), 2, 1);
             }

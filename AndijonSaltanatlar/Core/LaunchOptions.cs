@@ -97,6 +97,9 @@ public sealed class LaunchOptions
 	/// <summary>Sinov: jang maydoni (mashq jangi) darhol ochiladi.</summary>
 	public bool Arena;
 
+	/// <summary>Sinov: saltanat xaritasida shu hududga yurish boshlanadi.</summary>
+	public int? MarchRegion;
+
 	/// <summary>Sinov: urug' tugagan, fermer murojaati oynasi ochiq.</summary>
 	public bool FarmRequest;
 
@@ -276,6 +279,10 @@ public sealed class LaunchOptions
 				break;
 			case "--farm-request":
 				launchOptions.FarmRequest = true;
+				break;
+			case "--march":
+				launchOptions.MarchRegion = int.Parse(text, CultureInfo.InvariantCulture);
+				i++;
 				break;
 			case "--arena":
 				launchOptions.Arena = true;

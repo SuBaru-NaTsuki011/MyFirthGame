@@ -42,7 +42,7 @@ namespace AndijonSaltanatlar.UI
         private int SmallBtn => Touch ? 30 : 22;
         private const int PanelW = 248;
 
-        private enum Tab { None, Build, City, Population, Army, State, Civ, Settings, Diag, Farm, World }
+        private enum Tab { None, Build, City, Population, Army, State, Civ, Settings, Diag, Farm, World, Mission }
 
         private readonly AssetManager _assets;
         private readonly PixelFont _font;
@@ -61,6 +61,10 @@ namespace AndijonSaltanatlar.UI
         public string PhaseName = "";
         public bool PetitionOpen { get; private set; }
         public bool OpenCivRequested;
+        /// <summary>MISSIYA bo'limi bosildi (Game1 missiyalar ro'yxatini ochadi).</summary>
+        public bool OpenMissionsRequested;
+        /// <summary>Katta oyna ochiq (DIAGNOSTIKA, VAQT, murojaat, vazir...) — missiya kartasi ko'rsatilmaydi.</summary>
+        public bool BlocksTracker => _tab == Tab.Diag || TimePanelOpen || FarmRequestOpen || PetitionOpen || AdvisorOpen || (_governorPanel?.IsOpen ?? false);
         public bool AdvisorOpen;
         public AIGovernorPanel GovernorPanel => _governorPanel;
         private Rectangle _upgradeBtn, _moveBtn;
@@ -124,6 +128,7 @@ namespace AndijonSaltanatlar.UI
                 ("QURILISH", Tab.Build),
                 ("DIAGNOSTIKA", Tab.Diag),
                 ("FERMERLIK", Tab.Farm),
+                ("MISSIYA", Tab.Mission),
                 (Texts.TabCivilization, Tab.Civ),
                 ("DUNYO", Tab.World),
                 (Texts.TabSettings, Tab.Settings),
@@ -365,6 +370,7 @@ namespace AndijonSaltanatlar.UI
                     Tab t = _tabs[i].Item2;
                     if (t == Tab.Civ) { OpenCivRequested = true; return; } // to'liq ekran
                     if (t == Tab.World) { OpenWorldRequested = true; return; } // saltanat xaritasi (to'liq ekran)
+                    if (t == Tab.Mission) { OpenMissionsRequested = true; return; } // MISSIYALAR ro'yxati (to'liq ekran)
                     if (_tab == t) { _tab = Tab.None; if (t == Tab.Build) _state.CancelBuild(); }
                     else _tab = t;
                     return;
@@ -777,7 +783,7 @@ namespace AndijonSaltanatlar.UI
                     title = b.Name;
                     subtitle = Building.CategoryName(b.Category);
                     desc = b.Description;
-                    rows.Add(("Daraja: " + b.Level + "/" + BuildingUpgradeSystem.MaxLevel, Gold));
+                    rows.Add(("Daraja: " + b.Level + "/" + BuildingUpgradeSystem.MaxLevel + " (" + BuildingUpgradeSystem.LevelName(b.Level) + ")", Gold));
                     rows.Add((Texts.HitPoints + ": " + b.HitPoints + "/" + b.MaxHitPoints, Cream));
                     if (b.Cost > 0) rows.Add((Texts.Cost + ": " + b.Cost + " " + Texts.Coin, Muted));
                     if (b.PopulationCapacity > 0) rows.Add((Texts.Capacity + ": +" + b.PopulationCapacity + " " + Texts.Population, Green));
@@ -834,7 +840,12 @@ namespace AndijonSaltanatlar.UI
             if (_state.Selected is Building bld && BuildingUpgradeSystem.CanUpgrade(bld))
             {
                 Panel(sb, _upgradeBtn, PanelBg2, Gold, 1);
-                DrawButtonText(sb, "Daraja +1 (" + BuildingUpgradeSystem.UpgradeCost(bld) + ")", _upgradeBtn, Cream);
+                DrawButtonText(sb, "KATTALASHTIRISH (" + BuildingUpgradeSystem.UpgradeCost(bld) + ")", _upgradeBtn, Cream);
+            }
+            else if (_state.Selected is Building maxB && maxB.Level >= BuildingUpgradeSystem.MaxLevel)
+            {
+                Panel(sb, _upgradeBtn, PanelBg, Border, 1);
+                DrawButtonText(sb, "ENG YUQORI DARAJA", _upgradeBtn, Muted);
             }
             else if (_state.Selected is LandParcel lpb && lpb.State != LandParcelState.Open)
             {

@@ -62,7 +62,7 @@ namespace AndijonSaltanatlar.Buildings
             Level++;
             MaxHitPoints += MaxHitPoints / 4;
             HitPoints = MaxHitPoints;
-            if (PopulationCapacity > 0) PopulationCapacity += 2;
+            if (PopulationCapacity > 0) PopulationCapacity += Level >= 4 ? 3 : 2;
         }
 
         // --- IWorldObject ---

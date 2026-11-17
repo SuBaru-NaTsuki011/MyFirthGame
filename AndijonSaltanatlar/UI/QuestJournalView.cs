@@ -108,7 +108,7 @@ namespace AndijonSaltanatlar.UI
         {
             Layout(vw, vh);
             Fill(sb, new Rectangle(0, 0, vw, vh), Bg);
-            _font.Draw(sb, "TOPSHIRIQLAR", new Vector2(16, 14), Gold, 3, 1);
+            _font.Draw(sb, "MISSIYALAR", new Vector2(16, 14), Gold, 3, 1);
             Panel(sb, _backBtn, PanelBg, Border, 1);
             _font.DrawCentered(sb, "SHAHARGA QAYTISH", _backBtn.Center.ToVector2(), Cream, 2, 1);
 

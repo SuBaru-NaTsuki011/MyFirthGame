@@ -294,7 +294,31 @@ namespace AndijonSaltanatlar.World
 
             BattleResult res = BattleSimulationService.Simulate(attacker.Name, defender.Name, r.Name,
                 attacker.MilitaryStrength, defender.MilitaryStrength, defenseBonus, 0, _rng);
+            return ApplyPlayerAttack(r, attacker, defender, res);
+        }
 
+        /// <summary>
+        /// Yurish (o'yinchi jang sahnasida o'zi boshqargan jang) natijasini dunyoga qo'llaydi:
+        /// g'alabada hudud saltanatga qo'shiladi, munosabatlar va xazina o'zgaradi, raqib qo'shini kamayadi.
+        /// </summary>
+        public BattleResult PlayerCampaignResult(int regionId, BattleOutcome outcome, int attackerStart, int defenderStart, int attackerLoss, int defenderLoss)
+        {
+            Region r = Regions.Get(regionId);
+            if (r == null || r.OwnerKingdomId == 0 || r.OwnerKingdomId == Kingdoms.PlayerKingdomId) return null;
+            Kingdom defender = Kingdoms.Get(r.OwnerKingdomId);
+            Kingdom attacker = PlayerKingdom;
+            defender.MilitaryStrength = Math.Max(10, defender.MilitaryStrength - defenderLoss);
+            var res = new BattleResult
+            {
+                AttackerName = attacker.Name, DefenderName = defender.Name, RegionName = r.Name,
+                AttackerStrength = attackerStart, DefenderStrength = defenderStart,
+                AttackerLosses = attackerLoss, DefenderLosses = defenderLoss, Outcome = outcome, DurationDays = 1,
+            };
+            return ApplyPlayerAttack(r, attacker, defender, res);
+        }
+
+        private BattleResult ApplyPlayerAttack(Region r, Kingdom attacker, Kingdom defender, BattleResult res)
+        {
             if (res.Outcome == BattleOutcome.Galaba)
             {
                 r.OwnerKingdomId = attacker.Id;
