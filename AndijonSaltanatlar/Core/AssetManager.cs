@@ -47,6 +47,9 @@ namespace AndijonSaltanatlar.Core
         public const string UnitSpearman = "unit_spearman";
         public const string UnitShield = "unit_shield";
         public const string UnitPatrol = "unit_patrol";
+        public const string UnitRaider = "unit_raider";           // bosqinchi
+        public const string UnitRaiderChief = "unit_raider_chief"; // bosqinchilar sardori
+        public const string UnitShah = "unit_shah";                // shoh (tojli)
         public const string UnitCitizen = "unit_citizen"; // + <0..4> + _0.._2 (fuqaro turi + kadr)
         public const int CitizenKinds = 5;
         public const int UnitFrames = 3;
@@ -134,6 +137,9 @@ namespace AndijonSaltanatlar.Core
             RegisterUnit(SpriteKeys.UnitSpearman, UnitArt.Spearman);
             RegisterUnit(SpriteKeys.UnitShield, UnitArt.Shield);
             RegisterUnit(SpriteKeys.UnitPatrol, UnitArt.Patrol);
+            RegisterUnit(SpriteKeys.UnitRaider, UnitArt.Raider);
+            RegisterUnit(SpriteKeys.UnitRaiderChief, UnitArt.RaiderChief);
+            RegisterUnit(SpriteKeys.UnitShah, UnitArt.Shah);
 
             // Fuqarolar (har turi 3 kadr)
             for (int k = 0; k < SpriteKeys.CitizenKinds; k++)

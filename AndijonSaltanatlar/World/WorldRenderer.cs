@@ -53,6 +53,32 @@ namespace AndijonSaltanatlar.World
                 Building bb = o as Building;
                 if (bb != null && bb.BuildProgress < 1f)
                     tint = new Color(150, 180, 255) * (0.45f + 0.55f * bb.BuildProgress); // qurilayotgan bino
+
+                if (o is Unit cu)
+                {
+                    if (cu.HurtTimer > 0f) tint = new Color(255, 120, 110); // zarba yegan — qizarish
+                    SpriteEffects fx = o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                    if (cu.IsDown)
+                    {
+                        // Yiqilgan jangchi: yerga yotgan holatda (90° burilgan), xira
+                        Vector2 feet = IsoMath.TileToWorld(cu.Position);
+                        var origin = new Vector2(o.Texture.Width / 2f, o.Texture.Height - Core.Graphics.UnitArt.FootOffset);
+                        sb.Draw(o.Texture, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)), null, new Color(150, 140, 135),
+                            o.Flipped ? -MathHelper.PiOver2 : MathHelper.PiOver2, origin, 1f, fx, 0f);
+                    }
+                    else
+                    {
+                        // Zarba holati (kesish / chopish / sanchish / aylanma): oyoq atrofida og'ish va siljish
+                        cu.GetAttackPose(out Vector2 off, out float rot, out float sy, out bool spin);
+                        if (spin) fx = fx == SpriteEffects.None ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                        Vector2 feet = IsoMath.TileToWorld(cu.Position);
+                        var origin = new Vector2(o.Texture.Width / 2f, o.Texture.Height - Core.Graphics.UnitArt.FootOffset);
+                        sb.Draw(o.Texture, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)) + off, null, tint, rot, origin,
+                            new Vector2(1f, sy), fx, 0f);
+                    }
+                    continue;
+                }
+
                 sb.Draw(o.Texture, o.DrawPosition, null, tint, 0f, Vector2.Zero, 1f,
                     o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
 

@@ -21,6 +21,9 @@ namespace AndijonSaltanatlar.Units
     /// </summary>
     public enum Direction { North, East, South, West }
 
+    /// <summary>Unit qaysi tomonda: shahar himoyachilari/aholisi yoki bosqinchilar.</summary>
+    public enum UnitTeam { Player, Enemy }
+
     /// <summary>
     /// Barcha jangchilar uchun asos klass. Position — uzluksiz tile koordinatasi (tile markazi = +0.5).
     /// Prompt 16 (Transaction 11, 13, 15): frame-based animatsiya, to'g'ri yo'nalish,
@@ -66,6 +69,150 @@ namespace AndijonSaltanatlar.Units
         public int MaxHitPoints { get; protected set; }
         public int Attack { get; protected set; }
 
+        // --- Jang / boshqaruv (Combat tizimi) ---
+        public UnitTeam Team { get; set; } = UnitTeam.Player;
+        /// <summary>Unit yiqilgan (HP tugagan). Himoyachilar o'lmaydi — bosqin tugagach o'rnidan turadi.</summary>
+        public bool IsDown => HitPoints <= 0;
+        /// <summary>
+        /// true bo'lsa unitning o'z xatti-harakati (patrul, post) to'xtaydi — uni tashqi tizim boshqaradi:
+        /// o'yinchi (ichiga kirish) yoki jang AI'si. Harakat DriveMove/DriveIdle orqali beriladi.
+        /// </summary>
+        public bool ExternallyControlled { get; set; }
+        /// <summary>Hujum masofasi (tile). Nayzalilar uzunroq uradi.</summary>
+        public float AttackRange { get; protected set; } = 0.95f;
+        /// <summary>Zarba animatsiyasi (oldinga intilish) qolgan vaqti.</summary>
+        public float AttackTimer { get; set; }
+        /// <summary>Jarohat (qizarish) animatsiyasi qolgan vaqti.</summary>
+        public float HurtTimer { get; set; }
+        /// <summary>Keyingi zarbagacha qolgan vaqt.</summary>
+        public float AttackCooldown { get; set; }
+        private float _driveSpeed;
+
+        /// <summary>Tashqi boshqaruvda bir qadam: yo'nalishni darhol burish va yurish animatsiyasi.</summary>
+        public void DriveMove(Vector2 tileDelta, float speed)
+        {
+            SetFacing(tileDelta);
+            _driveSpeed = speed;
+            State = UnitState.Walking;
+        }
+
+        /// <summary>Tashqi boshqaruvda joyida turish.</summary>
+        public void DriveIdle()
+        {
+            _driveSpeed = 0f;
+            State = UnitState.Idle;
+        }
+
+        /// <summary>Yo'nalishni silliqlashsiz, darhol berilgan tomonga buradi (o'yinchi boshqaruvi uchun).</summary>
+        public void SetFacing(Vector2 tileDelta)
+        {
+            if (tileDelta.LengthSquared() < 0.0001f) return;
+            Direction = AngleToDirection(MathF.Atan2(tileDelta.Y, tileDelta.X));
+        }
+
+        /// <summary>Hp'ni to'liq yoki qisman tiklash (bosqindan keyin).</summary>
+        public void Revive(float fraction)
+        {
+            HitPoints = Math.Max(1, (int)(MaxHitPoints * Math.Clamp(fraction, 0.05f, 1f)));
+            HurtTimer = 0f;
+        }
+
+        // --- Zarba turlari ---
+        public const int AttackSlash = 0;     // KESISH: yonlama qilich silkinishi
+        public const int AttackOverhead = 1;  // CHOPISH: qilichni ko'tarib, tepadan urish
+        public const int AttackThrust = 2;    // SANCHISH: oldinga keskin hamla
+        public const int AttackSpin = 3;      // AYLANMA: atrofga aylanib urish
+        /// <summary>Bitta zarba animatsiyasining davomiyligi (soniya).</summary>
+        public const float SwingTime = 0.3f;
+
+        /// <summary>Hozirgi (oxirgi) zarba turi — animatsiya va qilich izi shunga qarab chiziladi.</summary>
+        public int AttackKind { get; set; }
+
+        /// <summary>Unit qarab turgan tomonning world (ekran) yo'nalishi, birlik vektor.</summary>
+        public Vector2 FacingWorld
+        {
+            get
+            {
+                Vector2 d = Direction switch
+                {
+                    Direction.North => new Vector2(0, -1),
+                    Direction.East => new Vector2(1, 0),
+                    Direction.South => new Vector2(0, 1),
+                    _ => new Vector2(-1, 0)
+                };
+                Vector2 w = IsoMath.TileToWorld(d);
+                if (w.LengthSquared() > 0f) w.Normalize();
+                return w;
+            }
+        }
+
+        /// <summary>Unit qarab turgan tomon (tile yo'nalishi).</summary>
+        public Vector2 FacingTile => Direction switch
+        {
+            Direction.North => new Vector2(0, -1),
+            Direction.East => new Vector2(1, 0),
+            Direction.South => new Vector2(0, 1),
+            _ => new Vector2(-1, 0)
+        };
+
+        /// <summary>Zarba jarayoni 0..1 (0 — boshlanishi, 1 — tugashi).</summary>
+        public float AttackProgress => AttackTimer <= 0f ? 1f : 1f - Math.Clamp(AttackTimer / SwingTime, 0f, 1f);
+
+        /// <summary>
+        /// Zarba paytidagi tana holati: siljish (world piksel), og'ish burchagi, vertikal masshtab va
+        /// aylanma zarbada sprite'ni teskari aylantirish. Har bir zarba turi o'z harakatiga ega.
+        /// </summary>
+        public void GetAttackPose(out Vector2 offset, out float rotation, out float scaleY, out bool spinFlip)
+        {
+            offset = Vector2.Zero; rotation = 0f; scaleY = 1f; spinFlip = false;
+            if (AttackTimer <= 0f) return;
+            float p = AttackProgress;
+            float side = Flipped ? -1f : 1f;      // oldinga og'ish soat mili (o'ngga qarasa) yoki teskari
+            Vector2 f = FacingWorld;
+            switch (AttackKind)
+            {
+                case AttackOverhead:
+                    if (p < 0.4f)
+                    {   // qilichni ko'tarish: orqaga og'ib, cho'zilib
+                        float k = p / 0.4f;
+                        offset = new Vector2(0, -4f * k) - f * 2f * k;
+                        rotation = -0.22f * k * side;
+                        scaleY = 1f + 0.08f * k;
+                    }
+                    else
+                    {   // tepadan urish: oldinga engashib, yerga bosilib
+                        float k = (p - 0.4f) / 0.6f;
+                        float hit = MathF.Sin(MathF.Min(1f, k * 1.6f) * MathF.PI * 0.5f);
+                        offset = f * 7f * (1f - k * 0.6f) + new Vector2(0, 2f * hit);
+                        rotation = (0.34f * (1f - k) + 0.05f) * side;
+                        scaleY = 1f - 0.07f * (1f - k);
+                    }
+                    break;
+                case AttackThrust:
+                {   // oldinga keskin hamla, keyin orqaga qaytish
+                    float k = p < 0.35f ? p / 0.35f : 1f - (p - 0.35f) / 0.65f;
+                    offset = f * 11f * k;
+                    rotation = 0.12f * k * side;
+                    scaleY = 1f - 0.05f * k;
+                    break;
+                }
+                case AttackSpin:
+                    // aylanib urish: kichik sakrash va sprite chap-o'ngga aylanadi
+                    offset = new Vector2(0, -4f * MathF.Sin(p * MathF.PI));
+                    spinFlip = ((int)(p * 6f)) % 2 == 1;
+                    rotation = 0.1f * MathF.Sin(p * MathF.PI * 6f);
+                    break;
+                default:
+                {   // KESISH: yonlama silkinish — orqaga burilib, oldinga qarsillatib
+                    float k = MathF.Sin(p * MathF.PI);
+                    offset = f * 5f * k;
+                    rotation = MathHelper.Lerp(-0.26f, 0.3f, p) * side;
+                    break;
+                }
+            }
+            offset = new Vector2(MathF.Round(offset.X), MathF.Round(offset.Y));
+        }
+
         /// <summary> Placeholder yoki real per-entity animatsiya renderlovchi konteksti.
         /// Hozircha cheklovli cheklovlarni boshqarish uchun fase g'oya qo'llaniladi. </summary>
         public float PerEntityPhaseOffset { get; } = (float)(Rng.NextDouble() * MathF.PI * 2);
@@ -110,8 +257,15 @@ namespace AndijonSaltanatlar.Units
 
         public void Update(float dt)
         {
-            // 1) Xatti-harakatni yangilash (suhbatda — joyida turadi)
-            if (Hold) State = UnitState.Idle;
+            if (AttackTimer > 0f) AttackTimer = MathF.Max(0f, AttackTimer - dt);
+            if (HurtTimer > 0f) HurtTimer = MathF.Max(0f, HurtTimer - dt);
+            if (AttackCooldown > 0f) AttackCooldown = MathF.Max(0f, AttackCooldown - dt);
+
+            // 1) Xatti-harakatni yangilash (suhbatda — joyida turadi; yiqilgan — qimirlamaydi;
+            //    tashqi boshqaruvda — harakatni Combat tizimi beradi)
+            if (IsDown) State = UnitState.Idle;
+            else if (ExternallyControlled) { /* DriveMove / DriveIdle orqali */ }
+            else if (Hold) State = UnitState.Idle;
             else UpdateBehavior(dt);
 
             // 2) Yo'nalishni spring-based usulda yangilash (keskin burilishning oldini oladi)
@@ -171,6 +325,14 @@ namespace AndijonSaltanatlar.Units
             }
 
             Texture = Frames[0]; // default
+
+            // Tashqi boshqaruv: kadr tezligi haqiqiy harakat tezligiga to'g'ri proporsional
+            if (ExternallyControlled && State == UnitState.Walking && Frames.Length > 1)
+            {
+                _animTimer += dt * MathF.Max(1f, _driveSpeed) * 3.4f;
+                Texture = Frames[1 + (int)_animTimer % (Frames.Length - 1)];
+                return;
+            }
 
             // Placeholder animatsiya — faqat yurishda animatsiya yuritish
             if (State == UnitState.Walking)

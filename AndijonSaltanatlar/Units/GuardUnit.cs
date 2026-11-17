@@ -55,6 +55,7 @@ namespace AndijonSaltanatlar.Units
             Description = "Uzun nayzali darvozabon. Shaharga kirganlarni sinchiklab kuzatadi.";
             SpriteKey = SpriteKeys.UnitSpearman;
             Attack = 12;
+            AttackRange = 1.35f; // uzun nayza
             SetHitPoints(110);
         }
     }

@@ -73,7 +73,12 @@ namespace AndijonSaltanatlar.UI
             "Bekor qilish: o'ng tugma yoki Esc",
             "Tanlash: obyekt ustiga chap tugma bilan bosing",
             "Saqlash / Yuklash: F5 / F9",
-            "To'xtatish: Bo'sh joy (Space)  |  Yordam: H"
+            "To'xtatish: Bo'sh joy (Space)  |  Yordam: H",
+            "Ichiga kirish: jangchini tanlab F (Q/E almashtirish)",
+            "Uy/saroyga kirish: odam ichida bino yonida ENTER",
+            "Jang: SPACE kombo (kesish-chopish-sanchish), R aylanma",
+            "Shohni chiqarish: saroyda shoh yonida F",
+            "Bosqin chaqirish (sinov): B"
         };
     }
 }

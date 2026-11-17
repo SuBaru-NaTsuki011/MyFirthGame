@@ -40,7 +40,10 @@ public static class GameConfig
 
 	public const float MinZoom = 0.4f;
 
-	public const float MaxZoom = 2.5f;
+	public const float MaxZoom = 3f;
+
+	/// <summary>Odam ichiga kirganda (3-shaxs ko'rinishi) kamera yaqinligi.</summary>
+	public const float PossessZoom = 2.5f;
 
 	public const float StartZoom = 0.8f;
 
