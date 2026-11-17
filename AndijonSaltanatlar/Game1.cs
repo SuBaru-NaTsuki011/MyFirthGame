@@ -1342,7 +1342,7 @@ public sealed class Game1 : Game
 				unit.SpeedScale = speedScale;
 			}
 		}
-		_units.Update(dt);
+		_units.Update(dt * (_combat?.TimeScale ?? 1f));
 		_birds?.Update(dt, _dayNight.NightAmount, _combat.Possessed);
 		_citizenSocial.Update(_units, dt);
 		UpdateFarmControl();

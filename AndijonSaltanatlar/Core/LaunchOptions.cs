@@ -251,6 +251,13 @@ public sealed class LaunchOptions
 				launchOptions.ScreenshotFrames = int.Parse(text, CultureInfo.InvariantCulture);
 				i++;
 				break;
+			case "--battle-demo":
+				AndijonSaltanatlar.UI.BattleScene.ReplayLastRound = true;
+				AndijonSaltanatlar.UI.OnlinePanel.DemoBattle = AndijonSaltanatlar.UI.OnlinePanel.BuildDemoBattle();
+				break;
+			case "--replay-round":
+				AndijonSaltanatlar.UI.BattleScene.ReplayLastRound = true;
+				break;
 			case "--raid":
 				launchOptions.RaidGate = int.Parse(text, CultureInfo.InvariantCulture);
 				i++;

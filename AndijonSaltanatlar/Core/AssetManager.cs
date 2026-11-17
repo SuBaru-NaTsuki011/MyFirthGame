@@ -165,7 +165,40 @@ namespace AndijonSaltanatlar.Core
                 int frame = f;
                 Register(key + "_" + f, () => UnitArt.Frame(kind, frame));
             }
+            if (kind == UnitArt.Shah) return;
+            // Zarba kadrlari: key_a{tur}_{bosqich}
+            for (int a = 0; a < UnitArt.AttackKinds; a++)
+                for (int ph = 0; ph < UnitArt.AttackPhases; ph++)
+                {
+                    int aa = a, pp = ph;
+                    Register(AttackKey(key, aa, pp), () => UnitArt.AttackFrame(kind, aa, pp));
+                }
         }
+
+        /// <summary>Zarba kadri kaliti (masalan "unit_swordsman_a1_2").</summary>
+        public static string AttackKey(string key, int attack, int phase) => key + "_a" + attack + "_" + phase;
+
+        private readonly Dictionary<Texture2D, Texture2D> _flash = new Dictionary<Texture2D, Texture2D>();
+
+        /// <summary>
+        /// Sprite'ning oq silueti (zarba tekkan lahzadagi chaqnash uchun). Alfa niqobidan bir marta yasaladi —
+        /// GetData kerak emas (telefonda ham ishlaydi).
+        /// </summary>
+        public Texture2D FlashOf(Texture2D tex)
+        {
+            if (tex == null) return null;
+            if (_flash.TryGetValue(tex, out var w)) return w;
+            if (!_alpha.TryGetValue(tex, out byte[] mask) || mask.Length != tex.Width * tex.Height) return null;
+            var data = new Color[mask.Length];
+            for (int i = 0; i < mask.Length; i++) { byte a = mask[i]; data[i] = new Color(a, a, a, a); }
+            w = new Texture2D(_gd, tex.Width, tex.Height, false, SurfaceFormat.Color);
+            w.SetData(data);
+            _flash[tex] = w;
+            return w;
+        }
+
+        /// <summary>Sprite bo'lsa qaytaradi, bo'lmasa null (istisno tashlamaydi).</summary>
+        public Texture2D TryGet(string key) => key != null && _textures.TryGetValue(key, out var tex) ? tex : null;
 
         private void Register(string key, Func<Canvas> placeholder)
         {

@@ -54,6 +54,29 @@ namespace AndijonSaltanatlar.UI
         private int _seenTerritorySerial;
         private float _territoryPulse;
 
+        /// <summary>Sinov: namunaviy jang (--battle-demo). null bo'lsa oddiy rejim.</summary>
+        public static BattleDto DemoBattle;
+
+        public static BattleDto BuildDemoBattle() => new BattleDto
+        {
+            Id = 9001, Status = BattleStatus.InProgress, Round = 2, RegionName = "Samarqand", IsPvp = true,
+            AttackerName = "Urgut sultonligi", DefenderName = "Buxoro amirligi", AttackerCommander = "Sherzod", DefenderCommander = "Nodirbek",
+            AttackerColor = new[] { 214, 112, 40 }, DefenderColor = new[] { 120, 60, 40 }, AttackerFlag = "1-8-0-0-3-6", DefenderFlag = "10-2-6-1-3-0",
+            AttackerStartPower = 160, DefenderStartPower = 150, AttackerPower = 140, DefenderPower = 118, AttackerMorale = 74, DefenderMorale = 61,
+            IAmAttacker = true, IAmParticipant = true, RoundSecondsLeft = 25,
+            AttackerGroups = new List<UnitGroupDto>
+            {
+                new UnitGroupDto { Line = UnitLine.Piyoda, Level = 2, Count = 40 }, new UnitGroupDto { Line = UnitLine.Piyoda, Level = 1, Count = 30 },
+                new UnitGroupDto { Line = UnitLine.Otliq, Level = 1, Count = 15 }, new UnitGroupDto { Line = UnitLine.Masofaviy, Level = 1, Count = 20 }
+            },
+            DefenderGroups = new List<UnitGroupDto>
+            {
+                new UnitGroupDto { Line = UnitLine.Piyoda, Level = 3, Count = 35 }, new UnitGroupDto { Line = UnitLine.Piyoda, Level = 1, Count = 30 },
+                new UnitGroupDto { Line = UnitLine.Masofaviy, Level = 1, Count = 18 }
+            },
+            Rounds = new List<BattleRoundDto> { new BattleRoundDto { Round = 1, AttackerDecision = BattleDecision.Faol, DefenderDecision = BattleDecision.Muvozanatli, AttackerLoss = 10, DefenderLoss = 22 } }
+        };
+
         public bool IsOpen { get; private set; }
         public bool WantsKeyboard => IsOpen && _ui.FocusId != null;
 
@@ -195,11 +218,25 @@ namespace AndijonSaltanatlar.UI
         // ------------------------------------------------------------------
         public void Draw(SpriteBatch sb, int vw, int vh, float time)
         {
+            if (_input == null && DemoBattle != null) _input = new InputManager();
             if (_input == null) return;
             _sbCache = sb;
             UiKit ui = _ui;
             ui.Begin(sb, _input, vw, vh, time);
             ThemeTokens T = ui.T;
+
+            // Sinov (--battle-demo): jang sahnasi namunaviy qo'shinlar bilan (serverga ulanishsiz)
+            if (DemoBattle != null)
+            {
+                float ddt = _lastDrawTime < 0 ? 0f : Math.Clamp(time - _lastDrawTime, 0f, 0.1f);
+                _lastDrawTime = time;
+                ui.Fill(new Rectangle(0, 0, vw, vh), T.Background);
+                _battleScene ??= new BattleScene(_assets);
+                BattleScene.Bind(sb);
+                _battleScene.Draw(ui, sb, DemoBattle, vw, vh, ddt, false);
+                ui.End();
+                return;
+            }
 
             if (!IsOpen)
             {

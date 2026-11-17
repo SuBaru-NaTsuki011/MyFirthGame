@@ -86,6 +86,58 @@ namespace AndijonSaltanatlar.Units
         public float HurtTimer { get; set; }
         /// <summary>Keyingi zarbagacha qolgan vaqt.</summary>
         public float AttackCooldown { get; set; }
+
+        // --- Zarba va jarohat animatsiyasi ---
+        /// <summary>Zarba kadrlari: [tur * 3 + bosqich] (kesish/chopish/sanchish × ko'tarish/urish/davomi). null — oddiy kadr.</summary>
+        public Texture2D[] AttackFrames { get; set; }
+        /// <summary>Zarba tekkan lahzadagi oq chaqnash (soniya).</summary>
+        public float FlashTimer { get; set; }
+        public const float FlashTime = 0.08f;
+        /// <summary>Zarbadan chayqalish (orqaga og'ib, qaytish).</summary>
+        public float HitReactTimer { get; set; }
+        public const float HitReactTime = 0.28f;
+        /// <summary>Zarba kelgan yo'nalish (world, birlik vektor) — unit shu tomonga chayqaladi.</summary>
+        public Vector2 HitDirWorld { get; set; }
+        /// <summary>Orqaga uloqtirish tezligi (tile/s). Jang tizimi har kadr qo'llaydi va so'ndiradi.</summary>
+        public Vector2 KnockVelocity { get; set; }
+        /// <summary>Yiqilganiga qancha bo'ldi (silliq yiqilish animatsiyasi uchun).</summary>
+        public float DownTime { get; private set; }
+        /// <summary>Ko'rinish (1 — to'liq). Yiqilgan bosqinchi yo'qolishdan oldin asta so'nadi.</summary>
+        public float FadeAlpha { get; set; } = 1f;
+
+        /// <summary>Zarba yeganda: chaqnash, chayqalish yo'nalishi va qizarish.</summary>
+        public void TakeHitVisual(Vector2 fromWorldDir)
+        {
+            FlashTimer = FlashTime;
+            HitReactTimer = HitReactTime;
+            HurtTimer = 0.3f;
+            if (fromWorldDir.LengthSquared() > 0.0001f) { fromWorldDir.Normalize(); HitDirWorld = fromWorldDir; }
+        }
+
+        /// <summary>Chayqalish holati: tez orqaga og'ish va sekin qaytish.</summary>
+        public void GetHitPose(out Vector2 offset, out float rotation)
+        {
+            offset = Vector2.Zero; rotation = 0f;
+            if (HitReactTimer <= 0f) return;
+            float t = 1f - HitReactTimer / HitReactTime;
+            float k = t < 0.25f ? t / 0.25f : 1f - (t - 0.25f) / 0.75f;
+            k = k * k * (3f - 2f * k);
+            offset = HitDirWorld * 6f * k + new Vector2(0, -1.5f * k);
+            offset = new Vector2(MathF.Round(offset.X), MathF.Round(offset.Y));
+            rotation = 0.24f * k * (HitDirWorld.X >= 0f ? 1f : -1f);
+        }
+
+        /// <summary>Yiqilish burchagi (0..90°): tezlashib qulaydi va yerga tushganda biroz sakraydi.</summary>
+        public float FallAngle
+        {
+            get
+            {
+                float t = Math.Clamp(DownTime / 0.45f, 0f, 1f);
+                float e = t * t * (2.2f - 1.2f * t);
+                float bounce = t > 0.75f ? MathF.Sin((t - 0.75f) / 0.25f * MathF.PI) * 0.13f : 0f;
+                return MathHelper.PiOver2 * Math.Clamp(e - bounce, 0f, 1f);
+            }
+        }
         private float _driveSpeed;
 
         /// <summary>Tashqi boshqaruvda bir qadam: yo'nalishni darhol burish va yurish animatsiyasi.</summary>
@@ -176,23 +228,23 @@ namespace AndijonSaltanatlar.Units
                     {   // qilichni ko'tarish: orqaga og'ib, cho'zilib
                         float k = p / 0.4f;
                         offset = new Vector2(0, -4f * k) - f * 2f * k;
-                        rotation = -0.22f * k * side;
-                        scaleY = 1f + 0.08f * k;
+                        rotation = -0.1f * k * side;
+                        scaleY = 1f + 0.05f * k;
                     }
                     else
                     {   // tepadan urish: oldinga engashib, yerga bosilib
                         float k = (p - 0.4f) / 0.6f;
                         float hit = MathF.Sin(MathF.Min(1f, k * 1.6f) * MathF.PI * 0.5f);
                         offset = f * 7f * (1f - k * 0.6f) + new Vector2(0, 2f * hit);
-                        rotation = (0.34f * (1f - k) + 0.05f) * side;
-                        scaleY = 1f - 0.07f * (1f - k);
+                        rotation = (0.14f * (1f - k) + 0.03f) * side;
+                        scaleY = 1f - 0.06f * (1f - k);
                     }
                     break;
                 case AttackThrust:
                 {   // oldinga keskin hamla, keyin orqaga qaytish
                     float k = p < 0.35f ? p / 0.35f : 1f - (p - 0.35f) / 0.65f;
                     offset = f * 11f * k;
-                    rotation = 0.12f * k * side;
+                    rotation = 0.06f * k * side;
                     scaleY = 1f - 0.05f * k;
                     break;
                 }
@@ -206,7 +258,7 @@ namespace AndijonSaltanatlar.Units
                 {   // KESISH: yonlama silkinish — orqaga burilib, oldinga qarsillatib
                     float k = MathF.Sin(p * MathF.PI);
                     offset = f * 5f * k;
-                    rotation = MathHelper.Lerp(-0.26f, 0.3f, p) * side;
+                    rotation = MathHelper.Lerp(-0.08f, 0.12f, p) * side;
                     break;
                 }
             }
@@ -260,6 +312,9 @@ namespace AndijonSaltanatlar.Units
             if (AttackTimer > 0f) AttackTimer = MathF.Max(0f, AttackTimer - dt);
             if (HurtTimer > 0f) HurtTimer = MathF.Max(0f, HurtTimer - dt);
             if (AttackCooldown > 0f) AttackCooldown = MathF.Max(0f, AttackCooldown - dt);
+            if (FlashTimer > 0f) FlashTimer = MathF.Max(0f, FlashTimer - dt);
+            if (HitReactTimer > 0f) HitReactTimer = MathF.Max(0f, HitReactTimer - dt);
+            if (IsDown) DownTime += dt; else { DownTime = 0f; FadeAlpha = 1f; }
 
             // 1) Xatti-harakatni yangilash (suhbatda — joyida turadi; yiqilgan — qimirlamaydi;
             //    tashqi boshqaruvda — harakatni Combat tizimi beradi)
@@ -271,8 +326,28 @@ namespace AndijonSaltanatlar.Units
             // 2) Yo'nalishni spring-based usulda yangilash (keskin burilishning oldini oladi)
             UpdateFacing(dt);
 
-            // 3) Animatsiya kadrini yangilash (turish/yurish)
+            // 3) Animatsiya kadrini yangilash (turish/yurish), zarba paytida — zarba kadri
             UpdateAnimation(dt);
+            ApplyAttackFrame();
+        }
+
+        /// <summary>
+        /// Zarba paytida haqiqiy zarba kadri: ko'tarish (0..30%), urish (30..62%), davomi (62..100%).
+        /// Aylanma zarbada kesish kadrlari aylana bo'ylab almashinadi.
+        /// </summary>
+        private void ApplyAttackFrame()
+        {
+            if (AttackTimer <= 0f || IsDown || AttackFrames == null) return;
+            float p = AttackProgress;
+            int kind, phase;
+            if (AttackKind == AttackSpin) { kind = AttackSlash; phase = ((int)(p * 7f)) % 3; }
+            else
+            {
+                kind = Math.Clamp(AttackKind, 0, 2);
+                phase = p < 0.3f ? 0 : p < 0.62f ? 1 : 2;
+            }
+            Texture2D t = AttackFrames[kind * 3 + phase];
+            if (t != null) Texture = t;
         }
 
         /// <summary>Har bir unit turi o'z xatti-harakatini shu yerda belgilaydi.</summary>

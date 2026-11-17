@@ -62,25 +62,34 @@ namespace AndijonSaltanatlar.World
 
                 if (o is Unit cu)
                 {
-                    if (cu.HurtTimer > 0f) tint = new Color(255, 120, 110); // zarba yegan — qizarish
+                    // Zarba yegan: qizarish asta so'nadi
+                    if (cu.HurtTimer > 0f) tint = Color.Lerp(Color.White, new Color(255, 116, 104), MathHelper.Clamp(cu.HurtTimer / 0.3f, 0f, 1f));
+                    tint *= cu.FadeAlpha;
                     SpriteEffects fx = o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                    Vector2 feet = IsoMath.TileToWorld(cu.Position);
+                    var origin = new Vector2(o.Texture.Width / 2f, o.Texture.Height - Core.Graphics.UnitArt.FootOffset);
                     if (cu.IsDown)
                     {
-                        // Yiqilgan jangchi: yerga yotgan holatda (90° burilgan), xira
-                        Vector2 feet = IsoMath.TileToWorld(cu.Position);
-                        var origin = new Vector2(o.Texture.Width / 2f, o.Texture.Height - Core.Graphics.UnitArt.FootOffset);
-                        sb.Draw(o.Texture, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)), null, new Color(150, 140, 135),
-                            o.Flipped ? -MathHelper.PiOver2 : MathHelper.PiOver2, origin, 1f, fx, 0f);
+                        // Yiqilish: tezlashib qulaydi, yerga tushib biroz sakraydi, keyin xira yotadi
+                        float lie = MathHelper.Clamp(cu.DownTime / 0.45f, 0f, 1f);
+                        Color down = Color.Lerp(tint, new Color(150, 140, 135) * cu.FadeAlpha, lie);
+                        float ang = cu.FallAngle * (o.Flipped ? -1f : 1f);
+                        Vector2 at = new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)) + cu.HitDirWorld * 4f * lie;
+                        sb.Draw(o.Texture, at, null, down, ang, origin, 1f, fx, 0f);
+                        if (cu.FlashTimer > 0f && _assets.FlashOf(o.Texture) is Texture2D wf)
+                            sb.Draw(wf, at, null, Color.White * (cu.FlashTimer / Unit.FlashTime) * cu.FadeAlpha, ang, origin, 1f, fx, 0f);
                     }
                     else
                     {
-                        // Zarba holati (kesish / chopish / sanchish / aylanma): oyoq atrofida og'ish va siljish
+                        // Zarba (kesish / chopish / sanchish / aylanma) va chayqalish: oyoq atrofida og'ish va siljish
                         cu.GetAttackPose(out Vector2 off, out float rot, out float sy, out bool spin);
+                        cu.GetHitPose(out Vector2 hoff, out float hrot);
                         if (spin) fx = fx == SpriteEffects.None ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
-                        Vector2 feet = IsoMath.TileToWorld(cu.Position);
-                        var origin = new Vector2(o.Texture.Width / 2f, o.Texture.Height - Core.Graphics.UnitArt.FootOffset);
-                        sb.Draw(o.Texture, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)) + off, null, tint, rot, origin,
-                            new Vector2(1f, sy), fx, 0f);
+                        Vector2 at = new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)) + off + hoff;
+                        sb.Draw(o.Texture, at, null, tint, rot + hrot, origin, new Vector2(1f, sy), fx, 0f);
+                        // Zarba tekkan lahza: oq chaqnash
+                        if (cu.FlashTimer > 0f && _assets.FlashOf(o.Texture) is Texture2D wf)
+                            sb.Draw(wf, at, null, Color.White * (cu.FlashTimer / Unit.FlashTime) * cu.FadeAlpha, rot + hrot, origin, new Vector2(1f, sy), fx, 0f);
                     }
                     if (cu is CitizenUnit citizen && !cu.IsDown)
                     {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using AndijonSaltanatlar.Core;
+using AndijonSaltanatlar.Core.Graphics;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -26,6 +27,14 @@ namespace AndijonSaltanatlar.Units
             for (int i = 0; i < frames.Length; i++)
                 frames[i] = _assets.Get(unit.SpriteKey + "_" + i);
             unit.SetFrames(frames);
+            var attack = new Texture2D[UnitArt.AttackKinds * UnitArt.AttackPhases];
+            bool any = false;
+            for (int i = 0; i < attack.Length; i++)
+            {
+                attack[i] = _assets.TryGet(AssetManager.AttackKey(unit.SpriteKey, i / UnitArt.AttackPhases, i % UnitArt.AttackPhases));
+                any |= attack[i] != null;
+            }
+            unit.AttackFrames = any ? attack : null;
             Units.Add(unit);
             return unit;
         }

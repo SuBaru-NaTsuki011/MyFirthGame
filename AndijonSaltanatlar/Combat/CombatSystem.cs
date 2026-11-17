@@ -126,8 +126,23 @@ namespace AndijonSaltanatlar.Combat
         private readonly Dictionary<Unit, float> _corpseTimers = new Dictionary<Unit, float>();
         private readonly Dictionary<Unit, float> _reviveTimers = new Dictionary<Unit, float>();
 
-        private struct FloatText { public Vector2 World; public string Text; public Color Color; public float T; }
+        private struct FloatText { public Vector2 World; public string Text; public Color Color; public float T; public bool Big; public float Vx; }
         private readonly List<FloatText> _floats = new List<FloatText>();
+
+        // --- Zarba hissi: kechiktirilgan zarar, zarrachalar, to'xtash (hit-stop), silkinish ---
+        /// <summary>Zarar qurol tekkan lahzada beriladi (silkinish boshlanganda emas).</summary>
+        private struct PendingHit { public Unit A, V; public int Dmg, Kind; public float Delay, Knock, Reach; public bool Heavy; }
+        private readonly List<PendingHit> _pending = new List<PendingHit>();
+
+        private const byte PSpark = 0, PDust = 1, PRing = 2;
+        private struct Particle { public Vector2 World, Vel; public float Life, Max, Size; public Color Color; public byte Kind; }
+        private readonly List<Particle> _particles = new List<Particle>();
+
+        private CameraManager _cam;
+        private float _hitStop;
+
+        /// <summary>Zarba tekkan lahzadagi qisqa to'xtash (o'yin "og'irlik" hissi): unitlar shu koeffitsient bilan yangilanadi.</summary>
+        public float TimeScale => _hitStop > 0f ? 0.06f : 1f;
 
         // --- Bosqin holati ---
         public bool RaidActive { get; private set; }
@@ -330,12 +345,7 @@ namespace AndijonSaltanatlar.Combat
             {
                 Unit t = targets[i].u;
                 int dmg = (int)(baseDmg * PlayerDamageMultiplier * mult) + _rng.Next(0, 5);
-                Hit(p, t, dmg);
-                if (!t.IsDown && knock > 0f)
-                {
-                    Vector2 away = t.Position - p.Position;
-                    if (away.LengthSquared() > 0.0001f) { away.Normalize(); MoveWithCollision(t, away * knock); }
-                }
+                ScheduleHit(p, t, dmg, kind, knock, reach, i);
             }
         }
 
@@ -452,6 +462,7 @@ namespace AndijonSaltanatlar.Combat
         /// <param name="input">Boshqaruv kiritishi (panel/dialog ochiq bo'lsa null).</param>
         public void Update(float dt, InputManager input, CameraManager camera)
         {
+            _cam = camera;
             // Floating matnlar va natija banneri real vaqtda so'nadi
             for (int i = _floats.Count - 1; i >= 0; i--)
             {
@@ -461,8 +472,14 @@ namespace AndijonSaltanatlar.Combat
             }
             if (_resultTimer > 0f) _resultTimer -= dt;
 
+            // Zarba tekkan lahza: dunyo bir zumga deyarli to'xtaydi
+            if (_hitStop > 0f && dt > 0f) { _hitStop -= dt; dt *= TimeScale; }
+            UpdateParticles(dt);
+
             UpdatePossessed(dt, input, camera);
             if (dt <= 0f) return;
+            UpdatePendingHits(dt);
+            UpdateKnockback(dt);
 
             // Avtomatik bosqinlar o'chirilgan (o'yinchi talabi) — bosqin faqat B tugmasi bilan chaqiriladi.
             if (RaidIncoming)
@@ -495,7 +512,7 @@ namespace AndijonSaltanatlar.Combat
             {
                 var dead = new List<Unit>();
                 foreach (var kv in _corpseTimers) if (kv.Value - dt <= 0f) dead.Add(kv.Key);
-                foreach (Unit d in new List<Unit>(_corpseTimers.Keys)) _corpseTimers[d] -= dt;
+                foreach (Unit d in new List<Unit>(_corpseTimers.Keys)) { _corpseTimers[d] -= dt; d.FadeAlpha = Math.Clamp(_corpseTimers[d] / 0.8f, 0f, 1f); }
                 foreach (Unit d in dead) { _corpseTimers.Remove(d); _raiders.Remove(d as RaiderUnit); RemoveUnit(d); }
             }
 
@@ -543,6 +560,47 @@ namespace AndijonSaltanatlar.Combat
                 }
                 if (a.Mode != AgentMode.Possessed) { a.Mode = AgentMode.Fighting; if (a.Target == null || a.Target.IsDown) a.Target = enemy; }
             }
+            if (RaidActive) SoundAlarm();
+        }
+
+        /// <summary>
+        /// Jang signali: bosqin paytida har bir bosqinchiga eng yaqin ikki himoyachi (postdan uzoq bo'lsa ham) yuboriladi —
+        /// aks holda shahar markazini talayotgan bosqinchilarga hech kim chiqmasdi.
+        /// </summary>
+        private void SoundAlarm()
+        {
+            var assigned = new Dictionary<Unit, int>();
+            foreach (Agent ag in _agents.Values)
+                if (ag.Mode == AgentMode.Fighting && ag.Target != null && !ag.Target.IsDown)
+                    assigned[ag.Target] = assigned.GetValueOrDefault(ag.Target) + 1;
+            foreach (RaiderUnit r in _raiders)
+            {
+                if (r.IsDown) continue;
+                int have = assigned.GetValueOrDefault(r);
+                while (have < 2)
+                {
+                    Unit best = null;
+                    float bd = float.MaxValue;
+                    foreach (Unit u in _units.Units)
+                    {
+                        if (!IsSoldier(u) || u.IsDown || u == Possessed) continue;
+                        if (_agents.TryGetValue(u, out Agent ex) && ex.Mode != AgentMode.Returning) continue; // jangda yoki soqchilikda
+                        float d = Vector2.DistanceSquared(u.Position, r.Position);
+                        if (d < bd) { bd = d; best = u; }
+                    }
+                    if (best == null) return;
+                    if (!_agents.TryGetValue(best, out Agent a))
+                    {
+                        a = new Agent { Unit = best, Home = best.Position };
+                        _agents[best] = a;
+                        best.ExternallyControlled = true;
+                    }
+                    a.Mode = AgentMode.Fighting;
+                    a.Target = r;
+                    a.Path = null;
+                    have++;
+                }
+            }
         }
 
         private void UpdateFighter(Agent a, float dt)
@@ -552,7 +610,8 @@ namespace AndijonSaltanatlar.Combat
             if (a.Target == null || a.Target.IsDown || a.ThinkTimer <= 0f)
             {
                 a.ThinkTimer = 0.5f;
-                a.Target = NearestEnemy(u, DisengageRange);
+                // Bosqin paytida signal bilan kelgan himoyachi uzoqdagi dushmanni ham ta'qib qiladi
+                a.Target = NearestEnemy(u, RaidActive ? 90f : DisengageRange);
             }
             if (a.Target == null) { BeginReturn(a); return; }
             ChaseAndStrike(a, a.Target, DefenderSpeed, dt);
@@ -645,20 +704,181 @@ namespace AndijonSaltanatlar.Combat
                     u.AttackTimer = Unit.SwingTime;
                     u.AttackCooldown = 1.0f + (float)_rng.NextDouble() * 0.35f;
                     int dmg = Math.Max(2, u.Attack + _rng.Next(-2, 3));
-                    Hit(u, target, dmg);
+                    ScheduleHit(u, target, dmg, u.AttackKind, 0.12f, u.AttackRange, 0);
                 }
                 return;
             }
             MoveAgent(a, target.Position, speed, dt, u.AttackRange * 0.85f);
         }
 
-        private void Hit(Unit attacker, Unit victim, int dmg)
+        /// <summary>Zarbani rejalashtiradi: zarar qurol nishonga tekkan lahzada (zarba turiga qarab) beriladi.</summary>
+        private void ScheduleHit(Unit a, Unit v, int dmg, int kind, float knock, float reach, int order)
+        {
+            float frac = kind switch
+            {
+                Unit.AttackOverhead => 0.5f,
+                Unit.AttackThrust => 0.36f,
+                Unit.AttackSpin => 0.28f + 0.07f * Math.Min(order, 6),
+                _ => 0.42f
+            };
+            _pending.Add(new PendingHit
+            {
+                A = a, V = v, Dmg = dmg, Kind = kind, Delay = Unit.SwingTime * frac, Knock = knock, Reach = reach + 0.75f,
+                Heavy = kind == Unit.AttackOverhead || kind == Unit.AttackThrust
+            });
+        }
+
+        private void UpdatePendingHits(float dt)
+        {
+            for (int i = _pending.Count - 1; i >= 0; i--)
+            {
+                PendingHit h = _pending[i];
+                h.Delay -= dt;
+                if (h.Delay > 0f) { _pending[i] = h; continue; }
+                _pending.RemoveAt(i);
+                if (h.A.IsDown || h.V.IsDown || !_units.Units.Contains(h.V)) continue;
+                Vector2 away = h.V.Position - h.A.Position;
+                if (away.Length() > h.Reach) continue; // nishon chetga chiqib ulgurdi — zarba havoga ketdi
+                Hit(h.A, h.V, h.Dmg, h.Heavy);
+                if (away.LengthSquared() > 0.0001f)
+                {
+                    away.Normalize();
+                    float push = h.V.IsDown ? Math.Max(h.Knock, 0.25f) : h.Knock;
+                    if (push > 0f) h.V.KnockVelocity += away * push * 9f;
+                }
+            }
+        }
+
+        /// <summary>Orqaga uloqtirish silliq: tezlik asta so'nadi (bir zumda "sakrab" ketmaydi).</summary>
+        private void UpdateKnockback(float dt)
+        {
+            foreach (Unit u in _units.Units)
+            {
+                Vector2 v = u.KnockVelocity;
+                if (v.LengthSquared() < 0.0004f) { if (v != Vector2.Zero) u.KnockVelocity = Vector2.Zero; continue; }
+                MoveWithCollision(u, v * dt);
+                u.KnockVelocity = v * MathF.Exp(-12f * dt);
+            }
+        }
+
+        // ---------------------------------------------------------------- Zarrachalar (uchqun, chang, zarba halqasi)
+        private float Rand(float a, float b) => a + (float)_rng.NextDouble() * (b - a);
+
+        private void Impact(Unit attacker, Unit victim, bool heavy, bool playerInvolved)
+        {
+            Vector2 feet = IsoMath.TileToWorld(victim.Position);
+            Vector2 chest = feet + new Vector2(0, -21);
+            Vector2 dir = feet - IsoMath.TileToWorld(attacker.Position);
+            if (dir.LengthSquared() < 0.0001f) dir = new Vector2(attacker.Flipped ? -1 : 1, 0);
+            dir.Normalize();
+            float baseAng = MathF.Atan2(dir.Y, dir.X);
+            int sparks = heavy ? 14 : 9;
+            for (int i = 0; i < sparks; i++)
+            {
+                float ang = baseAng + Rand(-0.95f, 0.95f);
+                float sp = Rand(70f, 170f) * (heavy ? 1.3f : 1f);
+                float life = Rand(0.16f, 0.32f);
+                _particles.Add(new Particle
+                {
+                    World = chest + new Vector2(Rand(-2f, 2f), Rand(-3f, 3f)),
+                    Vel = new Vector2(MathF.Cos(ang), MathF.Sin(ang)) * sp + new Vector2(0, -40f),
+                    Life = life, Max = life, Size = Rand(1f, 2f), Kind = PSpark,
+                    Color = Color.Lerp(new Color(255, 248, 214), new Color(255, 176, 64), Rand(0f, 1f))
+                });
+            }
+            for (int i = 0; i < (heavy ? 6 : 4); i++)
+            {
+                float life = Rand(0.35f, 0.55f);
+                _particles.Add(new Particle
+                {
+                    World = feet + new Vector2(Rand(-6f, 6f), Rand(-2f, 2f)),
+                    Vel = new Vector2(dir.X * Rand(10f, 30f) + Rand(-14f, 14f), Rand(-16f, -4f)),
+                    Life = life, Max = life, Size = Rand(2.5f, 4.5f), Kind = PDust, Color = new Color(198, 172, 128)
+                });
+            }
+            _particles.Add(new Particle { World = chest, Life = 0.2f, Max = 0.2f, Size = heavy ? 22f : 15f, Kind = PRing, Color = Color.White });
+            if (victim.IsDown)
+            {
+                // Yiqilish changi
+                for (int i = 0; i < 8; i++)
+                {
+                    float life = Rand(0.45f, 0.75f);
+                    _particles.Add(new Particle
+                    {
+                        World = feet + new Vector2(Rand(-10f, 10f), Rand(-3f, 3f)),
+                        Vel = new Vector2(Rand(-26f, 26f), Rand(-12f, -2f)),
+                        Life = life, Max = life, Size = Rand(3f, 5.5f), Kind = PDust, Color = new Color(186, 160, 118)
+                    });
+                }
+            }
+            if (playerInvolved)
+            {
+                _hitStop = Math.Max(_hitStop, heavy || victim.IsDown ? 0.085f : 0.05f);
+                _cam?.Shake(heavy || victim.IsDown ? 4.5f : 2.5f, heavy ? 0.22f : 0.14f);
+            }
+            if (_particles.Count > 600) _particles.RemoveRange(0, _particles.Count - 600);
+        }
+
+        private void UpdateParticles(float dt)
+        {
+            if (dt <= 0f) return;
+            for (int i = _particles.Count - 1; i >= 0; i--)
+            {
+                Particle p = _particles[i];
+                p.Life -= dt;
+                if (p.Life <= 0f) { _particles.RemoveAt(i); continue; }
+                p.World += p.Vel * dt;
+                if (p.Kind == PSpark) { p.Vel.Y += 420f * dt; p.Vel *= MathF.Exp(-2.5f * dt); }
+                else if (p.Kind == PDust) p.Vel *= MathF.Exp(-4f * dt);
+                _particles[i] = p;
+            }
+        }
+
+        private void DrawParticles(SpriteBatch sb, Texture2D px, CameraManager cam)
+        {
+            float z = cam.Zoom;
+            foreach (Particle p in _particles)
+            {
+                float t = p.Life / p.Max;       // 1 -> 0
+                Vector2 s = cam.WorldToScreen(p.World);
+                switch (p.Kind)
+                {
+                    case PSpark:
+                    {
+                        float len = Math.Max(2f, p.Vel.Length() * 0.03f * z);
+                        float ang = MathF.Atan2(p.Vel.Y, p.Vel.X);
+                        sb.Draw(px, s, null, p.Color * Math.Min(1f, t * 1.6f), ang + MathF.PI, new Vector2(0f, 0.5f), new Vector2(len, Math.Max(1f, p.Size * z * 0.8f)), SpriteEffects.None, 0f);
+                        break;
+                    }
+                    case PDust:
+                    {
+                        float sz = p.Size * (1.7f - 0.7f * t) * z;
+                        sb.Draw(px, new Rectangle((int)(s.X - sz / 2), (int)(s.Y - sz / 2), (int)sz, (int)sz), p.Color * (0.5f * t));
+                        break;
+                    }
+                    case PRing:
+                    {
+                        float r = MathHelper.Lerp(p.Size, 3f, t) * z;
+                        int dot = Math.Max(1, (int)(2 * z * t + 1));
+                        for (int k = 0; k < 14; k++)
+                        {
+                            float a = k / 14f * MathF.PI * 2f;
+                            sb.Draw(px, new Rectangle((int)(s.X + MathF.Cos(a) * r), (int)(s.Y + MathF.Sin(a) * r * 0.6f), dot, dot), p.Color * (0.85f * t));
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        private void Hit(Unit attacker, Unit victim, int dmg, bool heavy = false)
         {
             if (victim.IsDown) return;
             victim.HitPoints = Math.Max(0, victim.HitPoints - dmg);
-            victim.HurtTimer = 0.18f;
             bool byPlayer = attacker == Possessed;
-            AddFloat(victim.Position, dmg.ToString(), byPlayer ? new Color(255, 236, 120) : victim.Team == UnitTeam.Enemy ? Color.White : new Color(255, 120, 110));
+            victim.TakeHitVisual(IsoMath.TileToWorld(victim.Position) - IsoMath.TileToWorld(attacker.Position));
+            AddFloat(victim.Position, dmg.ToString(), byPlayer ? new Color(255, 236, 120) : victim.Team == UnitTeam.Enemy ? Color.White : new Color(255, 120, 110), byPlayer && heavy);
+            Impact(attacker, victim, heavy, byPlayer || victim == Possessed);
             if (!victim.IsDown) return;
 
             if (victim is RaiderUnit rv)
@@ -810,9 +1030,9 @@ namespace AndijonSaltanatlar.Combat
             if (_state.Selected == u) _state.Select(null);
         }
 
-        private void AddFloat(Vector2 tile, string text, Color c)
+        private void AddFloat(Vector2 tile, string text, Color c, bool big = false)
         {
-            _floats.Add(new FloatText { World = IsoMath.TileToWorld(tile) + new Vector2(_rng.Next(-6, 7), -46), Text = text, Color = c });
+            _floats.Add(new FloatText { World = IsoMath.TileToWorld(tile) + new Vector2(_rng.Next(-6, 7), -46), Text = text, Color = c, Big = big, Vx = _rng.Next(-14, 15) });
         }
 
         // ==================================================================
@@ -858,14 +1078,19 @@ namespace AndijonSaltanatlar.Combat
                 if (u.AttackTimer > 0f && !u.IsDown) DrawSlash(sb, px, cam, u);
 
             // --- Zarba raqamlari ---
+            // --- Uchqun, chang va zarba halqalari ---
+            DrawParticles(sb, px, cam);
+
             foreach (FloatText f in _floats)
             {
-                Vector2 s = cam.WorldToScreen(f.World + new Vector2(0, -22f * f.T));
+                float rise = 30f * (1f - (1f - f.T) * (1f - f.T));
+                Vector2 s = cam.WorldToScreen(f.World + new Vector2(f.Vx * f.T, -rise));
                 float alpha = f.T < 0.7f ? 1f : 1f - (f.T - 0.7f) / 0.3f;
-                Vector2 size = font.Measure(f.Text, 2);
+                int scale = (f.Big ? 3 : 2) * _k + (f.T < 0.09f ? _k : 0); // paydo bo'lganda "otilib" kattaroq
+                Vector2 size = font.Measure(f.Text, scale);
                 Vector2 p = new Vector2(MathF.Round(s.X - size.X / 2), MathF.Round(s.Y));
-                font.Draw(sb, f.Text, p + new Vector2(1, 1), Color.Black * (0.7f * alpha), 2);
-                font.Draw(sb, f.Text, p, f.Color * alpha, 2);
+                font.Draw(sb, f.Text, p + new Vector2(_k, _k), Color.Black * (0.75f * alpha), scale);
+                font.Draw(sb, f.Text, p, f.Color * alpha, scale);
             }
 
             // --- Bosqin banneri ---

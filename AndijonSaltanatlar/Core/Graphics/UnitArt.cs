@@ -92,11 +92,106 @@ namespace AndijonSaltanatlar.Core.Graphics
             return c;
         }
 
-        public static Canvas Frame(int kind, int frame)
+        /// <summary>Oddiy kadr: 0 — turish, 1-2 — yurish.</summary>
+        public static Canvas Frame(int kind, int frame) => Build(kind, frame, null);
+
+        /// <summary>Zarba turlari soni (kesish, chopish, sanchish) va har biridagi bosqichlar (ko'tarish, urish, davomi).</summary>
+        public const int AttackKinds = 3, AttackPhases = 3;
+
+        /// <summary>
+        /// Zarba kadri: qurolli qo'l haqiqatan harakatlanadi — ko'tarish (kuch yig'ish), urish (qurol oldinga), davomi
+        /// (qurol pastga/yonga o'tib ketadi). Kanvas kengroq (76x64), oyoq osti markazda — oddiy kadrlar bilan bir joyda turadi.
+        /// </summary>
+        public static Canvas AttackFrame(int kind, int attack, int phase) => Build(kind, 0, ArmPose.For(kind, attack, phase));
+
+        /// <summary>Zarba paytidagi qo'l va qurol holati (graduslarda; 0 — oldinga, -90 — tepaga, 90 — pastga).</summary>
+        public sealed class ArmPose
+        {
+            public float Arm, Weapon;
+            public int Lean, Stance;
+            public bool Behind => MathF.Cos(MathHelper.ToRadians(Arm)) < -0.35f;
+
+            private static readonly float[,] Table =
+            {
+                // kesish: orqaga ko'tarish -> gorizontal urish -> pastga o'tib ketish
+                { -140, -120, -1, 0 }, { -15, -5, 2, 3 }, { 35, 62, 2, 3 },
+                // chopish: tepaga ko'tarish -> oldinda tushirish -> yerga urish
+                { -105, -98, -2, 1 }, { -45, -22, 2, 3 }, { 42, 78, 3, 3 },
+                // sanchish: orqaga tortish -> to'liq cho'zilish -> qaytish
+                { 165, 0, -2, 1 }, { 0, 0, 3, 4 }, { 20, 12, 1, 3 },
+            };
+
+            public static ArmPose For(int kind, int attack, int phase)
+            {
+                int row = Math.Clamp(attack, 0, AttackKinds - 1) * AttackPhases + Math.Clamp(phase, 0, AttackPhases - 1);
+                return new ArmPose { Arm = Table[row, 0], Weapon = Table[row, 1], Lean = (int)Table[row, 2], Stance = (int)Table[row, 3] };
+            }
+        }
+
+        /// <summary>Qurolli qo'l: yelkadan qo'lgacha, keyin qurol (har bir jangchi turiga o'z quroli).</summary>
+        private static void DrawArmWeapon(Canvas c, int kind, int cx, int fy, ArmPose pose, Color tunic, Color skin)
+        {
+            Vector2 S = new Vector2(cx + 6, fy - 25);
+            float a = MathHelper.ToRadians(pose.Arm), w = MathHelper.ToRadians(pose.Weapon);
+            Vector2 ad = new Vector2(MathF.Cos(a), MathF.Sin(a));
+            Vector2 H = S + ad * 8f;
+            Vector2 d = new Vector2(MathF.Cos(w), MathF.Sin(w));
+            Vector2 n = new Vector2(-d.Y, d.X);
+            Color wood = new Color(134, 96, 56), steelHi = new Color(232, 238, 246);
+            switch (kind)
+            {
+                case Spearman:
+                    c.Line(H - d * 14, H + d * 16, wood, 2);
+                    c.FillPolygon(Pal.Steel, 0f, H + d * 16 + n * 2.6f, H + d * 16 - n * 2.6f, H + d * 24);
+                    c.FillPolygon(Pal.Red, 0f, H + d * 12, H + d * 15, H + d * 13.5f - n * 6f);
+                    break;
+                case Patrol:
+                    c.Line(H - d * 10, H + d * 12, wood, 2);
+                    c.FillPolygon(Pal.Steel, 0f, H + d * 12 + n * 2.4f, H + d * 12 - n * 2.4f, H + d * 19);
+                    break;
+                case Shield:
+                    // gurzi
+                    c.Line(H - d * 2, H + d * 11, wood, 2);
+                    c.FillEllipse((H + d * 13).X, (H + d * 13).Y, 3.4f, 3.4f, Pal.Steel);
+                    c.FillRect((int)(H + d * 13 - n * 4).X, (int)(H + d * 13 - n * 4).Y, 2, 2, Pal.Steel);
+                    c.FillRect((int)(H + d * 13 + n * 4).X, (int)(H + d * 13 + n * 4).Y, 2, 2, Pal.Steel);
+                    c.FillRect((int)(H + d * 17).X, (int)(H + d * 17).Y, 2, 2, Pal.Steel);
+                    break;
+                case Raider:
+                    // qisqa bolta
+                    c.Line(H - d * 2, H + d * 13, new Color(110, 78, 46), 2);
+                    {
+                        Vector2 e = H + d * 12;
+                        c.FillPolygon(Pal.Steel, 0.06f, e - d * 1 - n * 1, e + d * 3 - n * 1, e + d * 4 - n * 7, e - d * 2 - n * 6);
+                    }
+                    break;
+                case RaiderChief:
+                    // ikki qo'llik katta oybolta
+                    c.Line(H - d * 6, H + d * 21, new Color(96, 66, 40), 2);
+                    {
+                        Vector2 e = H + d * 18;
+                        c.FillPolygon(Pal.Steel, 0.08f, e - d * 2 - n * 1, e + d * 3 - n * 1, e + d * 5 - n * 9, e - d * 4 - n * 8);
+                        c.FillPolygon(Canvas.Shade(Pal.Steel, 0.8f), 0.08f, e - d * 1 + n * 1, e + d * 2 + n * 1, e + d * 3 + n * 5, e - d * 2 + n * 5);
+                    }
+                    break;
+                default:
+                    // egri qilich (shamshir): sopi, oltin ushlagich va bukilgan tig'
+                    c.Line(H - d * 2, H, new Color(90, 60, 36), 2);
+                    c.Line(H + d * 1 + n * 3, H + d * 1 - n * 3, Pal.Gold, 2);
+                    c.Line(H + d * 2, H + d * 10, Pal.Steel, 2);
+                    c.Line(H + d * 10, H + d * 17 - n * 2.5f, Pal.Steel, 2);
+                    c.Line(H + d * 3 - n * 0.6f, H + d * 9 - n * 0.6f, steelHi, 1);
+                    break;
+            }
+            c.Line(S, H, Canvas.Shade(tunic, 0.82f), 3);
+            c.FillRect((int)H.X - 1, (int)H.Y - 1, 3, 3, skin);
+        }
+
+        private static Canvas Build(int kind, int frame, ArmPose pose)
         {
             if (kind == Shah) return ShahFrame(frame);
-            var c = new Canvas(40, 54);
-            int cx = 20, fy = c.Height - FootOffset;
+            var c = pose == null ? new Canvas(40, 54) : new Canvas(76, 64);
+            int cx = c.Width / 2, fy = c.Height - FootOffset;
             Color tunic = kind switch
             {
                 Swordsman => new Color(156, 44, 38),
@@ -112,25 +207,30 @@ namespace AndijonSaltanatlar.Core.Graphics
             c.FillEllipse(cx, fy, 9, 3.5f, new Color(0, 0, 0, 70));
 
             // --- oyoqlar ---
-            int step = frame == 1 ? 2 : frame == 2 ? -2 : 0;
-            int liftA = frame == 1 ? 1 : 0, liftB = frame == 2 ? 1 : 0;
+            int step = pose != null ? pose.Stance : frame == 1 ? 2 : frame == 2 ? -2 : 0;
+            int liftA = pose == null && frame == 1 ? 1 : 0, liftB = pose == null && frame == 2 ? 1 : 0;
             c.FillRect(cx - 4 - step, fy - 11 - liftA, 3, 9, trouser);
             c.FillRect(cx - 4 - step, fy - 3 - liftA, 5, 3, boot);
             c.FillRect(cx + 1 + step, fy - 11 - liftB, 3, 9, trouser);
             c.FillRect(cx + 1 + step, fy - 3 - liftB, 5, 3, boot);
+            // Zarbada tana oldinga/orqaga engashadi (oyoqlar joyida qoladi)
+            if (pose != null) cx += pose.Lean;
 
             // --- orqadagi qurol (tana ortida) ---
-            if (kind == Spearman)
+            if (pose == null && kind == Spearman)
             {
                 c.FillRect(cx + 8, fy - 50, 2, 50, new Color(134, 96, 56));
                 c.FillPolygon(Pal.Steel, 0f, new Vector2(cx + 6, fy - 46), new Vector2(cx + 12, fy - 46), new Vector2(cx + 9, fy - 54));
                 c.FillPolygon(Pal.Red, 0f, new Vector2(cx + 10, fy - 45), new Vector2(cx + 17, fy - 43), new Vector2(cx + 10, fy - 40));
             }
-            else if (kind == Patrol)
+            else if (pose == null && kind == Patrol)
             {
                 c.FillRect(cx + 8, fy - 40, 2, 40, new Color(134, 96, 56));
                 c.FillPolygon(Pal.Steel, 0f, new Vector2(cx + 6, fy - 38), new Vector2(cx + 13, fy - 40), new Vector2(cx + 9, fy - 46));
             }
+
+            // Qurol orqada (ko'tarish bosqichi) — tana ortida chiziladi
+            if (pose != null && pose.Behind) DrawArmWeapon(c, kind, cx, fy, pose, tunic, skin);
 
             // --- tana: chopon ---
             c.FillPolygon(tunic, 0.06f, new Vector2(cx - 5, fy - 27), new Vector2(cx + 5, fy - 27), new Vector2(cx + 7, fy - 9), new Vector2(cx - 7, fy - 9));
@@ -159,9 +259,12 @@ namespace AndijonSaltanatlar.Core.Graphics
             }
             // qo'llar
             c.FillRect(cx - 8, fy - 26, 3, 10, Canvas.Shade(tunic, 0.82f));
-            c.FillRect(cx + 5, fy - 26, 3, 10, Canvas.Shade(tunic, 0.82f));
-            c.FillRect(cx + 5, fy - 17, 3, 2, skin);
             c.FillRect(cx - 8, fy - 17, 3, 2, skin);
+            if (pose == null)
+            {
+                c.FillRect(cx + 5, fy - 26, 3, 10, Canvas.Shade(tunic, 0.82f));
+                c.FillRect(cx + 5, fy - 17, 3, 2, skin);
+            }
 
             // --- bosh ---
             c.FillEllipse(cx, fy - 31, 4.4f, 4.6f, skin);
@@ -197,47 +300,76 @@ namespace AndijonSaltanatlar.Core.Graphics
                 if (kind == Swordsman) c.FillRect(cx + 1, fy - 49, 2, 4, Pal.Red); // jig'a
             }
 
-            // --- old qurollar ---
-            if (kind == Swordsman)
+            if (pose == null)
             {
-                // egri qilich (shamshir)
-                c.Line(new Vector2(cx + 7, fy - 17), new Vector2(cx + 11, fy - 27), Pal.Steel, 2);
-                c.Line(new Vector2(cx + 11, fy - 27), new Vector2(cx + 16, fy - 34), Pal.Steel, 2);
-                c.FillRect(cx + 5, fy - 17, 5, 2, Pal.Gold);
-                // kichik qalqon
-                c.FillEllipse(cx - 8, fy - 20, 4.5f, 5, new Color(110, 76, 44));
-                c.FillEllipse(cx - 8, fy - 20, 1.6f, 1.8f, Pal.Gold);
+                // --- old qurollar ---
+                if (kind == Swordsman)
+                {
+                    // egri qilich (shamshir)
+                    c.Line(new Vector2(cx + 7, fy - 17), new Vector2(cx + 11, fy - 27), Pal.Steel, 2);
+                    c.Line(new Vector2(cx + 11, fy - 27), new Vector2(cx + 16, fy - 34), Pal.Steel, 2);
+                    c.FillRect(cx + 5, fy - 17, 5, 2, Pal.Gold);
+                    // kichik qalqon
+                    c.FillEllipse(cx - 8, fy - 20, 4.5f, 5, new Color(110, 76, 44));
+                    c.FillEllipse(cx - 8, fy - 20, 1.6f, 1.8f, Pal.Gold);
+                }
+                else if (kind == Shield)
+                {
+                    // katta dumaloq qalqon
+                    c.FillEllipse(cx - 6, fy - 19, 8, 9, Pal.Gold);
+                    c.FillBlob(cx - 6, fy - 19, 6.6f, 7.6f, new Color(150, 40, 36), 0.04f);
+                    c.FillEllipse(cx - 6, fy - 19, 2.4f, 2.6f, Pal.Gold);
+                    // gurzi
+                    c.Line(new Vector2(cx + 7, fy - 16), new Vector2(cx + 11, fy - 28), new Color(134, 96, 56), 2);
+                    c.FillEllipse(cx + 12, fy - 30, 3, 3, Pal.Steel);
+                }
+                else if (kind == Spearman)
+                {
+                    c.FillEllipse(cx - 8, fy - 20, 4.5f, 5.5f, new Color(60, 90, 140));
+                    c.FillEllipse(cx - 8, fy - 20, 1.6f, 1.8f, Pal.Steel);
+                }
+                else if (kind == Raider)
+                {
+                    // qisqa bolta
+                    c.Line(new Vector2(cx + 7, fy - 15), new Vector2(cx + 11, fy - 30), new Color(110, 78, 46), 2);
+                    c.FillPolygon(Pal.Steel, 0.08f, new Vector2(cx + 10, fy - 31), new Vector2(cx + 16, fy - 33), new Vector2(cx + 15, fy - 26), new Vector2(cx + 11, fy - 27));
+                    // yog'och qalqoncha
+                    c.FillEllipse(cx - 8, fy - 20, 4.2f, 5f, new Color(92, 64, 40));
+                    c.FillRect(cx - 9, fy - 25, 2, 10, new Color(60, 42, 28));
+                }
+                else if (kind == RaiderChief)
+                {
+                    // ikki qo'llik katta oybolta
+                    c.Line(new Vector2(cx + 6, fy - 10), new Vector2(cx + 12, fy - 40), new Color(96, 66, 40), 2);
+                    c.FillPolygon(Pal.Steel, 0.1f, new Vector2(cx + 11, fy - 42), new Vector2(cx + 19, fy - 46), new Vector2(cx + 20, fy - 36), new Vector2(cx + 13, fy - 35));
+                    c.FillPolygon(Canvas.Shade(Pal.Steel, 0.8f), 0.1f, new Vector2(cx + 11, fy - 41), new Vector2(cx + 6, fy - 43), new Vector2(cx + 7, fy - 37), new Vector2(cx + 12, fy - 36));
+                }
             }
-            else if (kind == Shield)
+            else
             {
-                // katta dumaloq qalqon
-                c.FillEllipse(cx - 6, fy - 19, 8, 9, Pal.Gold);
-                c.FillBlob(cx - 6, fy - 19, 6.6f, 7.6f, new Color(150, 40, 36), 0.04f);
-                c.FillEllipse(cx - 6, fy - 19, 2.4f, 2.6f, Pal.Gold);
-                // gurzi
-                c.Line(new Vector2(cx + 7, fy - 16), new Vector2(cx + 11, fy - 28), new Color(134, 96, 56), 2);
-                c.FillEllipse(cx + 12, fy - 30, 3, 3, Pal.Steel);
-            }
-            else if (kind == Spearman)
-            {
-                c.FillEllipse(cx - 8, fy - 20, 4.5f, 5.5f, new Color(60, 90, 140));
-                c.FillEllipse(cx - 8, fy - 20, 1.6f, 1.8f, Pal.Steel);
-            }
-            else if (kind == Raider)
-            {
-                // qisqa bolta
-                c.Line(new Vector2(cx + 7, fy - 15), new Vector2(cx + 11, fy - 30), new Color(110, 78, 46), 2);
-                c.FillPolygon(Pal.Steel, 0.08f, new Vector2(cx + 10, fy - 31), new Vector2(cx + 16, fy - 33), new Vector2(cx + 15, fy - 26), new Vector2(cx + 11, fy - 27));
-                // yog'och qalqoncha
-                c.FillEllipse(cx - 8, fy - 20, 4.2f, 5f, new Color(92, 64, 40));
-                c.FillRect(cx - 9, fy - 25, 2, 10, new Color(60, 42, 28));
-            }
-            else if (kind == RaiderChief)
-            {
-                // ikki qo'llik katta oybolta
-                c.Line(new Vector2(cx + 6, fy - 10), new Vector2(cx + 12, fy - 40), new Color(96, 66, 40), 2);
-                c.FillPolygon(Pal.Steel, 0.1f, new Vector2(cx + 11, fy - 42), new Vector2(cx + 19, fy - 46), new Vector2(cx + 20, fy - 36), new Vector2(cx + 13, fy - 35));
-                c.FillPolygon(Canvas.Shade(Pal.Steel, 0.8f), 0.1f, new Vector2(cx + 11, fy - 41), new Vector2(cx + 6, fy - 43), new Vector2(cx + 7, fy - 37), new Vector2(cx + 12, fy - 36));
+                // Zarba kadri: chap qo'ldagi qalqonlar joyida, o'ng qo'l qurol bilan harakatda
+                if (kind == Swordsman)
+                {
+                    c.FillEllipse(cx - 8, fy - 20, 4.5f, 5, new Color(110, 76, 44));
+                    c.FillEllipse(cx - 8, fy - 20, 1.6f, 1.8f, Pal.Gold);
+                }
+                else if (kind == Shield)
+                {
+                    c.FillEllipse(cx - 6, fy - 19, 8, 9, Pal.Gold);
+                    c.FillBlob(cx - 6, fy - 19, 6.6f, 7.6f, new Color(150, 40, 36), 0.04f);
+                    c.FillEllipse(cx - 6, fy - 19, 2.4f, 2.6f, Pal.Gold);
+                }
+                else if (kind == Spearman)
+                {
+                    c.FillEllipse(cx - 8, fy - 20, 4.5f, 5.5f, new Color(60, 90, 140));
+                    c.FillEllipse(cx - 8, fy - 20, 1.6f, 1.8f, Pal.Steel);
+                }
+                else if (kind == Raider)
+                {
+                    c.FillEllipse(cx - 8, fy - 20, 4.2f, 5f, new Color(92, 64, 40));
+                    c.FillRect(cx - 9, fy - 25, 2, 10, new Color(60, 42, 28));
+                }
+                if (!pose.Behind) DrawArmWeapon(c, kind, cx, fy, pose, tunic, skin);
             }
 
             c.Outline(new Color(30, 20, 16), 0.7f);

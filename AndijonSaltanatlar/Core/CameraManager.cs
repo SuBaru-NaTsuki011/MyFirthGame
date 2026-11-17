@@ -18,6 +18,18 @@ namespace AndijonSaltanatlar.Core
         public Vector2 Position;
         public float Zoom { get; private set; }
 
+        // --- Ekran silkinishi (kuchli zarba) ---
+        private float _shakeT, _shakeDur, _shakeAmp, _shakeClock;
+        private Vector2 _shake;
+
+        /// <summary>Ekranni qisqa silkitadi (piksel amplituda, soniya). Kuchliroq silkinish kuchsizini almashtiradi.</summary>
+        public void Shake(float amplitude, float duration)
+        {
+            float current = _shakeDur > 0f ? _shakeAmp * (_shakeT / _shakeDur) : 0f;
+            if (amplitude < current) return;
+            _shakeAmp = amplitude; _shakeDur = Math.Max(0.01f, duration); _shakeT = _shakeDur;
+        }
+
         /// <summary>false bo'lsa WASD/strelkalar kamerani surmaydi (masalan, o'yinchi jangchini boshqarayotganda).</summary>
         public bool KeyboardPanEnabled { get; set; } = true;
 
@@ -46,20 +58,20 @@ namespace AndijonSaltanatlar.Core
             get
             {
                 // Pikselga yaxlitlash — sprite'lar "titrab" ko'rinmasligi uchun.
-                float tx = MathF.Round(-Position.X * Zoom + _viewport.Width * 0.5f);
-                float ty = MathF.Round(-Position.Y * Zoom + _viewport.Height * 0.5f);
+                float tx = MathF.Round(-Position.X * Zoom + _viewport.Width * 0.5f + _shake.X);
+                float ty = MathF.Round(-Position.Y * Zoom + _viewport.Height * 0.5f + _shake.Y);
                 return Matrix.CreateScale(Zoom, Zoom, 1f) * Matrix.CreateTranslation(tx, ty, 0f);
             }
         }
 
         public Vector2 ScreenToWorld(Vector2 screen)
         {
-            return (screen - new Vector2(_viewport.Width, _viewport.Height) * 0.5f) / Zoom + Position;
+            return (screen - _shake - new Vector2(_viewport.Width, _viewport.Height) * 0.5f) / Zoom + Position;
         }
 
         public Vector2 WorldToScreen(Vector2 world)
         {
-            return (world - Position) * Zoom + new Vector2(_viewport.Width, _viewport.Height) * 0.5f;
+            return (world - Position) * Zoom + new Vector2(_viewport.Width, _viewport.Height) * 0.5f + _shake;
         }
 
         /// <summary>Ekranda ko'rinayotgan world to'rtburchagi (chap, yuqori, o'ng, past).</summary>
@@ -75,6 +87,14 @@ namespace AndijonSaltanatlar.Core
         public void Update(float dt, InputManager input, Viewport viewport)
         {
             _viewport = viewport;
+            if (_shakeT > 0f)
+            {
+                _shakeT = MathF.Max(0f, _shakeT - dt);
+                _shakeClock += dt;
+                float k = _shakeT / _shakeDur;
+                _shake = new Vector2(MathF.Sin(_shakeClock * 83f), MathF.Cos(_shakeClock * 61f)) * _shakeAmp * k * k;
+            }
+            else _shake = Vector2.Zero;
 
             // --- Klaviatura bilan pan ---
             Vector2 move = Vector2.Zero;

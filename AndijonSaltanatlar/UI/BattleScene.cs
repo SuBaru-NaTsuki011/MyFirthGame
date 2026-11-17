@@ -48,16 +48,38 @@ namespace AndijonSaltanatlar.UI
             public Color Tint;
             public float Phase, Speed, Scale;
             public bool Support;
+            /// <summary>Masofaviy jangchi: yugurmaydi, orqadan o'q otadi.</summary>
+            public bool Ranged;
+            public int Col, Index;
         }
 
+        // --- Raund jangi xoreografiyasi: uchqunlar, o'qlar, yiqilganlar, silkinish ---
+        private struct Spark { public Vector2 Pos, Vel; public float Life, Max; public Color Color; }
+        private struct Arrow { public Vector2 From, To; public float Start, Dur, Arc; }
+        private struct Corpse { public Texture2D Tex; public Vector2 Pos; public float Scale, T; public bool Left; public Color Tint; }
+        private readonly List<Spark> _sparks = new List<Spark>();
+        private readonly List<Arrow> _arrows = new List<Arrow>();
+        private readonly List<Corpse> _corpses = new List<Corpse>();
+        private readonly HashSet<long> _strikes = new HashSet<long>();
+        private readonly HashSet<long> _fallen = new HashSet<long>();
+        private Vector2 _shake;
+        private float _actionClock;
+        private readonly Random _fx = new Random(7);
+        /// <summary>Raund harakati davomiyligi (soniya): yugurish, to'qnashuv va qaytish.</summary>
+        private const float ActionTime = 1.8f;
+
         public void Reset() { _battleId = -1; }
+
+        /// <summary>Sinov (--replay-round): jang ochilganda oxirgi raund harakati qayta o'ynaladi.</summary>
+        public static bool ReplayLastRound;
 
         public BattleSceneAction Draw(UiKit ui, SpriteBatch sb, BattleDto b, int vw, int vh, float dt, bool busy)
         {
             if (b == null) return BattleSceneAction.None;
             if (b.Id != _battleId)
             {
-                _battleId = b.Id; _seenRounds = b.Rounds.Count; _enterT = 0f; _battleEndT = null; _actionT = 1f; _selected = null; _showReport = false; _dust.Clear();
+                _battleId = b.Id; _seenRounds = Math.Max(0, b.Rounds.Count - (ReplayLastRound ? 1 : 0)); _enterT = 0f; _battleEndT = null; _actionT = 1f; _selected = null; _showReport = false; _dust.Clear();
+                _sparks.Clear(); _arrows.Clear(); _corpses.Clear(); _strikes.Clear(); _fallen.Clear();
             }
             _sceneTime += dt;
             _enterT = Math.Min(1f, _enterT + dt / 1.4f);
@@ -68,11 +90,19 @@ namespace AndijonSaltanatlar.UI
                 BattleRoundDto last = b.Rounds[b.Rounds.Count - 1];
                 _lastAttackerLoss = last.AttackerLoss; _lastDefenderLoss = last.DefenderLoss;
                 _actionT = 0f;
+                _actionClock = 0f;
+                _strikes.Clear(); _fallen.Clear(); _arrows.Clear();
                 _selected = null;
                 var rng = new Random(b.Id * 31 + _seenRounds);
                 for (int i = 0; i < 26; i++) _dust.Add(new Vector3((float)rng.NextDouble(), (float)rng.NextDouble(), 0f));
             }
-            _actionT = Math.Min(1f, _actionT + dt / 1.1f);
+            _actionT = Math.Min(1f, _actionT + dt / ActionTime);
+            if (_actionT < 1f) _actionClock += dt;
+            // To'qnashuv lahzasida maydon silkinadi
+            float shakeK = _actionT > 0.27f && _actionT < 0.45f ? 1f - (_actionT - 0.27f) / 0.18f : 0f;
+            float sc0 = Math.Max(1f, vh / 720f);
+            _shake = shakeK > 0f ? new Vector2(MathF.Sin(_sceneTime * 87f), MathF.Cos(_sceneTime * 63f)) * 3.2f * sc0 * shakeK : Vector2.Zero;
+            UpdateSparks(dt);
 
             ThemeTokens T = ui.T;
             BattleSceneAction act = BattleSceneAction.None;
@@ -203,7 +233,9 @@ namespace AndijonSaltanatlar.UI
                         Phase = (float)rng.NextDouble() * MathHelper.TwoPi,
                         Speed = 1.6f + (float)rng.NextDouble() * 1.4f,
                         Scale = (g.Line == UnitLine.Otliq ? 1.25f : 1.1f) * s,
-                        Support = g.Line == UnitLine.Aravasi || g.Line == UnitLine.Lager
+                        Support = g.Line == UnitLine.Aravasi || g.Line == UnitLine.Lager,
+                        Ranged = g.Line == UnitLine.Masofaviy,
+                        Col = col, Index = i
                     });
                 }
             }
@@ -219,18 +251,35 @@ namespace AndijonSaltanatlar.UI
             var dAnchor = new Vector2(f.Center.X + f.Width * 0.09f, midY);
             bool done = b.Status == BattleStatus.Completed;
             int aWin = done && b.WinnerKingdomId == b.AttackerKingdomId ? 1 : done && b.WinnerKingdomId != 0 ? -1 : 0;
-            DrawSide(sb, Formation(b.AttackerGroups, true, aAnchor, s, b.Id * 7 + 1, ac), true, s, f, aWin, _lastAttackerLoss > 0, done && b.Peace);
-            DrawSide(sb, Formation(b.DefenderGroups, false, dAnchor, s, b.Id * 7 + 2, dc), false, s, f, -aWin, _lastDefenderLoss > 0, done && b.Peace);
+            DrawCorpses(sb);
+            var aFigs = Formation(b.AttackerGroups, true, aAnchor, s, b.Id * 7 + 1, ac);
+            var dFigs = Formation(b.DefenderGroups, false, dAnchor, s, b.Id * 7 + 2, dc);
+            float aPer = Math.Max(1f, Math.Max(1, b.AttackerGroups.Sum(g => g.Count)) / 22f), dPer = Math.Max(1f, Math.Max(1, b.DefenderGroups.Sum(g => g.Count)) / 22f);
+            DrawSide(sb, aFigs, true, s, f, aWin, _lastAttackerLoss, aPer, done && b.Peace);
+            DrawSide(sb, dFigs, false, s, f, -aWin, _lastDefenderLoss, dPer, done && b.Peace);
+            DrawArrows(sb, s);
+            DrawSparks(sb, s);
             // Sarkardalar (qo'shin orqasida, kattaroq) — CommandGesture raund hal bo'lganda.
             DrawCommander(sb, aAnchor + new Vector2(-150 * s, -10 * s), true, s, ac, aWin);
             DrawCommander(sb, dAnchor + new Vector2(150 * s, -10 * s), false, s, dc, -aWin);
         }
 
-        private void DrawSide(SpriteBatch sb, List<Figure> figs, bool left, float s, Rectangle f, int outcome, bool hit, bool peace)
+        /// <summary>
+        /// Bir tomon qo'shini. Raund hal bo'lganda xoreografiya (ActionTime): 0..28% — old qatorlar raqib tomon yuguradi,
+        /// 28..78% — to'qnashuv: haqiqiy zarba kadrlari (ko'tarish → urish → davomi), tegishda uchqun, yo'qotgan tomon
+        /// orqaga chayqaladi va old qatordan askarlar yiqiladi; 78..100% — o'z joyiga qaytish. Orqa qator (aravalar) o'q otadi.
+        /// </summary>
+        private void DrawSide(SpriteBatch sb, List<Figure> figs, bool left, float s, Rectangle f, int outcome, int loss, float perFigure, bool peace)
         {
             float dir = left ? 1f : -1f;
             float t = _sceneTime;
-            // March: maydon chetidan o'z joyiga (ease-out), har figura biroz kechikib.
+            float u = _actionT;
+            bool acting = u < 1f && !peace;
+            bool hit = loss > 0;
+            float centerX = f.Center.X;
+            int fallCount = hit ? Math.Clamp((int)MathF.Ceiling(loss / perFigure), 1, 4) : 0;
+            var frontIdx = figs.Where(x => x.Col == 0 && !x.Support && !x.Ranged).Select(x => x.Index).OrderBy(x => x).Take(fallCount).ToList();
+
             for (int i = 0; i < figs.Count; i++)
             {
                 Figure g = figs[i];
@@ -238,16 +287,75 @@ namespace AndijonSaltanatlar.UI
                 float e = MathHelper.Clamp((_enterT - delay) / (1f - 0.35f), 0f, 1f);
                 e = 1f - (1f - e) * (1f - e) * (1f - e);
                 Vector2 pos = Vector2.Lerp(g.Home - new Vector2(dir * f.Width * 0.45f, 0), g.Home, e);
-
-                // Idle: yengil tebranish (har biri o'z fazasida)
                 float bob = MathF.Sin(t * g.Speed + g.Phase) * 1.4f * s;
-                // Mavhum harakat: markazga qisqa intilish va qaytish (support orqada qoladi)
-                float a = _actionT < 1f ? MathF.Sin(_actionT * MathF.PI) : 0f;
-                if (!g.Support) pos.X += dir * a * 26 * s * (0.7f + 0.3f * MathF.Sin(g.Phase));
-                // Reaction: yo'qotishda qisqa silkinish
-                if (hit && _actionT < 0.6f) pos.X += MathF.Sin(_actionT * 60f + g.Phase) * 2f * s * (1f - _actionT / 0.6f);
                 float alpha = 1f;
-                // Yakun: g'olib sakraydi (Victory), mag'lub orqaga chekinadi (Withdraw); tinchlikda — joyida turadi.
+                float rot = 0f;
+                string frameKey = null;
+                long key = ((long)(left ? 1 : 2) << 40) | ((long)g.Index << 8);
+
+                if (acting && !g.Support && !g.Ranged)
+                {
+                    // Yugurish manzili: old qator raqib bilan to'qnashadi, orqadagilar zichlashib kelib turadi
+                    float targetX = centerX - dir * (13f * s + g.Col * 19f * s);
+                    float adv = targetX - g.Home.X;
+                    float k;
+                    if (u < 0.28f) { float c = u / 0.28f; k = c * c * (3f - 2f * c); }
+                    else if (u < 0.78f) k = 1f;
+                    else { float c = (u - 0.78f) / 0.22f; k = 1f - c * c * (3f - 2f * c); }
+                    pos.X += adv * k;
+                    if (u < 0.28f) bob -= MathF.Abs(MathF.Sin(u / 0.28f * MathF.PI * 3f)) * 3f * s; // yugurish sakrashi
+
+                    if (u >= 0.28f && u < 0.78f && g.Col <= 1)
+                    {
+                        // To'qnashuv: ikki marta zarba (har askar o'z fazasida)
+                        float lt = (u - 0.28f) / 0.5f + (g.Phase / MathHelper.TwoPi) * 0.22f;
+                        float cyc = lt * 2f;
+                        int ci = (int)cyc;
+                        float fr = cyc - ci;
+                        if (ci < 2)
+                        {
+                            int atk = (g.Index + ci) % 3;
+                            int ph = fr < 0.33f ? 0 : fr < 0.6f ? 1 : 2;
+                            frameKey = AssetManager.AttackKey(g.Sprite, atk, ph);
+                            if (ph == 1) pos.X += dir * 4f * s; // urishda oldinga intiladi
+                            // Tegish lahzasi: uchqun (bir marta)
+                            long sk = key | (uint)ci;
+                            if (g.Col == 0 && fr >= 0.42f && _strikes.Add(sk))
+                                SpawnSparks(new Vector2(pos.X + dir * 15f * s, pos.Y - 22f * s), dir, s, atk == 1 ? 12 : 8);
+                        }
+                        // Yo'qotgan tomon: zarbalardan orqaga chayqaladi
+                        if (hit) pos.X -= dir * MathF.Abs(MathF.Sin(cyc * MathF.PI)) * 4f * s;
+                    }
+
+                    // Old qatordan yiqilganlar (yo'qotishga mutanosib): yiqilish o'rni maydonda qoladi
+                    if (hit && g.Col == 0 && frontIdx.Contains(g.Index) && u >= 0.56f)
+                    {
+                        if (_fallen.Add(key))
+                        {
+                            Texture2D ct = _assets.TryGet(g.Sprite + "_0");
+                            if (ct != null)
+                                _corpses.Add(new Corpse { Tex = ct, Pos = pos + new Vector2(0, bob), Scale = g.Scale, Left = left, Tint = g.Tint, T = 0f });
+                            if (_corpses.Count > 40) _corpses.RemoveAt(0);
+                            for (int d = 0; d < 6; d++)
+                                _dust.Add(new Vector3((pos.X - f.Center.X) / (f.Width * 0.3f) + 0.5f, (float)_fx.NextDouble() * 0.4f + 0.3f, 0.6f));
+                        }
+                        continue; // yiqilgan askar safdan chiqadi (o'rnini orqadagisi egallaydi)
+                    }
+                }
+                else if (acting && g.Ranged && u > 0.08f && u < 0.45f)
+                {
+                    // Masofaviy jangchilar orqadan o'q otadi (har raundda bir martadan)
+                    long ak = key | 0xAAL;
+                    float when = 0.1f + (g.Phase / MathHelper.TwoPi) * 0.3f;
+                    if (u >= when && _strikes.Add(ak))
+                    {
+                        Vector2 from = pos + new Vector2(dir * 6f * s, -26f * s);
+                        Vector2 to = new Vector2(centerX + dir * (14f + (float)_fx.NextDouble() * 50f) * s, pos.Y + ((float)_fx.NextDouble() - 0.5f) * 40f * s - 10f * s);
+                        _arrows.Add(new Arrow { From = from, To = to, Start = _actionClock, Dur = 0.55f + (float)_fx.NextDouble() * 0.2f, Arc = (40f + (float)_fx.NextDouble() * 30f) * s });
+                    }
+                }
+
+                // Yakun: g'olib sakraydi, mag'lub orqaga chekinadi; tinchlikda — joyida turadi.
                 if (outcome > 0 && !peace) bob -= MathF.Max(0f, MathF.Sin(t * 5f + g.Phase)) * 6f * s;
                 if (outcome < 0 && !peace)
                 {
@@ -256,16 +364,104 @@ namespace AndijonSaltanatlar.UI
                     alpha = 1f - 0.6f * w;
                 }
                 pos.Y += bob;
+                pos += _shake;
 
-                int frame = ((int)(t * 2.2f + g.Phase * 3) % 3 + 3) % 3; // sekin kadr almashinuvi
-                Texture2D tex = _assets.Get(g.Sprite + "_" + frame) ?? _assets.Get(g.Sprite + "_0");
+                Texture2D tex = frameKey != null ? _assets.TryGet(frameKey) : null;
+                if (tex == null)
+                {
+                    int frame = acting && !g.Support && !g.Ranged && u < 0.28f ? ((int)(u * 30f) + g.Index) % 2 + 1 // yugurish kadrlari
+                        : ((int)(t * 2.2f + g.Phase * 3) % 3 + 3) % 3;
+                    tex = _assets.TryGet(g.Sprite + "_" + frame) ?? _assets.TryGet(g.Sprite + "_0");
+                }
                 if (tex == null) continue;
-                // Anchor — oyoq ostida (pastki markaz) va o'zgarmaydi.
                 var origin = new Vector2(tex.Width / 2f, tex.Height - 2);
                 Color col = g.Tint * alpha;
-                if (hit && _actionT < 0.35f) col = Color.Lerp(col, new Color(255, 200, 190), 0.5f * (1f - _actionT / 0.35f));
+                if (hit && acting && u > 0.3f && u < 0.75f)
+                {
+                    float flash = MathF.Max(0f, MathF.Sin((u - 0.3f) / 0.45f * MathF.PI * 4f));
+                    col = Color.Lerp(col, new Color(255, 196, 186) * alpha, 0.55f * flash);
+                }
                 sb.Draw(_assets.Pixel, new Rectangle((int)(pos.X - 9 * s), (int)(pos.Y - 2 * s), (int)(18 * s), (int)(5 * s)), new Color(0, 0, 0, 60) * alpha); // soya
-                sb.Draw(tex, pos, null, col, 0f, origin, g.Scale, left ? SpriteEffects.None : SpriteEffects.FlipHorizontally, 0f);
+                sb.Draw(tex, pos, null, col, rot, origin, g.Scale, left ? SpriteEffects.None : SpriteEffects.FlipHorizontally, 0f);
+            }
+        }
+
+        // ------------------------------------------------------------------ Effektlar
+        private void SpawnSparks(Vector2 at, float dir, float s, int n)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                float ang = (dir > 0 ? 0f : MathF.PI) + ((float)_fx.NextDouble() - 0.5f) * 2.2f;
+                float sp = (90f + (float)_fx.NextDouble() * 140f) * s;
+                float life = 0.18f + (float)_fx.NextDouble() * 0.18f;
+                _sparks.Add(new Spark
+                {
+                    Pos = at, Vel = new Vector2(MathF.Cos(ang), MathF.Sin(ang)) * sp - new Vector2(0, 50f * s),
+                    Life = life, Max = life, Color = Color.Lerp(new Color(255, 250, 220), new Color(255, 170, 60), (float)_fx.NextDouble())
+                });
+            }
+            if (_sparks.Count > 400) _sparks.RemoveRange(0, _sparks.Count - 400);
+        }
+
+        private void UpdateSparks(float dt)
+        {
+            for (int i = _sparks.Count - 1; i >= 0; i--)
+            {
+                Spark p = _sparks[i];
+                p.Life -= dt;
+                if (p.Life <= 0f) { _sparks.RemoveAt(i); continue; }
+                p.Pos += p.Vel * dt;
+                p.Vel.Y += 520f * dt;
+                _sparks[i] = p;
+            }
+            for (int i = _corpses.Count - 1; i >= 0; i--) { Corpse c = _corpses[i]; c.T += dt; _corpses[i] = c; }
+        }
+
+        private void DrawSparks(SpriteBatch sb, float s)
+        {
+            foreach (Spark p in _sparks)
+            {
+                float k = p.Life / p.Max;
+                float len = Math.Max(2f, p.Vel.Length() * 0.025f);
+                sb.Draw(_assets.Pixel, p.Pos + _shake, null, p.Color * Math.Min(1f, k * 1.6f), MathF.Atan2(p.Vel.Y, p.Vel.X) + MathF.PI, new Vector2(0f, 0.5f), new Vector2(len, Math.Max(1f, 2f * s)), SpriteEffects.None, 0f);
+            }
+        }
+
+        private void DrawArrows(SpriteBatch sb, float s)
+        {
+            for (int i = _arrows.Count - 1; i >= 0; i--)
+            {
+                Arrow a = _arrows[i];
+                float k = (_actionClock - a.Start) / a.Dur;
+                if (k < 0f) continue;
+                if (k > 1f)
+                {
+                    if (k > 1.15f) { _arrows.RemoveAt(i); continue; }
+                    // yerga sanchilgan o'q
+                    sb.Draw(_assets.Pixel, a.To + _shake, null, new Color(90, 66, 40), -0.9f, new Vector2(0f, 0.5f), new Vector2(9f * s, Math.Max(1f, 1.5f * s)), SpriteEffects.None, 0f);
+                    continue;
+                }
+                Vector2 p = Vector2.Lerp(a.From, a.To, k) + new Vector2(0, -a.Arc * 4f * k * (1f - k));
+                Vector2 d = (a.To - a.From) + new Vector2(0, -a.Arc * 4f * (1f - 2f * k));
+                float ang = MathF.Atan2(d.Y, d.X);
+                sb.Draw(_assets.Pixel, p + _shake, null, new Color(70, 52, 34), ang + MathF.PI, new Vector2(0f, 0.5f), new Vector2(12f * s, Math.Max(1f, 1.5f * s)), SpriteEffects.None, 0f);
+                sb.Draw(_assets.Pixel, p + _shake, null, new Color(210, 214, 222), ang, new Vector2(0f, 0.5f), new Vector2(3f * s, Math.Max(1f, 2f * s)), SpriteEffects.None, 0f);
+            }
+        }
+
+        /// <summary>Yiqilganlar: qulab tushadi (sakrab), keyin maydonda xira yotib qoladi.</summary>
+        private void DrawCorpses(SpriteBatch sb)
+        {
+            foreach (Corpse c in _corpses)
+            {
+                float k = Math.Clamp(c.T / 0.42f, 0f, 1f);
+                float e = k * k * (2.2f - 1.2f * k);
+                float bounce = k > 0.75f ? MathF.Sin((k - 0.75f) / 0.25f * MathF.PI) * 0.12f : 0f;
+                float ang = MathHelper.PiOver2 * Math.Clamp(e - bounce, 0f, 1f) * (c.Left ? -1f : 1f);
+                float fade = c.T < 3f ? 1f : Math.Max(0.45f, 1f - (c.T - 3f) / 4f);
+                Color col = Color.Lerp(c.Tint, new Color(120, 112, 104), 0.5f * k) * fade;
+                var origin = new Vector2(c.Tex.Width / 2f, c.Tex.Height - 2);
+                sb.Draw(c.Tex, c.Pos + _shake, null, col, ang, origin, c.Scale, c.Left ? SpriteEffects.None : SpriteEffects.FlipHorizontally, 0f);
             }
         }
 
@@ -277,7 +473,7 @@ namespace AndijonSaltanatlar.UI
             float gesture = _actionT < 1f ? MathF.Sin(_actionT * MathF.PI) : 0f;
             pos.Y += MathF.Sin(t * 1.3f + (left ? 0 : 1.7f)) * 1.2f * s - gesture * 5 * s;
             if (outcome > 0) pos.Y -= MathF.Max(0f, MathF.Sin(t * 4f)) * 5 * s;
-            Texture2D tex = _assets.Get(SpriteKeys.UnitShield + "_" + ((int)(t * 1.5f) % 3)) ?? _assets.Get(SpriteKeys.UnitShield + "_0");
+            Texture2D tex = _assets.TryGet(SpriteKeys.UnitShield + "_" + ((int)(t * 1.5f) % 3)) ?? _assets.TryGet(SpriteKeys.UnitShield + "_0");
             if (tex == null) return;
             var origin = new Vector2(tex.Width / 2f, tex.Height - 2);
             sb.Draw(_assets.Pixel, new Rectangle((int)(pos.X - 12 * s), (int)(pos.Y - 2 * s), (int)(24 * s), (int)(6 * s)), new Color(0, 0, 0, 70));
