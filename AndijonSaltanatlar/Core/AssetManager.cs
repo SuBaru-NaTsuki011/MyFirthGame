@@ -21,6 +21,8 @@ namespace AndijonSaltanatlar.Core
         public const string MainHall = "building_mainhall";
         public const string Barracks = "building_barracks";
         public const string Garden = "building_garden";
+        public const string Farm = "building_farm";
+        public const string GladiatorArena = "building_gladiator_arena";
         public const string Madrasa = "building_madrasa";
         public const string Mosque = "building_mosque";
         public const string Caravanserai = "building_caravanserai";
@@ -50,8 +52,8 @@ namespace AndijonSaltanatlar.Core
         public const string UnitRaider = "unit_raider";           // bosqinchi
         public const string UnitRaiderChief = "unit_raider_chief"; // bosqinchilar sardori
         public const string UnitShah = "unit_shah";                // shoh (tojli)
-        public const string UnitCitizen = "unit_citizen"; // + <0..4> + _0.._2 (fuqaro turi + kadr)
-        public const int CitizenKinds = 5;
+        public const string UnitCitizen = "unit_citizen"; // + <0..5> + _0.._2 (fuqaro turi + kadr)
+        public const int CitizenKinds = CitizenArt.Kinds;
         public const int UnitFrames = 3;
 
         public const string IconCoin = "icon_coin";
@@ -108,6 +110,8 @@ namespace AndijonSaltanatlar.Core
             Register(SpriteKeys.MainHall, BuildingArt.MainHall);
             Register(SpriteKeys.Barracks, BuildingArt.Barracks);
             Register(SpriteKeys.Garden, BuildingArt.Garden);
+            Register(SpriteKeys.Farm, BuildingArt.Farm);
+            Register(SpriteKeys.GladiatorArena, BuildingArt.GladiatorArena);
             Register(SpriteKeys.Madrasa, BuildingArt.Madrasa);
             Register(SpriteKeys.Mosque, BuildingArt.Mosque);
             Register(SpriteKeys.Caravanserai, BuildingArt.Caravanserai);

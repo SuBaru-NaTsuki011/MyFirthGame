@@ -446,6 +446,47 @@ namespace AndijonSaltanatlar.Core.Graphics
             return ic.C;
         }
 
+        public static Canvas Farm()
+        {
+            var ic = new IsoCanvas(4, 58);
+            Color soil = new Color(112, 78, 47);
+            ic.Top(0.06f, 0.06f, 3.94f, 3.94f, 0, new Color(116, 145, 70), 0.05f);
+            ic.Top(0.34f, 0.34f, 3.66f, 3.66f, 0, soil);
+            for (int row = 0; row < 5; row++)
+            {
+                float y = 0.52f + row * 0.62f;
+                ic.QuadSW(0.45f, 3.55f, y, 4, 7, new Color(82, 57, 36));
+                for (int col = 0; col < 9; col++)
+                {
+                    float x = 0.56f + col * 0.36f;
+                    ic.Pole(x, y, 7, 17 + (col % 3) * 2, new Color(63, 130, 59), 2);
+                    ic.QuadSW(x - 0.08f, x + 0.08f, y, 14, 17, new Color(178, 160, 62));
+                }
+            }
+            ic.Box(3.28f, 0.24f, 3.78f, 0.38f, 0, 12, Pal.Wood, 3);
+            ic.Box(3.72f, 0.24f, 3.86f, 3.72f, 0, 12, Pal.Wood, 3);
+            ic.C.Outline(Outline, 0.45f);
+            return ic.C;
+        }
+
+        public static Canvas GladiatorArena()
+        {
+            var ic = new IsoCanvas(5, 104);
+            Color stone = new Color(173, 132, 84);
+            ic.Top(0.08f, 0.08f, 4.92f, 4.92f, 0, new Color(174, 123, 75));
+            ic.Top(0.65f, 0.65f, 4.35f, 4.35f, 0, new Color(196, 159, 108));
+            ic.Top(1.05f, 1.05f, 3.95f, 3.95f, 0, new Color(143, 94, 58));
+            ic.Box(0.18f, 0.18f, 4.82f, 0.44f, 0, 43, stone, 5, Pal.Plaster);
+            ic.Box(0.18f, 0.18f, 0.44f, 4.82f, 0, 43, stone, 5, Pal.Plaster);
+            ic.Box(4.56f, 0.18f, 4.82f, 4.82f, 0, 43, stone, 5, Pal.Plaster);
+            ic.Box(0.18f, 4.56f, 2.1f, 4.82f, 0, 43, stone, 5, Pal.Plaster);
+            ic.Box(3.0f, 4.56f, 4.82f, 4.82f, 0, 43, stone, 5, Pal.Plaster);
+            ic.QuadSW(1.45f, 3.55f, 3.05f, 24, 28, Pal.Red);
+            ic.QuadSE(3.55f, 1.45f, 3.05f, 24, 28, Canvas.Shade(Pal.Red, 0.7f));
+            ic.C.Outline(Outline, 0.45f);
+            return ic.C;
+        }
+
         // =====================================================================
         //  MADRASA (4x4) — ichki hovli, peshtoq, burchak gumbazlari
         // =====================================================================

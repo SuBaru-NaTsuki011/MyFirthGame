@@ -21,6 +21,8 @@ namespace AndijonSaltanatlar.Buildings
                 case BuildingType.Gate: b = new Gate(position, variant != 0); break;
                 case BuildingType.MainHall: b = new MainHall(position); break;
                 case BuildingType.Garden: b = new Garden(position); break;
+                case BuildingType.Farm: b = new Farm(position); break;
+                case BuildingType.GladiatorArena: b = new GladiatorArenaBuilding(position); break;
                 case BuildingType.Barracks: b = new Barracks(position); break;
                 case BuildingType.Madrasa: b = new Madrasa(position); break;
                 case BuildingType.Mosque: b = new Mosque(position); break;

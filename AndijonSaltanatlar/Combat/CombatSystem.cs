@@ -41,6 +41,7 @@ namespace AndijonSaltanatlar.Combat
         private readonly UnitManager _units;
         private readonly GameStateManager _state;
         private readonly Random _rng = new Random();
+        public Action<CitizenUnit> OnCitizenWorkRequested { get; set; }
 
         private enum AgentMode { Possessed, Fighting, Raiding, Returning, Escort }
 
@@ -180,7 +181,10 @@ namespace AndijonSaltanatlar.Combat
             if (_agents.TryGetValue(u, out Agent a)) a.Mode = AgentMode.Possessed; // uy joyi saqlanadi
             else _agents[u] = new Agent { Unit = u, Mode = AgentMode.Possessed, Home = u.Position };
             _state.Select(u);
-            _state.ShowMessage("Siz endi: " + u.Name + ".  WASD — yurish, Space/sichqoncha — zarba, F — chiqish");
+            string controls = u is CitizenUnit
+                ? "WASD — yurish, E — ish, F — chiqish"
+                : "WASD — yurish, Space/sichqoncha — zarba, F — chiqish";
+            _state.ShowMessage("Siz endi: " + u.Name + ".  " + controls);
             return true;
         }
 
@@ -230,7 +234,12 @@ namespace AndijonSaltanatlar.Combat
             if (input == null || _justPossessed) { _justPossessed = false; p.DriveIdle(); return; }
 
             if (input.KeyPressed(Keys.F) || input.KeyPressed(Keys.Escape)) { Release(); return; }
-            if (input.KeyPressed(Keys.E)) { CyclePossession(1); return; }
+            if (input.KeyPressed(Keys.E))
+            {
+                if (p is CitizenUnit citizen) OnCitizenWorkRequested?.Invoke(citizen);
+                else CyclePossession(1);
+                return;
+            }
             if (input.KeyPressed(Keys.Q)) { CyclePossession(-1); return; }
 
             // Ekran yo'nalishidagi harakat (W — ekranda yuqoriga) -> tile yo'nalishi

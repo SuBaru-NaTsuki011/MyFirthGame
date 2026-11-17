@@ -56,8 +56,21 @@ public sealed class Game1 : Game
 	// Jang: istalgan jangchi/fuqaro ichiga kirish (F) + shaharga bosqin (B / avtomatik)
 	private AndijonSaltanatlar.Combat.CombatSystem _combat;
 
+	private AndijonSaltanatlar.NPC.CitizenSocialSystem _citizenSocial;
+
+	private AndijonSaltanatlar.NPC.NPCInteractionManager _npcInteractions;
+
+	private GladiatorUnit _arenaGladiatorOne;
+
+	private GladiatorUnit _arenaGladiatorTwo;
+
+	private int _arenaBuildingId;
+
 	// Uyga kirish: boshqarilayotgan odam uy yonida ENTER bossa — ichki xona (yotoqxona + oshxona)
 	private AndijonSaltanatlar.Interiors.HouseInterior _interior;
+
+	// Parrandalar: kaptarlar, chumchuqlar, laylaklar (bezak, odam yaqinlashsa uchib ketadi)
+	private BirdSystem _birds;
 
 	private Unit _lastPossessed;
 
@@ -179,7 +192,7 @@ public sealed class Game1 : Game
 		_uiKit = new AndijonSaltanatlar.UI.Design.UiKit(_assets.Pixel, new AndijonSaltanatlar.UI.Design.Typography(_font));
 		_perf = new Core.PerformanceMonitor();
 		_onlinePanel = new OnlinePanel(_assets, _font, _online, _uiKit);
-		_renderer = new WorldRenderer(_assets);
+		_renderer = new WorldRenderer(_assets, _font);
 		_glow = BuildGlow();
 		_mainMenu = new MainMenuScreen(_assets, _font) { Ui = _uiKit };
 		_pendingStoryMode = _opt.Story || _opt.SmokeLog != null;
@@ -363,9 +376,14 @@ public sealed class Game1 : Game
 		_state.PendingCampaignState = _pendingStory;
 		_pendingStory = null;
 		_state.InitPopulation(_buildings);
+		_npcInteractions = new AndijonSaltanatlar.NPC.NPCInteractionManager();
+		_npcInteractions.BindUnits(_units, _state.Pop);
 		_construction = new ConstructionSystem(_map, _buildings, _units, _state, _assets);
 		_combat = new AndijonSaltanatlar.Combat.CombatSystem(_map, _units, _state);
+		_citizenSocial = new AndijonSaltanatlar.NPC.CitizenSocialSystem();
+		_combat.OnCitizenWorkRequested = PerformCitizenWork;
 		_interior = new AndijonSaltanatlar.Interiors.HouseInterior(_assets, _map, _buildings, _state);
+		_birds = new BirdSystem(_assets, _map, _units);
 		_governor = new AIGovernorManager
 		{
 			OnMessage = (string msg) =>
@@ -726,6 +744,7 @@ public sealed class Game1 : Game
 			TradeTax = _state.Policy.TradeTax,
 			ProdTax = _state.Policy.ProductionTax,
 			Citizens = _state.Pop.Snapshot(),
+			CitizenBindings = _npcInteractions.Bindings.ToList(),
 			World = _state.World.Snapshot(),
 			Military = _state.Military.Snapshot(),
 			Civ = _state.Civ.Snapshot(),
@@ -745,7 +764,10 @@ public sealed class Game1 : Game
 					Y = building.Position.Y,
 					Variant = building.Variant,
 					HitPoints = building.HitPoints,
-					Level = building.Level
+					Level = building.Level,
+					CropStage = building is Farm farm ? (int)farm.CropStage : 0,
+					GrowthDays = building is Farm cropFarm ? cropFarm.GrowthDays : 0,
+					StoredProduce = building is Farm storedFarm ? storedFarm.StoredProduce : 0
 				});
 			}
 		}
@@ -791,6 +813,7 @@ public sealed class Game1 : Game
 		_state.Policy.TradeTax = saveGameData.TradeTax;
 		_state.Policy.ProductionTax = saveGameData.ProdTax;
 		_state.Pop.Restore(saveGameData.Citizens, _buildings);
+		_npcInteractions.BindUnits(_units, _state.Pop, saveGameData.CitizenBindings);
 		if (saveGameData.World != null)
 		{
 			_state.World.Restore(saveGameData.World);
@@ -832,6 +855,10 @@ public sealed class Game1 : Game
 				if (playerBuilding.Level > 1)
 				{
 					building.Level = playerBuilding.Level;
+				}
+				if (building is Farm farm)
+				{
+					farm.RestoreCropState(playerBuilding.CropStage, playerBuilding.GrowthDays, playerBuilding.StoredProduce);
 				}
 			}
 		}
@@ -882,6 +909,7 @@ public sealed class Game1 : Game
 			}
 			_onlinePanel.Update(_input, viewport.Width, viewport.Height, num);
 			_units.Update(num * 0.6f);
+			_birds?.Update(num * 0.6f, _dayNight.NightAmount, null);
 			_map.Update(num);
 			_dayNight.Update(_state.Clock.DayFraction);
 			_frames++;
@@ -1076,11 +1104,16 @@ public sealed class Game1 : Game
 			}
 		}
 		_units.Update(dt);
+		_birds?.Update(dt, _dayNight.NightAmount, _combat.Possessed);
+		_citizenSocial.Update(_units, dt);
+		UpdateFarmControl();
 		_map.Update(dt);
 		int day = _state.Day;
 		_state.Update(num, _buildings);
+		SyncArenaGladiators();
 		if (_state.Day != day)
 		{
+			_npcInteractions.RefreshUnits(_units, _state.Pop);
 			_governor?.OnDayTick();
 		}
 		_time += num;
@@ -1098,6 +1131,157 @@ public sealed class Game1 : Game
 		base.Update(gameTime);
 	}
 
+	private static Vector2 BuildingCenter(Building building)
+	{
+		return new Vector2(building.Position.X + building.Size.X / 2f, building.Position.Y + building.Size.Y / 2f);
+	}
+
+	private void UpdateFarmControl()
+	{
+		CitizenUnit controlledFarmer = _combat.Possessed as CitizenUnit;
+		foreach (Building building in _buildings.Buildings)
+		{
+			if (!(building is Farm farm)) continue;
+			farm.IsPlayerControlled = controlledFarmer != null &&
+				controlledFarmer.Kind == CitizenArt.Farmer &&
+				controlledFarmer.IsBound &&
+				_state.Pop.GetById(controlledFarmer.CitizenId)?.WorkplaceBuildingId == farm.Id;
+		}
+	}
+
+	private void SyncArenaGladiators()
+	{
+		Building arena = _buildings.Buildings.FirstOrDefault(b => b.Type == BuildingType.GladiatorArena && b.BuildProgress >= 1f);
+		if (arena == null)
+		{
+			if (_arenaGladiatorOne != null) _units.Remove(_arenaGladiatorOne);
+			if (_arenaGladiatorTwo != null) _units.Remove(_arenaGladiatorTwo);
+			_arenaGladiatorOne = null;
+			_arenaGladiatorTwo = null;
+			_arenaBuildingId = 0;
+			return;
+		}
+		if (_arenaBuildingId == arena.Id && _arenaGladiatorOne != null && _arenaGladiatorTwo != null) return;
+
+		if (_arenaGladiatorOne != null) _units.Remove(_arenaGladiatorOne);
+		if (_arenaGladiatorTwo != null) _units.Remove(_arenaGladiatorTwo);
+		float y = arena.Position.Y + arena.Size.Y / 2f;
+		Vector2 west = new Vector2(arena.Position.X - 1f, y);
+		Vector2 east = new Vector2(arena.Position.X + arena.Size.X + 1f, y);
+		_arenaGladiatorOne = _units.Add(new GladiatorUnit(
+			new[] { west, west + new Vector2(0f, 1.5f), west + new Vector2(1f, 1.5f) },
+			"Gladiator Bahodir", arena.Id));
+		_arenaGladiatorTwo = _units.Add(new GladiatorUnit(
+			new[] { east, east + new Vector2(0f, -1.5f), east + new Vector2(-1f, -1.5f) },
+			"Gladiator Rustam", arena.Id));
+		_arenaBuildingId = arena.Id;
+	}
+
+	private Building FindNearbyBuilding(BuildingType type, Vector2 position, float range)
+	{
+		Building nearest = null;
+		float best = range;
+		foreach (Building building in _buildings.Buildings)
+		{
+			if (building.Type != type) continue;
+			float distance = Vector2.Distance(position, BuildingCenter(building));
+			if (distance < best)
+			{
+				best = distance;
+				nearest = building;
+			}
+		}
+		return nearest;
+	}
+
+	private void PerformCitizenWork(CitizenUnit citizen)
+	{
+		if (!citizen.TryBeginWork(_state.Day))
+		{
+			_state.ShowMessage("Bu fuqaro bugungi ishini bajardi. Ertaga davom etadi.");
+			return;
+		}
+
+		if (citizen.Kind == CitizenArt.Farmer)
+		{
+			Farm farm = null;
+			float best = 2.8f;
+			foreach (Building building in _buildings.Buildings)
+			{
+				if (!(building is Farm candidate)) continue;
+				float distance = Vector2.Distance(citizen.Position, BuildingCenter(candidate));
+				if (distance < best) { best = distance; farm = candidate; }
+			}
+
+			if (farm != null)
+			{
+				if (farm.CropStage == FarmCropStage.Empty)
+				{
+					farm.PlantCrop();
+					_state.ShowMessage("Dehqon urug' sepdi. Hosil 3 o'yin kunida yetiladi.");
+				}
+				else if (farm.CropStage == FarmCropStage.Growing)
+				{
+					_state.ShowMessage("Ekin o'smoqda: " + farm.GrowthDays + "/" + Farm.CropGrowthDays + " kun.");
+				}
+				else
+				{
+					int harvest = farm.HarvestCrop();
+					_state.ShowMessage(harvest + " birlik hosil o'rildi. Bozorga olib boring.");
+				}
+				return;
+			}
+
+			Building market = FindNearbyBuilding(BuildingType.Market, citizen.Position, 2.8f);
+			if (market != null)
+			{
+				int sold = 0;
+				foreach (Building building in _buildings.Buildings)
+				{
+					if (!(building is Farm storedFarm) || storedFarm.StoredProduce == 0) continue;
+					if (Vector2.Distance(BuildingCenter(market), BuildingCenter(storedFarm)) > 12f) continue;
+					sold += storedFarm.SellStoredProduce();
+				}
+				if (sold > 0)
+				{
+					int income = sold * 2;
+					_state.Coins += income;
+					_state.ShowMessage("Bozorda " + sold + " birlik hosil sotildi: +" + income + " tanga.");
+				}
+				else _state.ShowMessage("Sotish uchun hosil yo'q. Avval fermadan hosil o'ring.");
+				return;
+			}
+
+			_state.ShowMessage("Dehqon sifatida ishlash uchun ferma yoki bozor yoniga boring.");
+			return;
+		}
+
+		if (citizen.Kind == CitizenArt.Merchant || citizen.Kind == CitizenArt.Craftsman)
+		{
+			if (FindNearbyBuilding(BuildingType.Market, citizen.Position, 2.8f) != null)
+			{
+				_state.Coins += 4;
+				_state.ShowMessage(citizen.RoleLabel + " bozor savdosida qatnashdi: +4 tanga.");
+			}
+			else _state.ShowMessage("Savdo qilish uchun bozorga boring.");
+			return;
+		}
+
+		if (citizen.Kind == CitizenArt.Shepherd)
+		{
+			if (FindNearbyBuilding(BuildingType.Farm, citizen.Position, 2.8f) != null ||
+				FindNearbyBuilding(BuildingType.Garden, citizen.Position, 2.8f) != null)
+			{
+				_state.Food += 3;
+				_state.ShowMessage("Chopon chorvani parvarish qildi: +3 oziq-ovqat.");
+			}
+			else _state.ShowMessage("Chorvani boqish uchun ferma yoki bog'ga boring.");
+			return;
+		}
+
+		_state.ShowMessage(citizen.RoleLabel + " kundalik yumushini davom ettirdi.");
+	}
+
 	private void HandleHotkeys()
 	{
 		// Jangchi ichida: klaviatura to'liq jangchiga tegishli (boshqaruvni CombatSystem o'qiydi).
@@ -1107,6 +1291,16 @@ public sealed class Game1 : Game
 			{
 				_perf.Enabled = !_perf.Enabled;
 			}
+			return;
+		}
+		if (_input.KeyPressed(Keys.E) && _state.Selected is CitizenUnit citizen)
+		{
+			string line = citizen.Kind == CitizenArt.Farmer
+				? "Ekinlarim yaxshi o'syapti!"
+				: citizen.Kind == CitizenArt.Merchant ? "Bozorda savdo qizg'in!"
+				: "Shahar tinchligi barqaror.";
+			citizen.Say(line, 4f);
+			_state.ShowMessage(citizen.Name + ": " + line);
 			return;
 		}
 		if (_input.KeyPressed(Keys.F) && !_strategicMode && !_civMode && !_questMode)
@@ -1338,6 +1532,7 @@ public sealed class Game1 : Game
 		Vector4 visibleWorldRect = _camera.VisibleWorldRect;
 		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, null, _camera.Transform);
 		_map.Draw(_sb, visibleWorldRect);
+		_birds?.DrawShadows(_sb, visibleWorldRect);
 		LandExpansionRenderer.Draw(_sb, _map, _state.Land, visibleWorldRect);
 		if (_state.Mode == GameMode.Playing && !_input.MouseOverUI)
 		{
@@ -1350,7 +1545,8 @@ public sealed class Game1 : Game
 		DrawSelectionHighlight();
 		_combat?.DrawGroundMarkers(_sb);
 		_blueprintRenderer?.Draw(_sb, _governor?.Blueprint, _governor?.Blueprints.SelectedItemId ?? 0);
-		_renderer.Draw(_sb, visibleWorldRect, _map, _buildings, _units);
+		_renderer.Draw(_sb, visibleWorldRect, _map, _buildings, _units, _birds?.GroundObjects);
+		_birds?.DrawSky(_sb, visibleWorldRect);
 		_construction.Draw(_sb);
 		_sb.End();
 	}

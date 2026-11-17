@@ -36,8 +36,9 @@ namespace AndijonSaltanatlar.World
 
             // Hunarmand (qo'shinxona/g'arb tomoni) va dehqon (janubiy dala)
             C(CitizenArt.Craftsman, 0.8f, (16.5f, 20.5f), (21.5f, 20.5f), (21.5f, 31.5f));
-            C(CitizenArt.Farmer, 0.7f, (24.5f, 50.5f), (31.5f, 50.5f), (36.5f, 50.5f));
-            C(CitizenArt.Farmer, 0.7f, (31.5f, 44.5f), (31.5f, 50.5f));
+            C(CitizenArt.Farmer, 0.7f, (24.5f, 50.5f), (31.5f, 50.5f), (36.5f, 50.5f), (42.5f, 36.5f));
+            C(CitizenArt.Farmer, 0.7f, (31.5f, 44.5f), (31.5f, 50.5f), (39.5f, 40.5f));
+            C(CitizenArt.Shepherd, 0.72f, (12.5f, 47.5f), (18.5f, 52.5f), (24.5f, 50.5f));
 
             // PROMPT 17: mahalla ko'chalarida yuradigan aholi (suhbatlashish mumkin bo'lgan fuqarolar ko'proq bo'lsin)
             C(CitizenArt.Citizen, 0.75f, (22.5f, 21.5f), (26.5f, 21.5f));

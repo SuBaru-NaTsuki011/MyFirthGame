@@ -91,8 +91,10 @@ namespace AndijonSaltanatlar.Interiors
             _state = state;
         }
 
-        private static bool Enterable(Building b) =>
-            b.BuildProgress >= 1f && (b.Type == BuildingType.House || b.Type == BuildingType.MainHall);
+        internal static bool IsEnterable(Building b) =>
+            b != null && b.BuildProgress >= 1f
+            && b.Type != BuildingType.Garden && b.Type != BuildingType.Tower
+            && b.Type != BuildingType.Wall && b.Type != BuildingType.Gate;
 
         // ==================================================================
         // Shahardagi binoni topish
@@ -106,7 +108,7 @@ namespace AndijonSaltanatlar.Interiors
             float best = 0.9f;
             foreach (Building b in _buildings.Buildings)
             {
-                if (!Enterable(b)) continue;
+                if (!IsEnterable(b)) continue;
                 float dx = MathF.Max(0f, MathF.Max(b.Position.X - who.Position.X, who.Position.X - (b.Position.X + b.Size.X)));
                 float dy = MathF.Max(0f, MathF.Max(b.Position.Y - who.Position.Y, who.Position.Y - (b.Position.Y + b.Size.Y)));
                 float d = MathF.Sqrt(dx * dx + dy * dy);
@@ -142,8 +144,16 @@ namespace AndijonSaltanatlar.Interiors
                 int v = VariantOf(building);
                 InteriorArt.Style s = InteriorArt.For(v);
                 LoadShell(v, () => InteriorArt.Shell(s, out Vector2 o).WithOrigin(o));
-                BuildHouseLayout(v, s);
-                BuildHouseResidents(building);
+                if (building.Type == BuildingType.House)
+                {
+                    BuildHouseLayout(v, s);
+                    BuildHouseResidents(building);
+                }
+                else
+                {
+                    BuildPublicBuildingLayout(building, v, s);
+                    BuildPublicBuildingResidents(building);
+                }
                 _pos = new Vector2(6.5f, 7.4f);
             }
             _leftDoor = false;
@@ -172,9 +182,8 @@ namespace AndijonSaltanatlar.Interiors
         /// <summary>Bino eshigi oldidagi yuriladigan nuqta (uy: old hovli darvozasi, saroy: old tomon o'rtasi).</summary>
         public Vector2 OutsideDoor(Building h)
         {
-            var preferred = h.Type == BuildingType.MainHall
-                ? new Vector2(h.Position.X + h.Size.X / 2f + 0.5f, h.Position.Y + h.Size.Y + 0.5f)
-                : new Vector2(h.Position.X + 1.45f, h.Position.Y + 2.5f);
+            Point entrance = h.FrontEntranceTile;
+            var preferred = new Vector2(entrance.X + 0.5f, entrance.Y + 0.5f);
             if (_map.IsWalkable((int)preferred.X, (int)preferred.Y)) return preferred;
             for (int r = 0; r <= 2; r++)
                 for (int y = h.Position.Y - 1 - r; y <= h.Position.Y + h.Size.Y + r; y++)
@@ -253,6 +262,33 @@ namespace AndijonSaltanatlar.Interiors
             Add(Tex(k + "table", () => InteriorArt.Table(s)), 5, 4, 2);
         }
 
+        private void BuildPublicBuildingLayout(Building building, int v, InteriorArt.Style s)
+        {
+            ClearLayout();
+            string k = "public_" + v + "_";
+            if (building.Type == BuildingType.Barracks)
+            {
+                Texture2D bed = Tex(k + "bed", () => InteriorArt.Bed(s));
+                Add(bed, 0, 0, 2);
+                Add(bed, 0, 3, 2);
+                Add(bed, 5, 0, 2);
+                Add(bed, 5, 3, 2);
+                Texture2D chest = Tex(k + "chest", () => InteriorArt.Chest(s));
+                Add(chest, 1, 6, 1);
+                Add(chest, 6, 6, 1);
+                return;
+            }
+
+            Add(Tex(k + "table", () => InteriorArt.Table(s)), 3, 3, 2);
+        }
+
+        private void BuildPublicBuildingResidents(Building building)
+        {
+            _residents.Clear();
+            _title = building.Name.ToUpperInvariant();
+            _subtitle = "Bino ichki qismi";
+        }
+
         private static readonly Vector2[] HouseSlots =
         {
             new Vector2(7.45f, 4.7f), new Vector2(7.5f, 1.35f), new Vector2(5.8f, 3.5f),
@@ -320,6 +356,7 @@ namespace AndijonSaltanatlar.Interiors
             switch (c.Profession)
             {
                 case CitizenProfession.Savdogar: return CitizenArt.Merchant;
+                case CitizenProfession.Dehqon:
                 case CitizenProfession.Bogbon: return CitizenArt.Farmer;
                 case CitizenProfession.Tashuvchi:
                 case CitizenProfession.Muallim: return CitizenArt.Craftsman;
@@ -644,7 +681,9 @@ namespace AndijonSaltanatlar.Interiors
             if (Active || NearbyHouse == null) return;
             Building h = NearbyHouse;
             Vector2 top = cam.WorldToScreen(IsoMath.TileToWorld(new Vector2(h.Position.X + h.Size.X, h.Position.Y + h.Size.Y)) + new Vector2(0, -h.Texture.Height - 6));
-            string t = h.Type == BuildingType.MainHall ? "[ENTER] SAROYGA KIRISH" : "[ENTER] UYGA KIRISH";
+            string t = h.Type == BuildingType.MainHall ? "[ENTER] SAROYGA KIRISH"
+                : h.Type == BuildingType.GladiatorArena ? "[ENTER] JANG MAYDONIGA KIRISH"
+                : "[ENTER] " + h.Name.ToUpperInvariant() + "GA KIRISH";
             Vector2 s = font.Measure(t, 2);
             var r = new Rectangle((int)(top.X - s.X / 2 - 8), (int)(top.Y - s.Y - 8), (int)s.X + 16, (int)s.Y + 10);
             r.X = Math.Clamp(r.X, 8, vw - r.Width - 8);

@@ -22,7 +22,8 @@ namespace AndijonSaltanatlar.AdvancedEconomy
         PopulationTax, // aholi solig'i: oila -> xazina
         StateBuy,      // davlat bozordan sotib oldi (xazina -> bozor, mol -> ombor)
         StateSell,     // davlat ombordan bozorga sotdi (bozor -> xazina, mol -> bozor)
-        MarketFee      // egasiz foyda / ombor sotuvi -> xazina
+        MarketFee,     // egasiz foyda / ombor sotuvi -> xazina
+        CitizenTrade
     }
 
     /// <summary>Bitta qayd etilgan operatsiya (faqat muhimlari alohida saqlanadi: davlat savdosi).</summary>

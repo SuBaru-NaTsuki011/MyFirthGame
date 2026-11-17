@@ -28,7 +28,7 @@ namespace AndijonSaltanatlar.Population
         /// <summary>Ishga joylash tartibi (muhimlik bo'yicha).</summary>
         private static readonly CitizenProfession[] JobOrder =
         {
-            CitizenProfession.Bogbon, CitizenProfession.Savdogar, CitizenProfession.Tashuvchi,
+            CitizenProfession.Dehqon, CitizenProfession.Bogbon, CitizenProfession.Savdogar, CitizenProfession.Tashuvchi,
             CitizenProfession.Soqchi, CitizenProfession.Amaldor, CitizenProfession.Muallim
         };
 
@@ -69,6 +69,7 @@ namespace AndijonSaltanatlar.Population
         {
             switch (type)
             {
+                case BuildingType.Farm: profession = CitizenProfession.Dehqon; return 6;
                 case BuildingType.Garden: profession = CitizenProfession.Bogbon; return 5;
                 case BuildingType.Market: profession = CitizenProfession.Savdogar; return 4;
                 case BuildingType.Caravanserai: profession = CitizenProfession.Tashuvchi; return 3;

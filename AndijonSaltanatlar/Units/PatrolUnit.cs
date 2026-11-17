@@ -15,6 +15,7 @@ namespace AndijonSaltanatlar.Units
 
         /// <summary>Har bir nuqtada to'xtab turish vaqti (soniya).</summary>
         public float PauseTime { get; set; } = 1.5f;
+        public Vector2 NextPatrolPoint => PatrolPoints.Count == 0 ? Position : PatrolPoints[_targetIndex % PatrolPoints.Count];
 
         public PatrolUnit(IEnumerable<Vector2> patrolPoints, float speed = 1.1f) : base(Vector2.Zero)
         {

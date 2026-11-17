@@ -132,11 +132,11 @@ namespace AndijonSaltanatlar.AdvancedEconomy
             ResetDayStats();
 
             int coinsBefore = res.Get(ResourceType.Coin);
-            int gardeners = pop.CountProfession(CitizenProfession.Bogbon);
+            int gardeners = pop.CountProfession(CitizenProfession.Bogbon) + pop.CountProfession(CitizenProfession.Dehqon);
             int carriers = pop.CountProfession(CitizenProfession.Tashuvchi);
 
             // ---- 1. ISHLAB CHIQARISH → OMBOR ----
-            int foodProduced = EconomyManager.ComputeFoodProduction(gardeners, b.Count(BuildingType.Garden), foodBonus);
+            int foodProduced = EconomyManager.ComputeFoodProduction(gardeners, b.Count(BuildingType.Garden), b.Count(BuildingType.Farm), foodBonus);
             res.Add(ResourceType.Food, foodProduced);
             ProducedToday[(int)ProductType.Food] = foodProduced;
             Transactions.Add(TransactionType.Production, foodProduced, 0);

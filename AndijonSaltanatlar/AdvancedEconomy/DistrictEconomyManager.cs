@@ -210,6 +210,7 @@ namespace AndijonSaltanatlar.AdvancedEconomy
                         break;
                     case BuildingType.Market: d.Markets++; break;
                     case BuildingType.Garden: d.LocalProduction += 2; break;
+                    case BuildingType.Farm: d.LocalProduction += 6; break;
                     case BuildingType.Barracks: securityPoints[did] = securityPoints.GetValueOrDefault(did) + 20; break;
                     case BuildingType.Tower: securityPoints[did] = securityPoints.GetValueOrDefault(did) + 6; break;
                 }
