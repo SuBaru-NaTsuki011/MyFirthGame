@@ -47,6 +47,8 @@ namespace AndijonSaltanatlar.CityPlanning
             BuildingType.House => "Uy",
             BuildingType.Market => "Bozor",
             BuildingType.Garden => "Bog'",
+            BuildingType.Farm => "Ferma",
+            BuildingType.GladiatorArena => "Jang maydoni",
             BuildingType.Madrasa => "Madrasa",
             BuildingType.Mosque => "Masjid",
             BuildingType.Caravanserai => "Karvonsaroy",

@@ -75,6 +75,8 @@ namespace AndijonSaltanatlar.UI
             "Saqlash / Yuklash: F5 / F9",
             "To'xtatish: Bo'sh joy (Space)  |  Yordam: H",
             "Ichiga kirish: jangchini tanlab F (Q/E almashtirish)",
+            "Fuqaro: tanlab F bilan boshqaring; E — ish/suhbat; F — qaytish",
+            "Ferma: dehqon bilan E — urug' ekish yoki hosil o'rish; bozorga borib sotish",
             "Uy/saroyga kirish: odam ichida bino yonida ENTER",
             "Jang: SPACE kombo (kesish-chopish-sanchish), R aylanma",
             "Shohni chiqarish: saroyda shoh yonida F",

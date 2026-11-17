@@ -345,6 +345,15 @@ public sealed class GameStateManager
 		}
 		Weather.Update(Clock.Day, Season);
 		Pop.AssignJobs(buildings);
+		bool hasFarmers = Pop.CountProfession(CitizenProfession.Dehqon) > 0;
+		foreach (Building building in buildings.Buildings)
+		{
+			if (!(building is Farm farm)) continue;
+			int harvest = farm.WorkAutonomously(hasFarmers);
+			if (harvest <= 0) continue;
+			if (buildings.Count(BuildingType.Market) > 0) Coins += farm.SellStoredProduce() * 2;
+			else Food += harvest;
+		}
 		CivilizationModifiers civilizationModifiers = Civ.PlayerModifiers();
 		float num2 = SeasonManager.FoodModifier(Season) + Weather.ProductionModifier();
 		_economy.DailyTick(buildings, Pop, Policy, civilizationModifiers.Get(TechEffectType.FoodProductionBonus) + num2, civilizationModifiers.Get(TechEffectType.TradeIncomeBonus) + Weather.ProductionModifier() * 0.5f, civilizationModifiers.Get(TechEffectType.TaxEfficiencyBonus));

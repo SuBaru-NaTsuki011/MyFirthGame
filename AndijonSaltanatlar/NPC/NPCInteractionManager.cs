@@ -72,7 +72,7 @@ namespace AndijonSaltanatlar.NPC
             switch (kind)
             {
                 case CitizenArt.Merchant: wanted = new[] { CitizenProfession.Savdogar }; break;
-                case CitizenArt.Farmer: wanted = new[] { CitizenProfession.Bogbon }; break;
+                case CitizenArt.Farmer: wanted = new[] { CitizenProfession.Dehqon, CitizenProfession.Bogbon }; break;
                 case CitizenArt.Craftsman: wanted = new[] { CitizenProfession.Tashuvchi, CitizenProfession.Muallim }; break;
                 case CitizenArt.Buyer: wanted = new[] { CitizenProfession.None }; break;
                 default: wanted = new[] { CitizenProfession.None, CitizenProfession.Amaldor, CitizenProfession.Muallim, CitizenProfession.Soqchi }; break;

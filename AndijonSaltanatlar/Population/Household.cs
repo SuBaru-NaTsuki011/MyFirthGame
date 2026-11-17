@@ -16,6 +16,8 @@ namespace AndijonSaltanatlar.Population
         public float SharedMoney { get; set; } = 40;
         public float FoodReserve { get; set; } = 10;
         public float Happiness { get; set; } = 70;
+        public int HardshipDays { get; set; }
+        public bool IsRevolting { get; set; }
 
         // --- Oila iqtisodiyoti (oxirgi o'yin kuni) ---
         /// <summary>Kunlik daromad: ish haqi, hosil haqi, savdo foydasi, davlat yordami.</summary>

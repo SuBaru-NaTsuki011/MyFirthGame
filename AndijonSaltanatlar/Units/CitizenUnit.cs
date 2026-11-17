@@ -1,9 +1,12 @@
 using System.Collections.Generic;
 using AndijonSaltanatlar.Core;
+using AndijonSaltanatlar.Core.Graphics;
 using Microsoft.Xna.Framework;
 
 namespace AndijonSaltanatlar.Units
 {
+    public enum CitizenActivityIcon { None, Visiting, Talking, Trading, Complaining, Revolting }
+
     /// <summary>
     /// Shahar fuqarosi: belgilangan yo'nalish bo'ylab (A* yo'li bilan) yuradi.
     /// Qurolsiz, tinch aholi — shaharni "jonli" ko'rsatadi. PatrolUnit xatti-harakatini meros oladi.
@@ -13,24 +16,32 @@ namespace AndijonSaltanatlar.Units
     /// </summary>
     public sealed class CitizenUnit : PatrolUnit
     {
-        private static readonly string[] Names = { "Fuqaro", "Savdogar", "Hunarmand", "Dehqon", "Xaridor" };
+        private static readonly string[] Names = { "Fuqaro", "Savdogar", "Hunarmand", "Dehqon", "Xaridor", "Chopon" };
         private static readonly string[] Descs =
         {
             "Shahar aholisi. Kundalik yumushlari bilan band.",
             "Ipak va matolar savdogari. Bozor sari ketmoqda.",
             "Kulol-hunarmand. Ustaxonasiga qaytmoqda.",
             "Dehqon. Dalalardan shaharga kelmoqda.",
-            "Bozor xaridori. Narx-navo bilan qiziqadi."
+            "Bozor xaridori. Narx-navo bilan qiziqadi.",
+            "Chopon. Shahar chetidagi yaylovni aylanib yuradi."
         };
+        private static readonly string[] RoleLabels = { "ODDIY ODAM", "SAVDOGAR", "HUNARMAND", "DEHQON", "XARIDOR", "CHOPON" };
 
         public int Kind { get; }
+        public string RoleLabel => RoleLabels[Kind];
+        public string SpeechText { get; private set; } = "";
+        private float _speechTimer;
+        private int _lastWorkDay = -1;
+        public bool IsInsideBuilding { get; set; }
+        public CitizenActivityIcon ActivityIcon { get; private set; }
         /// <summary>Bog'langan haqiqiy fuqaro (PopulationManager). 0 = bog'lanmagan (faqat bezak).</summary>
         public int CitizenId { get; private set; }
         public bool IsBound => CitizenId > 0;
 
         public CitizenUnit(IEnumerable<Vector2> route, int kind, float speed = 0.8f) : base(route, speed)
         {
-            int k = ((kind % 5) + 5) % 5;
+            int k = ((kind % CitizenArt.Kinds) + CitizenArt.Kinds) % CitizenArt.Kinds;
             Kind = k;
             Name = Names[k];
             Description = Descs[k];
@@ -45,6 +56,28 @@ namespace AndijonSaltanatlar.Units
             CitizenId = citizenId;
             if (!string.IsNullOrEmpty(displayName)) Name = displayName;
             if (!string.IsNullOrEmpty(description)) Description = description;
+        }
+
+        public void Say(string text, float duration = 3f)
+        {
+            SpeechText = text ?? "";
+            _speechTimer = duration;
+        }
+
+        public void SetActivity(CitizenActivityIcon icon) => ActivityIcon = icon;
+
+        public void UpdateSpeech(float dt)
+        {
+            if (_speechTimer <= 0f) return;
+            _speechTimer -= dt;
+            if (_speechTimer <= 0f) SpeechText = "";
+        }
+
+        public bool TryBeginWork(int day)
+        {
+            if (_lastWorkDay == day) return false;
+            _lastWorkDay = day;
+            return true;
         }
     }
 }

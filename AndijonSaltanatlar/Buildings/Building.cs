@@ -6,7 +6,7 @@ namespace AndijonSaltanatlar.Buildings
 {
     public enum BuildingType
     {
-        House, Market, Tower, Wall, Gate, MainHall, Garden, Barracks, Madrasa, Mosque, Caravanserai
+        House, Market, Tower, Wall, Gate, MainHall, Garden, Barracks, Madrasa, Mosque, Caravanserai, Farm, GladiatorArena
     }
 
     public enum BuildingCategory
@@ -34,6 +34,7 @@ namespace AndijonSaltanatlar.Buildings
         public Point Position { get; set; }
         /// <summary>Iz o'lchami tile'larda.</summary>
         public Point Size { get; protected set; } = new Point(1, 1);
+        public Point FrontEntranceTile => new Point(Position.X + Size.X / 2, Position.Y + Size.Y);
         public Texture2D SpriteTexture { get; set; }
         public string SpriteKey { get; protected set; }
         public BuildingCategory Category { get; protected set; }

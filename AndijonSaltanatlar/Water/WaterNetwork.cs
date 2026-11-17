@@ -187,6 +187,8 @@ namespace AndijonSaltanatlar.Water
             {
                 case BuildingType.House: baseDemand = 1f; break;
                 case BuildingType.Garden: baseDemand = 2f; break;
+                case BuildingType.Farm: baseDemand = 4f; break;
+                case BuildingType.GladiatorArena: baseDemand = 2f; break;
                 case BuildingType.Market: baseDemand = 1.2f; break;
                 case BuildingType.Madrasa: baseDemand = 1f; break;
                 case BuildingType.Mosque: baseDemand = 0.6f; break;

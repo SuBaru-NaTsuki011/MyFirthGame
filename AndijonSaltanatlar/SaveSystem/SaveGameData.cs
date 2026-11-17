@@ -16,6 +16,9 @@ namespace AndijonSaltanatlar.SaveSystem
         public int Variant { get; set; }
         public int HitPoints { get; set; }
         public int Level { get; set; } = 1;
+        public int CropStage { get; set; }
+        public int GrowthDays { get; set; }
+        public int StoredProduce { get; set; }
     }
 
     /// <summary>O'yinchi qurgan yo'l katagi (Save/Load uchun).</summary>
@@ -58,6 +61,7 @@ namespace AndijonSaltanatlar.SaveSystem
         public List<SavedBuilding> PlayerBuildings { get; set; } = new List<SavedBuilding>();
         public List<SavedRoad> Roads { get; set; } = new List<SavedRoad>();
         public List<CitizenSnapshot> Citizens { get; set; } = new List<CitizenSnapshot>();
+        public List<int> CitizenBindings { get; set; } = new List<int>();
         public WorldSnapshot World { get; set; }
         public MilitarySnapshot Military { get; set; }
         public CivSnapshot Civ { get; set; }

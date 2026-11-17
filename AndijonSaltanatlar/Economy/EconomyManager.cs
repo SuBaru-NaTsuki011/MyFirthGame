@@ -56,8 +56,11 @@ namespace AndijonSaltanatlar.Economy
 
         /// <summary>Kunlik oziq-ovqat ishlab chiqarish formulasi (yagona manba).</summary>
         public static int ComputeFoodProduction(int farmers, int gardens, float foodBonus)
+            => ComputeFoodProduction(farmers, gardens, 0, foodBonus);
+
+        public static int ComputeFoodProduction(int farmers, int gardens, int farms, float foodBonus)
         {
-            int v = (int)((farmers * 5 + gardens * 2 + 3) * (1f + foodBonus));
+            int v = (int)((farmers * 5 + gardens * 2 + farms * 4 + 3) * (1f + foodBonus));
             return v < 0 ? 0 : v;
         }
 
@@ -72,7 +75,7 @@ namespace AndijonSaltanatlar.Economy
                               float foodBonus, float tradeBonus, float taxBonus, RetailDayResult retail = null)
         {
             int population = pop.Count;
-            int farmers = pop.CountProfession(CitizenProfession.Bogbon);
+            int farmers = pop.CountProfession(CitizenProfession.Bogbon) + pop.CountProfession(CitizenProfession.Dehqon);
             int traders = pop.CountProfession(CitizenProfession.Savdogar) + pop.CountProfession(CitizenProfession.Tashuvchi);
             int soldiers = pop.CountProfession(CitizenProfession.Soqchi);
             int officials = pop.CountProfession(CitizenProfession.Amaldor);
@@ -87,7 +90,7 @@ namespace AndijonSaltanatlar.Economy
             }
             else
             {
-                foodProduced = ComputeFoodProduction(farmers, b.Count(BuildingType.Garden), foodBonus);
+                foodProduced = ComputeFoodProduction(farmers, b.Count(BuildingType.Garden), b.Count(BuildingType.Farm), foodBonus);
                 foodConsumed = population;
                 _res.Add(ResourceType.Food, foodProduced - foodConsumed);
             }

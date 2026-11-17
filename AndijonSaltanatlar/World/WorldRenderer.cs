@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using AndijonSaltanatlar.Buildings;
 using AndijonSaltanatlar.Core;
+using AndijonSaltanatlar.Core.Graphics;
 using AndijonSaltanatlar.Units;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -16,12 +17,14 @@ namespace AndijonSaltanatlar.World
     {
         private readonly List<IWorldObject> _buffer = new List<IWorldObject>(1024);
         private readonly AssetManager _assets;
+        private readonly PixelFont _font;
 
         public int LastDrawnCount { get; private set; }
 
-        public WorldRenderer(AssetManager assets)
+        public WorldRenderer(AssetManager assets, PixelFont font)
         {
             _assets = assets;
+            _font = font;
         }
 
         private static int Compare(IWorldObject a, IWorldObject b)
@@ -39,12 +42,15 @@ namespace AndijonSaltanatlar.World
             return p.X + o.Texture.Width >= view.X && p.X <= view.Z && p.Y + o.Texture.Height >= view.Y && p.Y <= view.W;
         }
 
-        public void Draw(SpriteBatch sb, Vector4 view, MapManager map, BuildingManager buildings, UnitManager units)
+        /// <param name="extra">Qo'shimcha obyektlar (masalan, yerdagi qushlar) — binolar bilan birga saralanadi.</param>
+        public void Draw(SpriteBatch sb, Vector4 view, MapManager map, BuildingManager buildings, UnitManager units,
+            IReadOnlyList<IWorldObject> extra = null)
         {
             _buffer.Clear();
             foreach (var b in buildings.Buildings) if (Visible(b, view)) _buffer.Add(b);
             foreach (var d in map.Decorations) if (Visible(d, view)) _buffer.Add(d);
             foreach (var u in units.Units) if (Visible(u, view)) _buffer.Add(u);
+            if (extra != null) foreach (var e in extra) if (Visible(e, view)) _buffer.Add(e);
             _buffer.Sort(Compare);
 
             foreach (var o in _buffer)
@@ -76,11 +82,18 @@ namespace AndijonSaltanatlar.World
                         sb.Draw(o.Texture, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)) + off, null, tint, rot, origin,
                             new Vector2(1f, sy), fx, 0f);
                     }
+                    if (cu is CitizenUnit citizen && !cu.IsDown)
+                    {
+                        DrawCitizenRole(sb, o, citizen);
+                        if (!string.IsNullOrEmpty(citizen.SpeechText)) DrawCitizenSpeech(sb, o, citizen);
+                    }
                     continue;
                 }
 
                 sb.Draw(o.Texture, o.DrawPosition, null, tint, 0f, Vector2.Zero, 1f,
                     o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
+
+                if (o is Farm farm && farm.BuildProgress >= 1f) DrawFarmStatus(sb, o, farm);
 
                 // Bino daraja nishoni (evolyutsiya belgisi) — BuildingEvolution
                 if (o is Building b2 && b2.BuildProgress >= 1f)
@@ -116,6 +129,45 @@ namespace AndijonSaltanatlar.World
                 }
             }
             LastDrawnCount = _buffer.Count;
+        }
+
+        private void DrawCitizenRole(SpriteBatch sb, IWorldObject unit, CitizenUnit citizen)
+        {
+            Vector2 size = _font.Measure(citizen.RoleLabel, 1, 0);
+            int width = (int)size.X + 6;
+            int height = (int)size.Y + 4;
+            int x = (int)MathF.Round(unit.DrawPosition.X + unit.Texture.Width / 2f - width / 2f);
+            int y = (int)MathF.Round(unit.DrawPosition.Y - height - 2);
+            sb.Draw(_assets.Pixel, new Rectangle(x, y, width, height), new Color(12, 35, 22, 220));
+            _font.Draw(sb, citizen.RoleLabel, new Vector2(x + 3, y + 2), new Color(130, 245, 145), 1, 0);
+        }
+
+        private void DrawCitizenSpeech(SpriteBatch sb, IWorldObject unit, CitizenUnit citizen)
+        {
+            Vector2 size = _font.Measure(citizen.SpeechText, 1, 0);
+            int width = (int)size.X + 8;
+            int height = (int)size.Y + 6;
+            int x = (int)MathF.Round(unit.DrawPosition.X + unit.Texture.Width / 2f - width / 2f);
+            int y = (int)MathF.Round(unit.DrawPosition.Y - height - _font.Measure(citizen.RoleLabel, 1, 0).Y - 6);
+            var box = new Rectangle(x, y, width, height);
+            sb.Draw(_assets.Pixel, box, new Color(246, 230, 184));
+            sb.Draw(_assets.Pixel, new Rectangle(x, y, width, 1), new Color(83, 54, 35));
+            sb.Draw(_assets.Pixel, new Rectangle(x, y + height - 1, width, 1), new Color(83, 54, 35));
+            _font.DrawCentered(sb, citizen.SpeechText, new Vector2(box.Center.X, box.Center.Y), new Color(60, 42, 30), 1, 0);
+        }
+
+        private void DrawFarmStatus(SpriteBatch sb, IWorldObject building, Farm farm)
+        {
+            string text = farm.CropStage == FarmCropStage.Empty
+                ? "DALA: BO'SH"
+                : farm.CropStage == FarmCropStage.Mature ? "HOSIL TAYYOR" : "EKIN O'SMOQDA";
+            Vector2 size = _font.Measure(text, 1, 0);
+            int width = (int)size.X + 8;
+            int x = (int)MathF.Round(building.DrawPosition.X + building.Texture.Width / 2f - width / 2f);
+            int y = (int)MathF.Round(building.DrawPosition.Y - size.Y - 6);
+            var box = new Rectangle(x, y, width, (int)size.Y + 4);
+            sb.Draw(_assets.Pixel, box, new Color(18, 30, 21, 220));
+            _font.DrawCentered(sb, text, new Vector2(box.Center.X, box.Center.Y), new Color(165, 238, 139), 1, 0);
         }
 
         /// <summary>World nuqtasi ostidagi eng oldingi obyekt (Unit, Building yoki Decoration).</summary>

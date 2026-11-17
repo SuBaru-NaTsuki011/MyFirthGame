@@ -55,6 +55,12 @@ namespace AndijonSaltanatlar.Forecasting
                     case BuildingType.Garden:
                         jobs += 2; food += 5; happiness += 4;
                         break;
+                    case BuildingType.Farm:
+                        jobs += 6; food += 8;
+                        break;
+                    case BuildingType.GladiatorArena:
+                        happiness += 3;
+                        break;
                     case BuildingType.Madrasa:
                         jobs += 3; happiness += 2;
                         break;

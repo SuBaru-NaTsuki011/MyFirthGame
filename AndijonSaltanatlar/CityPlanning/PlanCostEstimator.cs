@@ -105,6 +105,8 @@ namespace AndijonSaltanatlar.CityPlanning
             BuildingType.House => "Turar joy sig'imi +5",
             BuildingType.Market => "Savdo va ish o'rinlari +",
             BuildingType.Garden => "Oziq-ovqat va baxt +",
+            BuildingType.Farm => "Dehqonlar, oziq-ovqat va hosil savdosi +",
+            BuildingType.GladiatorArena => "Gladiatorlar va tomosha +",
             BuildingType.Madrasa => "Ta'lim +",
             BuildingType.Mosque => "Madaniyat va baxt +",
             BuildingType.Caravanserai => "Savdo daromadi +, turar joy +8",
