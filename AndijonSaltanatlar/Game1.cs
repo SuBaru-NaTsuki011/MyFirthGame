@@ -72,6 +72,11 @@ public sealed class Game1 : Game
 	// Parrandalar: kaptarlar, chumchuqlar, laylaklar (bezak, odam yaqinlashsa uchib ketadi)
 	private BirdSystem _birds;
 
+	// Chorva: cho'ponlarning qo'y, echki va mollari (har kuni ko'payadi)
+	private LivestockSystem _livestock;
+
+	private readonly System.Collections.Generic.List<IWorldObject> _worldExtras = new System.Collections.Generic.List<IWorldObject>();
+
 	private Unit _lastPossessed;
 
 	private float _zoomBeforePossess = 0.8f;
@@ -411,11 +416,12 @@ public sealed class Game1 : Game
 		_npcInteractions = new AndijonSaltanatlar.NPC.NPCInteractionManager();
 		_npcInteractions.BindUnits(_units, _state.Pop);
 		_construction = new ConstructionSystem(_map, _buildings, _units, _state, _assets);
-		_combat = new AndijonSaltanatlar.Combat.CombatSystem(_map, _units, _state);
+		_combat = new AndijonSaltanatlar.Combat.CombatSystem(_map, _units, _state) { Buildings = _buildings };
 		_citizenSocial = new AndijonSaltanatlar.NPC.CitizenSocialSystem();
 		_combat.OnCitizenWorkRequested = PerformCitizenWork;
 		_interior = new AndijonSaltanatlar.Interiors.HouseInterior(_assets, _map, _buildings, _state);
 		_birds = new BirdSystem(_assets, _map, _units);
+		_livestock = new LivestockSystem(_assets, _map, _units);
 		_governor = new AIGovernorManager
 		{
 			OnMessage = (string msg) =>
@@ -1132,6 +1138,7 @@ public sealed class Game1 : Game
 			_onlinePanel.Update(_input, viewport.Width, viewport.Height, num);
 			_units.Update(num * 0.6f);
 			_birds?.Update(num * 0.6f, _dayNight.NightAmount, null);
+			_livestock?.Update(num * 0.6f);
 			_map.Update(num);
 			_dayNight.Update(_state.Clock.DayFraction);
 			_frames++;
@@ -1344,6 +1351,7 @@ public sealed class Game1 : Game
 		}
 		_units.Update(dt * (_combat?.TimeScale ?? 1f));
 		_birds?.Update(dt, _dayNight.NightAmount, _combat.Possessed);
+		_livestock?.Update(dt);
 		_citizenSocial.Update(_units, dt);
 		UpdateFarmControl();
 		_map.Update(dt);
@@ -1354,6 +1362,11 @@ public sealed class Game1 : Game
 		{
 			_npcInteractions.RefreshUnits(_units, _state.Pop);
 			_governor?.OnDayTick();
+			string herdNews = _livestock?.DayTick(_state);
+			if (herdNews != null)
+			{
+				_state.ShowMessage(herdNews);
+			}
 		}
 		_time += num;
 		_dayNight.Update(_state.Clock.DayFraction);
@@ -1811,7 +1824,10 @@ public sealed class Game1 : Game
 		DrawSelectionHighlight();
 		_combat?.DrawGroundMarkers(_sb);
 		_blueprintRenderer?.Draw(_sb, _governor?.Blueprint, _governor?.Blueprints.SelectedItemId ?? 0);
-		_renderer.Draw(_sb, visibleWorldRect, _map, _buildings, _units, _birds?.GroundObjects);
+		_worldExtras.Clear();
+		if (_birds != null) _worldExtras.AddRange(_birds.GroundObjects);
+		if (_livestock != null) _worldExtras.AddRange(_livestock.GroundObjects);
+		_renderer.Draw(_sb, visibleWorldRect, _map, _buildings, _units, _worldExtras);
 		_birds?.DrawSky(_sb, visibleWorldRect);
 		_construction.Draw(_sb);
 		_sb.End();
@@ -1943,6 +1959,7 @@ public sealed class Game1 : Game
 		LegacyUiSize(out float hudScale);
 		_combat?.DrawHud(_sb, _assets.Pixel, _font, _camera, viewport.Width, viewport.Height, Math.Max(1, (int)Math.Round(hudScale)));
 		_interior?.DrawPrompt(_sb, _assets.Pixel, _font, _camera, viewport.Width, viewport.Height);
+		_livestock?.DrawHerdInfo(_sb, _assets.Pixel, _font, _combat?.Possessed ?? (_state.Selected as Unit), viewport.Width);
 		_sb.End();
 		BeginLegacyUi(out Point v);
 		_ui.Draw(_sb, v.X, v.Y);

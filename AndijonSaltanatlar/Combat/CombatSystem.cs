@@ -30,9 +30,7 @@ namespace AndijonSaltanatlar.Combat
         private const float PlayerAttackCooldown = 0.42f;
         private const float PlayerDamageMultiplier = 1.6f;
         private const float DefenderSpeed = 1.8f;
-        private const float GuardAggro = 7f;            // postdagi soqchi shu radiusda jangga kiradi
-        private const float PatrolAggro = 11f;
-        private const float DisengageRange = 15f;
+        private const float DisengageRange = 15f;       // bosqindan tashqari (masalan, o'yinchi bosqinchi ichida) jang masofasi
         private const float RaiderAggro = 6f;
         private const float RaiderPossessedAggro = 9f;
         private static readonly Vector2 CityCenter = new Vector2(31.5f, 31.5f);
@@ -43,7 +41,14 @@ namespace AndijonSaltanatlar.Combat
         private readonly Random _rng = new Random();
         public Action<CitizenUnit> OnCitizenWorkRequested { get; set; }
 
-        private enum AgentMode { Possessed, Fighting, Raiding, Returning, Escort }
+        private enum AgentMode { Possessed, Fighting, Raiding, Returning, Escort, Fleeing, Hiding }
+
+        /// <summary>Fuqarolar qochib yashirinadigan uylarni topish uchun (Game1 o'rnatadi).</summary>
+        public AndijonSaltanatlar.Buildings.BuildingManager Buildings { get; set; }
+
+        private const float CitizenPanicRange = 10f;   // dushman shu masofada ko'rinsa fuqaro qochadi
+        private const float FleeSpeed = 2.7f;
+        private float _panicThink;
 
         private sealed class Agent
         {
@@ -58,6 +63,7 @@ namespace AndijonSaltanatlar.Combat
             public Point PathGoal;
             public float RepathTimer;
             public Vector2 EscortOffset;
+            public Vector2 FleeTo;
         }
 
         // ==================================================================
@@ -95,7 +101,7 @@ namespace AndijonSaltanatlar.Combat
                     Unit g = guards[i];
                     if (!_agents.TryGetValue(g, out Agent ga))
                     {
-                        ga = new Agent { Unit = g, Home = g.Position };
+                        ga = new Agent { Unit = g, Home = g.Position, Mode = AgentMode.Escort };
                         _agents[g] = ga;
                     }
                     g.ExternallyControlled = true;
@@ -192,6 +198,7 @@ namespace AndijonSaltanatlar.Combat
             Possessed = u;
             _justPossessed = true; // shu kadrdagi F/Q/E bosilishi darhol chiqarib yubormasin
             u.ExternallyControlled = true;
+            u.Hidden = false;
             u.DriveIdle();
             if (_agents.TryGetValue(u, out Agent a)) a.Mode = AgentMode.Possessed; // uy joyi saqlanadi
             else _agents[u] = new Agent { Unit = u, Mode = AgentMode.Possessed, Home = u.Position };
@@ -404,7 +411,8 @@ namespace AndijonSaltanatlar.Combat
                 _raiders.Add(r);
                 _agents[r] = new Agent { Unit = r, Mode = AgentMode.Raiding, Home = pos, ThinkTimer = (float)_rng.NextDouble() * 0.4f };
             }
-            _state.ShowMessage("BOSQIN! " + count + " ta dushman shaharga yurdi. Himoyaga!", true);
+            _state.ShowMessage("BOSQIN! " + count + " ta dushman! Barcha askarlar himoyaga otlandi, xalq uylarga yashirinsin!", true);
+            _defenderThink = 0f; // jangovar hayajon darhol
         }
 
         /// <summary>Bosqinchilar bosh ko'cha (31-32 qatorlar) bo'ylab darvoza tashqarisida saf tortadi.</summary>
@@ -451,7 +459,88 @@ namespace AndijonSaltanatlar.Combat
             foreach (Unit u in _units.Units)
                 if (u.Team == UnitTeam.Player && u.IsDown) u.Revive(victory ? 0.6f : 0.35f);
             foreach (Agent a in _agents.Values)
-                if (a.Mode == AgentMode.Fighting) BeginReturn(a);
+            {
+                if (a.Mode == AgentMode.Fleeing || a.Mode == AgentMode.Hiding)
+                {
+                    // Yashiringan xalq uylardan chiqib, o'z ishiga qaytadi
+                    a.Unit.Hidden = false;
+                    if (victory && a.Unit is CitizenUnit cz && _rng.Next(3) == 0) cz.Say("Xayriyat! Dushman qaytarildi!", 3f);
+                    BeginReturn(a);
+                }
+                else if (a.Mode == AgentMode.Fighting) BeginReturn(a);
+            }
+        }
+
+        // ==================================================================
+        // XALQ QOCHADI: dushmanni ko'rgan fuqaro eng yaqin xavfsiz uyga yugurib yashirinadi
+        // ==================================================================
+
+        private static readonly string[] PanicLines =
+        {
+            "Voy! Dushman! Qochinglar!", "Bosqinchilar! Uyga kiringlar!", "Yordam bering! Askarlar!", "Bolalarni olib qoching!"
+        };
+
+        private void UpdateCitizenPanic(float dt)
+        {
+            _panicThink -= dt;
+            if (_panicThink > 0f) return;
+            _panicThink = 0.4f;
+            foreach (Unit u in _units.Units)
+            {
+                if (!(u is CitizenUnit c) || c.IsDown || c.Hidden || c == Possessed) continue;
+                if (_agents.TryGetValue(c, out Agent existing) && existing.Mode != AgentMode.Returning) continue;
+                if (existing == null && c.ExternallyControlled) continue; // boshqa tizim band qilgan (masalan suhbat)
+                Unit raider = NearestEnemy(c, CitizenPanicRange);
+                if (raider == null) continue;
+
+                Agent a = existing ?? new Agent { Unit = c, Home = c.Position, Mode = AgentMode.Fleeing };
+                _agents[c] = a;
+                c.ExternallyControlled = true;
+                a.Mode = AgentMode.Fleeing;
+                a.Path = null;
+                a.FleeTo = FindHideout(c.Position);
+                c.Say(PanicLines[_rng.Next(PanicLines.Length)], 2.5f);
+                AddFloat(c.Position, "!", new Color(255, 230, 120));
+            }
+        }
+
+        /// <summary>Dushmanlardan uzoqroq, yaqin uy darvozasi. Topilmasa — dushmandan teskari tomonga.</summary>
+        private Vector2 FindHideout(Vector2 from)
+        {
+            Vector2 best = Vector2.Zero;
+            float bestScore = float.MaxValue;
+            if (Buildings != null)
+            {
+                foreach (var b in Buildings.Buildings)
+                {
+                    if (b.Type != AndijonSaltanatlar.Buildings.BuildingType.House || b.BuildProgress < 1f) continue;
+                    var door = new Vector2(b.Position.X + 1.45f, b.Position.Y + 2.5f);
+                    if (!Walk(door)) continue;
+                    float danger = float.MaxValue;
+                    foreach (RaiderUnit r in _raiders) if (!r.IsDown) danger = MathF.Min(danger, Vector2.Distance(r.Position, door));
+                    if (danger < 5f) continue; // dushman yonidagi uyga qochmaydi
+                    float score = Vector2.Distance(from, door) - MathF.Min(danger, 14f) * 0.3f;
+                    if (score < bestScore) { bestScore = score; best = door; }
+                }
+            }
+            if (bestScore < float.MaxValue) return best;
+            Unit near = null;
+            foreach (RaiderUnit r in _raiders) if (!r.IsDown && (near == null || Vector2.Distance(r.Position, from) < Vector2.Distance(near.Position, from))) near = r;
+            Vector2 away = near != null ? from - near.Position : new Vector2(1, 1);
+            if (away.LengthSquared() < 0.01f) away = new Vector2(1, 0);
+            away.Normalize();
+            return Clamp(from + away * 8f);
+        }
+
+        private void UpdateFleeing(Agent a, float dt)
+        {
+            if (MoveAgent(a, a.FleeTo, FleeSpeed, dt, 0.35f))
+            {
+                a.Mode = AgentMode.Hiding;
+                a.Unit.Hidden = true; // uyga kirib yashirindi
+                a.Unit.DriveIdle();
+                if (_state.Selected == a.Unit) _state.Select(null);
+            }
         }
 
         // ==================================================================
@@ -488,7 +577,11 @@ namespace AndijonSaltanatlar.Combat
                 if (_warnTimer <= 0f) { _warnTimer = 0f; SpawnRaid(); }
             }
 
-            if (RaidActive) UpdateDefenderAwareness(dt);
+            if (RaidActive)
+            {
+                UpdateDefenderAwareness(dt);
+                UpdateCitizenPanic(dt);
+            }
 
             // Agentlar (AI boshqaruvidagi unitlar)
             var snapshot = new List<Agent>(_agents.Values);
@@ -503,6 +596,8 @@ namespace AndijonSaltanatlar.Combat
                     case AgentMode.Raiding: UpdateRaider(a, dt); break;
                     case AgentMode.Returning: UpdateReturning(a, dt); break;
                     case AgentMode.Escort: UpdateEscort(a, dt); break;
+                    case AgentMode.Fleeing: UpdateFleeing(a, dt); break;
+                    case AgentMode.Hiding: u.DriveIdle(); break;
                 }
             }
             Separate();
@@ -549,16 +644,19 @@ namespace AndijonSaltanatlar.Combat
             foreach (Unit u in _units.Units)
             {
                 if (!IsSoldier(u) || u.IsDown || u == Possessed) continue;
-                float aggro = u is GuardUnit ? GuardAggro : PatrolAggro;
-                Unit enemy = NearestEnemy(u, aggro);
+                // Jangovar hayajon: bosqin paytida shahardagi BARCHA askarlar eng yaqin dushmanga yuguradi
+                Unit enemy = NearestEnemy(u, float.MaxValue);
                 if (enemy == null) continue;
                 if (!_agents.TryGetValue(u, out Agent a))
                 {
-                    a = new Agent { Unit = u, Home = u.Position };
+                    // Muhim: Mode aniq beriladi (enum standart qiymati Possessed — aks holda askar "o'yinchiniki" bo'lib qotib qoladi)
+                    a = new Agent { Unit = u, Home = u.Position, Mode = AgentMode.Fighting };
                     _agents[u] = a;
                     u.ExternallyControlled = true;
                 }
-                if (a.Mode != AgentMode.Possessed) { a.Mode = AgentMode.Fighting; if (a.Target == null || a.Target.IsDown) a.Target = enemy; }
+                // u != Possessed yuqorida tekshirilgan — hamrohlar ham, qaytayotganlar ham jangga kiradi
+                a.Mode = AgentMode.Fighting;
+                if (a.Target == null || a.Target.IsDown) a.Target = enemy;
             }
             if (RaidActive) SoundAlarm();
         }
@@ -987,7 +1085,8 @@ namespace AndijonSaltanatlar.Combat
         private void Separate()
         {
             var list = new List<Unit>();
-            foreach (Agent a in _agents.Values) if (!a.Unit.IsDown && a.Mode != AgentMode.Returning) list.Add(a.Unit);
+            foreach (Agent a in _agents.Values)
+                if (!a.Unit.IsDown && a.Mode != AgentMode.Returning && a.Mode != AgentMode.Hiding) list.Add(a.Unit);
             for (int i = 0; i < list.Count; i++)
                 for (int j = i + 1; j < list.Count; j++)
                 {
@@ -1061,7 +1160,9 @@ namespace AndijonSaltanatlar.Combat
             // --- HP chiziqlari (jangdagi yoki jarohatlangan unitlar) ---
             foreach (Unit u in _units.Units)
             {
-                bool show = u.Team == UnitTeam.Enemy || u == Possessed || (u.HitPoints < u.MaxHitPoints && u.MaxHitPoints > 0) || _agents.ContainsKey(u) && RaidActive;
+                if (u.Hidden) continue;
+                bool show = u.Team == UnitTeam.Enemy || u == Possessed || (u.HitPoints < u.MaxHitPoints && u.MaxHitPoints > 0)
+                    || (RaidActive && IsSoldier(u) && _agents.ContainsKey(u));
                 if (!show || u.IsDown) continue;
                 Vector2 s = cam.WorldToScreen(IsoMath.TileToWorld(u.Position) + new Vector2(0, -52));
                 if (s.X < -40 || s.Y < -20 || s.X > vw + 40 || s.Y > vh + 20) continue;

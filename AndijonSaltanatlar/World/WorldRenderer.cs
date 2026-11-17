@@ -49,7 +49,7 @@ namespace AndijonSaltanatlar.World
             _buffer.Clear();
             foreach (var b in buildings.Buildings) if (Visible(b, view)) _buffer.Add(b);
             foreach (var d in map.Decorations) if (Visible(d, view)) _buffer.Add(d);
-            foreach (var u in units.Units) if (Visible(u, view)) _buffer.Add(u);
+            foreach (var u in units.Units) if (!u.Hidden && Visible(u, view)) _buffer.Add(u);
             if (extra != null) foreach (var e in extra) if (Visible(e, view)) _buffer.Add(e);
             _buffer.Sort(Compare);
 

@@ -78,6 +78,8 @@ namespace AndijonSaltanatlar.Units
         /// o'yinchi (ichiga kirish) yoki jang AI'si. Harakat DriveMove/DriveIdle orqali beriladi.
         /// </summary>
         public bool ExternallyControlled { get; set; }
+        /// <summary>Unit uyga yashiringan (bosqin paytida qochgan fuqaro) — chizilmaydi va tanlanmaydi.</summary>
+        public bool Hidden { get; set; }
         /// <summary>Hujum masofasi (tile). Nayzalilar uzunroq uradi.</summary>
         public float AttackRange { get; protected set; } = 0.95f;
         /// <summary>Zarba animatsiyasi (oldinga intilish) qolgan vaqti.</summary>

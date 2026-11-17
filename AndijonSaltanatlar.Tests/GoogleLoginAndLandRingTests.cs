@@ -59,27 +59,30 @@ namespace AndijonSaltanatlar.Tests
         }
 
         [Fact]
-        public void Land_NextRingOpensOnlyAfterAllFourSidesOpened()
+        public void Land_SecondRingOpensOnlyAfterAllFourSidesOpened()
         {
             var land = new CityLandExpansionManager();
             land.Initialize();
             land.RefreshStates(population: 100000);
 
-            Assert.All(land.Parcels.Where(p => p.Ring == 1), p => Assert.Equal(LandParcelState.Unlockable, p.State));
-            Assert.All(land.Parcels.Where(p => p.Ring == 2), p => { Assert.Equal(LandParcelState.Locked, p.State); Assert.True(p.WaitingForPreviousRing); });
-
-            var ring1 = land.Parcels.Where(p => p.Ring == 1).ToList();
-            for (int i = 0; i < 3; i++) land.Unlock(ring1[i]);
-            land.RefreshStates(100000);
-            Assert.False(land.CanUnlockRing(land.Parcels.First(p => p.Ring == 2)));
-            Assert.All(land.Parcels.Where(p => p.Ring == 2), p => Assert.Equal(LandParcelState.Locked, p.State));
-
-            land.Unlock(ring1[3]);
-            Assert.Equal(1, land.LastCompletedRing);
-            land.RefreshStates(100000);
+            Assert.All(land.Parcels.Where(p => p.Ring == 1), p => Assert.Equal(LandParcelState.Open, p.State));
             Assert.Equal(2, land.CurrentRing);
-            Assert.All(land.Parcels.Where(p => p.Ring == 2), p => Assert.Equal(LandParcelState.Unlockable, p.State));
-            Assert.All(land.Parcels.Where(p => p.Ring == 3), p => Assert.True(p.WaitingForPreviousRing));
+
+            var ring2 = land.Parcels.Where(p => p.Ring == 2).ToList();
+            Assert.All(ring2, p => Assert.Equal(LandParcelState.Unlockable, p.State));
+            Assert.All(land.Parcels.Where(p => p.Ring == 3), p => { Assert.Equal(LandParcelState.Locked, p.State); Assert.True(p.WaitingForPreviousRing); });
+
+            for (int i = 0; i < 3; i++) land.Unlock(ring2[i]);
+            land.RefreshStates(100000);
+            Assert.False(land.CanUnlockRing(land.Parcels.First(p => p.Ring == 3)));
+            Assert.All(land.Parcels.Where(p => p.Ring == 3), p => Assert.Equal(LandParcelState.Locked, p.State));
+
+            land.Unlock(ring2[3]);
+            Assert.Equal(2, land.LastCompletedRing);
+            land.RefreshStates(100000);
+            Assert.Equal(3, land.CurrentRing);
+            Assert.All(land.Parcels.Where(p => p.Ring == 3), p => Assert.Equal(LandParcelState.Unlockable, p.State));
+            Assert.All(land.Parcels.Where(p => p.Ring == 4), p => Assert.True(p.WaitingForPreviousRing));
         }
 
         [Fact]
