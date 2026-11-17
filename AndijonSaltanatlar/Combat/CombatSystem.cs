@@ -823,8 +823,12 @@ namespace AndijonSaltanatlar.Combat
         }
 
         /// <summary>Ekran qatlami: HP chiziqlari, zarba raqamlari, bosqin banneri, boshqaruv paneli.</summary>
-        public void DrawHud(SpriteBatch sb, Texture2D px, PixelFont font, CameraManager cam, int vw, int vh)
+        /// <summary>HUD masshtabi (telefonda 2: eski UI bilan bir xil o'lcham).</summary>
+        private int _k = 1;
+
+        public void DrawHud(SpriteBatch sb, Texture2D px, PixelFont font, CameraManager cam, int vw, int vh, int uiScale = 1)
         {
+            _k = Math.Max(1, uiScale);
             // --- HP chiziqlari (jangdagi yoki jarohatlangan unitlar) ---
             foreach (Unit u in _units.Units)
             {
@@ -859,7 +863,7 @@ namespace AndijonSaltanatlar.Combat
             if (RaidIncoming)
             {
                 string t = "DUSHMAN YAQINLASHMOQDA!  " + GateNames[_gateIndex].ToUpperInvariant() + " DARVOZA  " + (int)MathF.Ceiling(_warnTimer);
-                Banner(sb, px, font, vw, t, new Color(150, 30, 26, 230), Color.White);
+                Banner(sb, px, font, vw, t, new Color(150, 30, 26, 230), Color.White, _k);
             }
             else if (RaidActive)
             {
@@ -868,13 +872,21 @@ namespace AndijonSaltanatlar.Combat
                 int def = 0;
                 foreach (Unit u in _units.Units) if (IsSoldier(u) && !u.IsDown) def++;
                 string t = "BOSQIN!  Dushman: " + alive + "/" + _raidTotal + "   Himoyachilar: " + def + (_lootStolen > 0 ? "   Talangan: " + _lootStolen : "");
-                Banner(sb, px, font, vw, t, new Color(110, 24, 22, 220), new Color(255, 230, 200));
+                Banner(sb, px, font, vw, t, new Color(110, 24, 22, 220), new Color(255, 230, 200), _k);
                 if (Possessed == null)
-                    font.DrawCentered(sb, "Jangchini tanlang va F bosing - o'zingiz jangga kiring!", new Vector2(vw / 2f, 92), new Color(255, 220, 150), 2);
+                {
+                    // Ko'rsatma xarita ustida o'qilishi uchun qora fon bilan
+                    string hint = "Jangchini tanlang va F bosing - o'zingiz jangga kiring!";
+                    int hs = FitScale(font, hint, vw - 24, 2 * _k);
+                    Vector2 hm = font.Measure(hint, hs);
+                    float hy = (44 + 30) * _k + 8 + hm.Y / 2f;
+                    sb.Draw(px, new Rectangle((int)(vw / 2f - hm.X / 2 - 8), (int)(hy - hm.Y / 2 - 5), (int)hm.X + 16, (int)hm.Y + 10), new Color(20, 12, 10, 190));
+                    font.DrawCentered(sb, hint, new Vector2(vw / 2f, hy), new Color(255, 220, 150), hs);
+                }
             }
             else if (_resultTimer > 0f && _resultText != null)
             {
-                Banner(sb, px, font, vw, _resultText, _resultVictory ? new Color(30, 100, 50, 225) : new Color(90, 30, 30, 225), Color.White);
+                Banner(sb, px, font, vw, _resultText, _resultVictory ? new Color(30, 100, 50, 225) : new Color(90, 30, 30, 225), Color.White, _k);
             }
 
             // --- Boshqaruv paneli ---
@@ -946,42 +958,66 @@ namespace AndijonSaltanatlar.Combat
             }
         }
 
-        private static void Banner(SpriteBatch sb, Texture2D px, PixelFont font, int vw, string text, Color bg, Color fg)
+        /// <summary>Matn kenglikka sig'adigan eng katta piksel masshtabi (kamida 1).</summary>
+        private static int FitScale(PixelFont font, string text, int maxW, int want)
         {
-            Vector2 size = font.Measure(text, 2);
-            int w = (int)size.X + 40, h = 30;
-            var r = new Rectangle(vw / 2 - w / 2, 44, w, h);
+            for (int s = Math.Max(1, want); s > 1; s--)
+                if (font.Measure(text, s).X <= maxW) return s;
+            return 1;
+        }
+
+        private static void Banner(SpriteBatch sb, Texture2D px, PixelFont font, int vw, string text, Color bg, Color fg, int k = 1)
+        {
+            int sc = FitScale(font, text, vw - 60, 2 * k);
+            Vector2 size = font.Measure(text, sc);
+            int w = (int)size.X + 40 * k, h = (int)size.Y + 16 * k;
+            var r = new Rectangle(vw / 2 - w / 2, 44 * k, w, h);
             sb.Draw(px, new Rectangle(r.X - 2, r.Y - 2, r.Width + 4, r.Height + 4), new Color(20, 12, 10, 220));
             sb.Draw(px, r, bg);
-            font.DrawCentered(sb, text, r.Center.ToVector2(), fg, 2);
+            font.DrawCentered(sb, text, r.Center.ToVector2(), fg, sc);
         }
 
         private void DrawPossessionPanel(SpriteBatch sb, Texture2D px, PixelFont font, int vw, int vh)
         {
             Unit p = Possessed;
-            int w = Math.Min(vw - 32, 620), h = 74;
-            var r = new Rectangle(vw / 2 - w / 2, vh - 44 - h - 10, w, h);
+            int k = _k;
+            // Boshqaruv yo'riqnomasi ikki qatorda va o'qiladigan o'lchamda (oldin bir qatorda mayda bo'lib, panelga sig'masdi)
+            string[] help =
+            {
+                "WASD yurish | SHIFT yugurish | SPACE kombo | R aylanma",
+                "ENTER binoga kirish | Q/E boshqasi | F chiqish"
+            };
+            int w = Math.Min(vw - 32, 640 * k);
+            int hs = 2 * k;
+            foreach (string line in help) hs = Math.Min(hs, FitScale(font, line, w - 28 * k, 2 * k));
+            int helpLine = PixelFont.GH * hs + 5 * k;
+            int h = 10 * k + 20 * k + 20 * k + help.Length * helpLine + 6 * k;
+            var r = new Rectangle(vw / 2 - w / 2, vh - 44 * k - h - 10 * k, w, h);
             sb.Draw(px, new Rectangle(r.X - 2, r.Y - 2, r.Width + 4, r.Height + 4), new Color(216, 167, 83, 230));
             sb.Draw(px, r, new Color(24, 20, 18, 235));
 
-            int x = r.X + 14, y = r.Y + 10;
-            font.Draw(sb, "SIZ: " + p.Name.ToUpperInvariant(), new Vector2(x, y), new Color(255, 214, 90), 2);
+            int x = r.X + 14 * k, y = r.Y + 10 * k;
             string atk = "Hujum " + Math.Max(4, p.Attack);
-            font.DrawRight(sb, atk, new Vector2(r.Right - 14, y), new Color(220, 200, 170), 2);
-            y += 20;
+            int ts = FitScale(font, "SIZ: " + p.Name.ToUpperInvariant() + "    " + atk, w - 28 * k, 2 * k);
+            font.Draw(sb, "SIZ: " + p.Name.ToUpperInvariant(), new Vector2(x, y), new Color(255, 214, 90), ts);
+            font.DrawRight(sb, atk, new Vector2(r.Right - 14 * k, y), new Color(220, 200, 170), ts);
+            y += 20 * k;
 
             // HP
-            int bw = w - 28, bh = 10;
+            int bw = w - 28 * k, bh = 10 * k;
             sb.Draw(px, new Rectangle(x - 1, y - 1, bw + 2, bh + 2), Color.Black);
             float f = p.MaxHitPoints > 0 ? (float)p.HitPoints / p.MaxHitPoints : 0f;
             sb.Draw(px, new Rectangle(x, y, (int)(bw * f), bh), f > 0.35f ? new Color(90, 200, 110) : new Color(220, 70, 50));
-            font.DrawCentered(sb, p.HitPoints + " / " + p.MaxHitPoints, new Vector2(x + bw / 2f, y + bh / 2f + 1), Color.White, 1);
+            font.DrawCentered(sb, p.HitPoints + " / " + p.MaxHitPoints, new Vector2(x + bw / 2f, y + bh / 2f + 1), Color.White, k);
             if (p.AttackCooldown > 0f)
-                sb.Draw(px, new Rectangle(x, y + bh + 2, (int)(bw * (p.AttackCooldown / PlayerAttackCooldown)), 2), new Color(255, 214, 90, 180));
-            y += 20;
+                sb.Draw(px, new Rectangle(x, y + bh + 2 * k, (int)(bw * (p.AttackCooldown / PlayerAttackCooldown)), 2 * k), new Color(255, 214, 90, 180));
+            y += 20 * k;
 
-            font.Draw(sb, "WASD yurish | SHIFT yugurish | SPACE kombo | R aylanma | ENTER binoga kirish | Q/E boshqasi | F chiqish",
-                new Vector2(x, y), new Color(190, 180, 160), 1);
+            foreach (string line in help)
+            {
+                font.Draw(sb, line, new Vector2(x, y), new Color(200, 190, 168), hs);
+                y += helpLine;
+            }
         }
     }
 }

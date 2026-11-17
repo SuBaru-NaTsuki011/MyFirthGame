@@ -1744,7 +1744,8 @@ public sealed class Game1 : Game
 		// Jang HUD (odam ichiga kirganda) va uyga kirish ko'rsatkichi — haqiqiy ekran o'lchamida
 		Viewport viewport = GraphicsDevice.Viewport;
 		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
-		_combat?.DrawHud(_sb, _assets.Pixel, _font, _camera, viewport.Width, viewport.Height);
+		LegacyUiSize(out float hudScale);
+		_combat?.DrawHud(_sb, _assets.Pixel, _font, _camera, viewport.Width, viewport.Height, Math.Max(1, (int)Math.Round(hudScale)));
 		_interior?.DrawPrompt(_sb, _assets.Pixel, _font, _camera, viewport.Width, viewport.Height);
 		_sb.End();
 		BeginLegacyUi(out Point v);
