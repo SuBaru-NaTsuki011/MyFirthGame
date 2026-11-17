@@ -30,6 +30,9 @@ namespace AndijonSaltanatlar.Units
             return unit;
         }
 
+        /// <summary>Unitni dunyodan olib tashlaydi (faqat vaqtinchalik unitlar — masalan bosqinchilar — uchun).</summary>
+        public bool Remove(Unit unit) => Units.Remove(unit);
+
         public void Update(float dt)
         {
             foreach (var u in Units) u.Update(dt);

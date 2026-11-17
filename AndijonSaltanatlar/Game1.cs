@@ -53,6 +53,16 @@ public sealed class Game1 : Game
 
 	private ConstructionSystem _construction;
 
+	// Jang: istalgan jangchi/fuqaro ichiga kirish (F) + shaharga bosqin (B / avtomatik)
+	private AndijonSaltanatlar.Combat.CombatSystem _combat;
+
+	// Uyga kirish: boshqarilayotgan odam uy yonida ENTER bossa — ichki xona (yotoqxona + oshxona)
+	private AndijonSaltanatlar.Interiors.HouseInterior _interior;
+
+	private Unit _lastPossessed;
+
+	private float _zoomBeforePossess = 0.8f;
+
 	private AIGovernorManager _governor;
 
 	private BlueprintRenderer _blueprintRenderer;
@@ -290,6 +300,36 @@ public sealed class Game1 : Game
 				_state.Coins += battleResult.CoinChange;
 			}
 		}
+		if (_opt.RaidGate.HasValue)
+		{
+			_combat.StartRaidNow(_opt.RaidGate.Value);
+		}
+		if (_opt.PossessNear.HasValue)
+		{
+			_combat.PossessNearestSoldier(_opt.PossessNear.Value);
+		}
+		if (_opt.EnterHouse.HasValue)
+		{
+			// -1: saroyga kirish, -2: shohni shaharga chiqarish, 0..: K-uy
+			var houses = _buildings.Buildings.Where((Building b) => _opt.EnterHouse.Value < 0 ? b.Type == BuildingType.MainHall : b.Type == BuildingType.House).ToList();
+			if (houses.Count > 0)
+			{
+				Building house = houses[Math.Clamp(_opt.EnterHouse.Value, 0, houses.Count - 1)];
+				if (_combat.Possessed == null)
+				{
+					_combat.PossessNearestSoldier(new Vector2(house.Position.X, house.Position.Y));
+				}
+				_lastPossessed = _combat.Possessed;
+				_interior.Enter(house, _combat.Possessed);
+				if (_opt.EnterHouse.Value == -2)
+				{
+					ShahUnit shah = _combat.SpawnShahAndPossess(_interior.OutsideDoor(house));
+					_interior.Exit(shah);
+					_lastPossessed = shah;
+					_camera.Jump(IsoMath.TileToWorld(shah.Position), GameConfig.PossessZoom);
+				}
+			}
+		}
 		if (_opt.BuildType != null)
 		{
 			BuildingType? buildingType = ParseBuild(_opt.BuildType);
@@ -324,6 +364,8 @@ public sealed class Game1 : Game
 		_pendingStory = null;
 		_state.InitPopulation(_buildings);
 		_construction = new ConstructionSystem(_map, _buildings, _units, _state, _assets);
+		_combat = new AndijonSaltanatlar.Combat.CombatSystem(_map, _units, _state);
+		_interior = new AndijonSaltanatlar.Interiors.HouseInterior(_assets, _map, _buildings, _state);
 		_governor = new AIGovernorManager
 		{
 			OnMessage = (string msg) =>
@@ -904,17 +946,26 @@ public sealed class Game1 : Game
 		else
 		{
 			bool flag = _storyOverlay != null && _storyOverlay.DialogueOpen;
+			bool inHouse = _interior.Active;
 			_storyOverlay?.Update(_input, num, viewport2.Width, viewport2.Height);
-			_ui.Update(_input, viewport2.Width, viewport2.Height);
-			_onlinePanel.UpdateLauncher(_input, viewport2.Width);
+			if (!inHouse)
+			{
+				_ui.Update(_input, viewport2.Width, viewport2.Height);
+				_onlinePanel.UpdateLauncher(_input, viewport2.Width);
+			}
 			if (_ui.OpenCivRequested)
 			{
 				_ui.OpenCivRequested = false;
 				_civMode = true;
 			}
-			_camera.Update(num, _input, viewport2);
+			bool possessing = _combat.Possessed != null;
+			_camera.KeyboardPanEnabled = !possessing;
+			if (!inHouse)
+			{
+				_camera.Update(num, _input, viewport2);
+			}
 			bool flag2 = _ui.GovernorPanel != null && _ui.GovernorPanel.PickMode != GovernorMapMode.None;
-			if (!flag && !flag2)
+			if (!flag && !flag2 && !possessing)
 			{
 				_construction.Update(_input, _camera);
 			}
@@ -926,7 +977,7 @@ public sealed class Game1 : Game
 					_ui.GovernorPanel.HandleMapClick(tile);
 				}
 			}
-			else if (!flag && _state.Mode == GameMode.Playing && _input.LeftPressed && !_input.MouseOverUI)
+			else if (!flag && !possessing && _state.Mode == GameMode.Playing && _input.LeftPressed && !_input.MouseOverUI)
 			{
 				Vector2 vector = _camera.ScreenToWorld(_input.MouseVector);
 				object obj = _renderer.PickAt(vector, _map, _buildings, _units);
@@ -958,6 +1009,62 @@ public sealed class Game1 : Game
 			{
 				_construction.SetHover(_opt.HoverTile.Value);
 			}
+		}
+		// Jang real vaqtda (o'yin tezligiga bog'liq emas), pauzada to'xtaydi.
+		// Kiritish faqat shahar ekranida va hech qanday panel/dialog ochiq bo'lmaganda beriladi.
+		bool combatInput = !onlineOpen && !_strategicMode && !_civMode && !_questMode
+			&& !(_storyOverlay != null && _storyOverlay.DialogueOpen)
+			&& !(_ui.GovernorPanel != null && _ui.GovernorPanel.IsOpen);
+		bool wasInHouse = _interior.Active;
+		_combat.Update(_state.Paused ? 0f : num, (combatInput && !wasInHouse) ? _input : null, _camera);
+
+		// Odam ichiga kirish/chiqishda kamera yaqinlashadi va avvalgi holatiga qaytadi (3-shaxs ko'rinishi)
+		Unit possessedNow = _combat.Possessed;
+		if (possessedNow != null && _lastPossessed == null)
+		{
+			_zoomBeforePossess = _camera.Zoom;
+			_camera.SetTargetZoom(GameConfig.PossessZoom);
+		}
+		else if (possessedNow == null && _lastPossessed != null)
+		{
+			if (_interior.Active) _interior.Exit();
+			_camera.SetTargetZoom(_zoomBeforePossess);
+		}
+		_lastPossessed = possessedNow;
+
+		// Uyga kirish / uy ichida yurish
+		bool canEnter = combatInput && possessedNow != null && !_combat.RaidActive && !_combat.RaidIncoming;
+		_interior.ShahAway = _combat.ShahInWorld;
+		if (_interior.Active)
+		{
+			_interior.Update(_state.Paused ? 0f : num, combatInput ? _input : null);
+			if (_interior.BecomeShahRequested)
+			{
+				// Saroyda shoh yonida F: o'yinchi shohga aylanadi va u saroy eshigidan shaharga chiqadi
+				_interior.BecomeShahRequested = false;
+				Vector2 door = _interior.OutsideDoor(_interior.House);
+				ShahUnit shah = _combat.SpawnShahAndPossess(door);
+				_interior.Exit(shah);
+				_lastPossessed = _combat.Possessed;
+			}
+		}
+		else
+		{
+			_interior.UpdateNearby(canEnter ? possessedNow : null);
+			if (canEnter && _interior.NearbyHouse != null && _input.KeyPressed(Keys.Enter))
+			{
+				_interior.Enter(_interior.NearbyHouse, possessedNow);
+			}
+		}
+
+		Unit followNow = _combat.Possessed;
+		if (followNow != null && !_interior.Active)
+		{
+			if (wasInHouse)
+			{
+				_camera.Jump(IsoMath.TileToWorld(followNow.Position) + new Vector2(0f, -20f), _camera.Zoom);
+			}
+			_camera.Follow(IsoMath.TileToWorld(followNow.Position) + new Vector2(0f, -20f), num);
 		}
 		float dt = (_state.Paused ? 0f : (num * (float)_state.Speed));
 		float speedScale = 1f - 0.8f * _dayNight.NightAmount;
@@ -993,6 +1100,25 @@ public sealed class Game1 : Game
 
 	private void HandleHotkeys()
 	{
+		// Jangchi ichida: klaviatura to'liq jangchiga tegishli (boshqaruvni CombatSystem o'qiydi).
+		if (_combat.Possessed != null)
+		{
+			if (_input.KeyPressed(Keys.F3))
+			{
+				_perf.Enabled = !_perf.Enabled;
+			}
+			return;
+		}
+		if (_input.KeyPressed(Keys.F) && !_strategicMode && !_civMode && !_questMode)
+		{
+			_combat.TryPossess(_state.Selected as Unit);
+			return;
+		}
+		if (_input.KeyPressed(Keys.B) && !_strategicMode && !_civMode && !_questMode)
+		{
+			_combat.TriggerRaid(manual: true);
+			return;
+		}
 		if (_input.KeyPressed(Keys.O))
 		{
 			_onlinePanel.Toggle();
@@ -1147,6 +1273,12 @@ public sealed class Game1 : Game
 		{
 			DrawQuest();
 		}
+		else if (_interior != null && _interior.Active && !_menuMode)
+		{
+			GraphicsDevice.Clear(new Color(20, 16, 14));
+			Viewport vpIn = GraphicsDevice.Viewport;
+			_interior.Draw(_sb, _assets.Pixel, _font, vpIn.Width, vpIn.Height, _dayNight.NightAmount);
+		}
 		else
 		{
 			DrawScene();
@@ -1216,6 +1348,7 @@ public sealed class Game1 : Game
 			}
 		}
 		DrawSelectionHighlight();
+		_combat?.DrawGroundMarkers(_sb);
 		_blueprintRenderer?.Draw(_sb, _governor?.Blueprint, _governor?.Blueprints.SelectedItemId ?? 0);
 		_renderer.Draw(_sb, visibleWorldRect, _map, _buildings, _units);
 		_construction.Draw(_sb);
@@ -1308,6 +1441,8 @@ public sealed class Game1 : Game
 	{
 		Viewport viewport = GraphicsDevice.Viewport;
 		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+		_combat?.DrawHud(_sb, _assets.Pixel, _font, _camera, viewport.Width, viewport.Height);
+		_interior?.DrawPrompt(_sb, _assets.Pixel, _font, _camera, viewport.Width, viewport.Height);
 		_ui.Draw(_sb, viewport.Width, viewport.Height);
 		_sb.End();
 	}

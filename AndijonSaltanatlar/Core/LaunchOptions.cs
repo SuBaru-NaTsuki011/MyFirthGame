@@ -70,6 +70,15 @@ public sealed class LaunchOptions
 	/// <summary>Oyna o'lchami (masalan 854x480 — telefon ekranini sinash uchun).</summary>
 	public Point? WindowSize;
 
+	/// <summary>Sinov: darhol bosqin (0 shimol, 1 janub, 2 g'arb, 3 sharq).</summary>
+	public int? RaidGate;
+
+	/// <summary>Sinov: shu tile'ga eng yaqin jangchi ichiga kirish.</summary>
+	public Vector2? PossessNear;
+
+	/// <summary>Sinov: K-uyga (ro'yxat tartibida) kirish — ichki ko'rinishni tekshirish uchun.</summary>
+	public int? EnterHouse;
+
 	public static LaunchOptions Parse(string[] args)
 	{
 		LaunchOptions launchOptions = new LaunchOptions();
@@ -193,6 +202,18 @@ public sealed class LaunchOptions
 			}
 			case "--frames":
 				launchOptions.ScreenshotFrames = int.Parse(text, CultureInfo.InvariantCulture);
+				i++;
+				break;
+			case "--raid":
+				launchOptions.RaidGate = int.Parse(text, CultureInfo.InvariantCulture);
+				i++;
+				break;
+			case "--enterhouse":
+				launchOptions.EnterHouse = int.Parse(text, CultureInfo.InvariantCulture);
+				i++;
+				break;
+			case "--possess":
+				launchOptions.PossessNear = ParsePair(text);
 				i++;
 				break;
 			case "--build":

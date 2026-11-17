@@ -18,6 +18,22 @@ namespace AndijonSaltanatlar.Core
         public Vector2 Position;
         public float Zoom { get; private set; }
 
+        /// <summary>false bo'lsa WASD/strelkalar kamerani surmaydi (masalan, o'yinchi jangchini boshqarayotganda).</summary>
+        public bool KeyboardPanEnabled { get; set; } = true;
+
+        /// <summary>Zoom'ni silliq o'zgartirish (masalan, odam ichiga kirganda yaqinlashish).</summary>
+        public void SetTargetZoom(float zoom)
+        {
+            _targetZoom = MathHelper.Clamp(zoom, GameConfig.MinZoom, GameConfig.MaxZoom);
+        }
+
+        /// <summary>Kamerani berilgan world nuqtaga silliq yaqinlashtiradi (boshqarilayotgan jangchiga ergashish).</summary>
+        public void Follow(Vector2 world, float dt, float sharpness = 8f)
+        {
+            Position = Vector2.Lerp(Position, world, 1f - MathF.Exp(-sharpness * dt));
+            ClampToMap();
+        }
+
         public CameraManager(Viewport viewport, Vector2 startWorld, float zoom)
         {
             _viewport = viewport;
@@ -62,10 +78,13 @@ namespace AndijonSaltanatlar.Core
 
             // --- Klaviatura bilan pan ---
             Vector2 move = Vector2.Zero;
-            if (input.KeyDown(Keys.A) || input.KeyDown(Keys.Left)) move.X -= 1;
-            if (input.KeyDown(Keys.D) || input.KeyDown(Keys.Right)) move.X += 1;
-            if (input.KeyDown(Keys.W) || input.KeyDown(Keys.Up)) move.Y -= 1;
-            if (input.KeyDown(Keys.S) || input.KeyDown(Keys.Down)) move.Y += 1;
+            if (KeyboardPanEnabled) // jangchini boshqarayotganda klaviatura jangchiga tegishli
+            {
+                if (input.KeyDown(Keys.A) || input.KeyDown(Keys.Left)) move.X -= 1;
+                if (input.KeyDown(Keys.D) || input.KeyDown(Keys.Right)) move.X += 1;
+                if (input.KeyDown(Keys.W) || input.KeyDown(Keys.Up)) move.Y -= 1;
+                if (input.KeyDown(Keys.S) || input.KeyDown(Keys.Down)) move.Y += 1;
+            }
             if (move != Vector2.Zero)
             {
                 move.Normalize();

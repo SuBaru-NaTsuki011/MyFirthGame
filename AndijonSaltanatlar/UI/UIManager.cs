@@ -651,6 +651,9 @@ namespace AndijonSaltanatlar.UI
                     desc = u.Description;
                     rows.Add((Texts.HitPoints + ": " + u.HitPoints + "/" + u.MaxHitPoints, Cream));
                     rows.Add((Texts.Attack + ": " + u.Attack, Muted));
+                    if (u.Team == UnitTeam.Enemy) rows.Add(("DUSHMAN", Red));
+                    if (!u.IsDown) rows.Add(("[F] ICHIGA KIRISH", Gold));
+                    else rows.Add(("Yiqilgan", Red));
                     break;
                 case Decoration d:
                     title = d.Name;
