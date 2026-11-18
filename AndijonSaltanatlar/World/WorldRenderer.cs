@@ -145,6 +145,7 @@ namespace AndijonSaltanatlar.World
                         if (citizen.Kind != Core.Graphics.CitizenArt.Citizen) DrawCitizenRole(sb, o, citizen);   // oddiy aholi boshida yozuv yo'q
                         if (!string.IsNullOrEmpty(citizen.SpeechText)) DrawCitizenSpeech(sb, o, citizen);
                     }
+                    if (cu.CanRank && cu.Rank > 0 && !cu.IsDown) DrawRankBadge(sb, o, cu);   // pagon
                     continue;
                 }
 
@@ -219,6 +220,30 @@ namespace AndijonSaltanatlar.World
             int y = (int)MathF.Round(unit.DrawPosition.Y - height - 2);
             sb.Draw(_assets.Pixel, new Rectangle(x, y, width, height), new Color(12, 35, 22, 220));
             _font.Draw(sb, citizen.RoleLabel, new Vector2(x + 3, y + 2), new Color(130, 245, 145), 1, 0);
+        }
+
+        /// <summary>Askar yelkasidagi pagon: unvon bo'yicha belgilar soni va rangi (kumush → oltin).
+        /// Kichik zoomда faqat rangli nuqta.</summary>
+        private void DrawRankBadge(SpriteBatch sb, IWorldObject unit, Unit u)
+        {
+            int pips = AndijonSaltanatlar.Military.MilitaryRank.Pips(u.Rank);
+            if (pips <= 0 || unit.Texture == null) return;
+            Color col = AndijonSaltanatlar.Military.MilitaryRank.PipColor(u.Rank);
+            float scale = AssetManager.ScaleOf(unit.Texture);
+            int w = (int)(unit.Texture.Width * scale);
+            int h = (int)(unit.Texture.Height * scale);
+            int cx = (int)MathF.Round(unit.DrawPosition.X + w * 0.60f);
+            int cy = (int)MathF.Round(unit.DrawPosition.Y + h * 0.26f);
+            if (w < 18)
+            {
+                sb.Draw(_assets.Pixel, new Rectangle(cx, cy, 3, 3), col); // uzoqdan — faqat nuqta
+                return;
+            }
+            const int ps = 2, gap = 1;
+            int bw = pips * (ps + gap) + 3;
+            sb.Draw(_assets.Pixel, new Rectangle(cx - 2, cy - 2, bw, ps + 5), new Color(28, 22, 16, 205)); // pagon toni
+            for (int i = 0; i < pips; i++)
+                sb.Draw(_assets.Pixel, new Rectangle(cx + i * (ps + gap), cy, ps, ps + 2), col);
         }
 
         private void DrawCitizenSpeech(SpriteBatch sb, IWorldObject unit, CitizenUnit citizen)

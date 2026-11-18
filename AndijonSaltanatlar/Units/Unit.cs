@@ -83,6 +83,42 @@ namespace AndijonSaltanatlar.Units
         /// <summary>Yurish qadami (tur bo'yicha): fuqaro 0.7, askar 0.85, shoh 0.8. Animatsiya masofaga
         /// bog'liq bo'lgani uchun bu tezlikni kamaytirsa ham odam sirpanmasdan sekinroq yuradi.</summary>
         public float GaitScale { get; set; } = 1f;
+
+        // --- Harbiy unvon (faqat askarlar) ---
+        /// <summary>Bu birlik unvon ola oladimi (askarlar — ha, fuqarolar — yo'q).</summary>
+        public bool CanRank { get; set; }
+        public int Experience { get; private set; }
+        /// <summary>Joriy unvon (0 — Oddiy askar ... 5 — Sarkarda).</summary>
+        public int Rank { get; private set; }
+        /// <summary>Unvon endigina oshdi — bildirishnoma uchun (Game1 o'qib, tozalaydi).</summary>
+        public bool RankUpPending { get; set; }
+
+        /// <summary>XP qo'shadi; chegaradan oshsa unvon ko'tariladi (kazarma darajasi maxRank bilan cheklaydi).</summary>
+        public void AddExperience(int xp, int maxRank)
+        {
+            if (!CanRank || xp <= 0) return;
+            Experience += xp;
+            int nr = AndijonSaltanatlar.Military.MilitaryRank.RankForXp(Experience, maxRank);
+            if (nr > Rank) { ApplyRankBonus(Rank, nr); Rank = nr; RankUpPending = true; }
+        }
+
+        /// <summary>Saqlashdan tiklash: XP va unvonni bonuslari bilan qayta o'rnatadi.</summary>
+        public void RestoreRank(int xp, int rank)
+        {
+            if (!CanRank) return;
+            Experience = xp < 0 ? 0 : xp;
+            int target = rank < 0 ? 0 : (rank > AndijonSaltanatlar.Military.MilitaryRank.Max ? AndijonSaltanatlar.Military.MilitaryRank.Max : rank);
+            if (target > Rank) { ApplyRankBonus(Rank, target); Rank = target; }
+        }
+
+        private void ApplyRankBonus(int from, int to)
+        {
+            var (atk, hp, spd) = AndijonSaltanatlar.Military.MilitaryRank.BonusDelta(from, to);
+            Attack += atk;
+            MaxHitPoints += hp;
+            HitPoints = MaxHitPoints;
+            Speed += spd;
+        }
         public UnitState State { get; protected set; } = UnitState.Idle;
         /// <summary>Hozir ko'rsatilayotgan kadr.</summary>
         public Texture2D Texture { get; private set; }

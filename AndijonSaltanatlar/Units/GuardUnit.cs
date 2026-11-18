@@ -17,6 +17,7 @@ namespace AndijonSaltanatlar.Units
             Name = "Qalqonli jangchi";
             Description = "Og‘ir qalqon va gurzi bilan qurollangan. Saroy va darvozalarni qo‘riqlaydi.";
             SpriteKey = SpriteKeys.UnitShield;
+            CanRank = true; // qo'riqchi — unvon ola oladi
             Speed = 0f;
             Attack = 8;
             SetHitPoints(140);

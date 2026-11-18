@@ -877,6 +877,13 @@ namespace AndijonSaltanatlar.UI
                     desc = u.Description;
                     rows.Add((Texts.HitPoints + ": " + u.HitPoints + "/" + u.MaxHitPoints, Cream));
                     rows.Add((Texts.Attack + ": " + u.Attack, Muted));
+                    if (u.CanRank)
+                    {
+                        rows.Add(("Unvon: " + AndijonSaltanatlar.Military.MilitaryRank.Name(u.Rank), Gold));
+                        rows.Add((u.Rank >= AndijonSaltanatlar.Military.MilitaryRank.Max
+                            ? "XP: " + u.Experience + " (eng yuqori unvon)"
+                            : "XP: " + u.Experience + " / " + AndijonSaltanatlar.Military.MilitaryRank.NextThreshold(u.Rank), Muted));
+                    }
                     if (u.Team == UnitTeam.Enemy) rows.Add(("DUSHMAN", Red));
                     if (!u.IsDown) rows.Add(("[F] ICHIGA KIRISH", Gold));
                     else rows.Add(("Yiqilgan", Red));

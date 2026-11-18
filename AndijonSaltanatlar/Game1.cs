@@ -1809,6 +1809,7 @@ public sealed class Game1 : Game
 			}
 		}
 		_units.Update(dt * (_combat?.TimeScale ?? 1f));
+		UpdateMilitaryRanks(dt);
 		_farmWork.Update(dt, _map, _buildings, _units, _state);
 		_units.ApplyPhysics(_map, _combat.Possessed, dt);
 		_combat.UnrestHigh = _taxRiot != null && _taxRiot.Active;
@@ -2538,6 +2539,42 @@ public sealed class Game1 : Game
 		BeginLegacyUi(out Point v);
 		_ui.Draw(_sb, v.X, v.Y);
 		_sb.End();
+	}
+
+	private float _rankTrainTimer;
+	// Harbiy unvonlar: kazarmada mashq orqali askarlar XP oladi; kazarma darajasi eng yuqori unvonni cheklaydi.
+	private void UpdateMilitaryRanks(float dt)
+	{
+		if (dt <= 0f || _units == null || _buildings == null || _state == null) return;
+		int maxBarracks = 0;
+		foreach (Building b in _buildings.Buildings)
+			if (b.Type == BuildingType.Barracks && b.BuildProgress >= 1f && b.Level > maxBarracks) maxBarracks = b.Level;
+		int maxRank = Math.Min(AndijonSaltanatlar.Military.MilitaryRank.Max, maxBarracks);
+
+		_rankTrainTimer += dt;
+		int gained = 0;
+		if (_rankTrainTimer >= 2f) { gained = (int)(_rankTrainTimer / 2f) * 2; _rankTrainTimer %= 2f; }
+
+		foreach (Unit u in _units.Units)
+		{
+			if (!u.CanRank || u.IsDown || u.Team != UnitTeam.Player) continue;
+			if (gained > 0 && maxRank > 0) u.AddExperience(gained, maxRank);
+			if (u.RankUpPending)
+			{
+				u.RankUpPending = false;
+				_state.ShowMessage(u.Name + " unvoni oshdi: " + AndijonSaltanatlar.Military.MilitaryRank.Name(u.Rank) + "!");
+			}
+		}
+	}
+
+	/// <summary>Jang/g'alayon natijasida askarга XP beradi (tashqi tizimlar chaqiradi).</summary>
+	public void AwardSoldierXp(Unit u, int xp)
+	{
+		if (u == null || !u.CanRank) return;
+		int maxBarracks = 0;
+		foreach (Building b in _buildings.Buildings)
+			if (b.Type == BuildingType.Barracks && b.BuildProgress >= 1f && b.Level > maxBarracks) maxBarracks = b.Level;
+		u.AddExperience(xp, Math.Min(AndijonSaltanatlar.Military.MilitaryRank.Max, maxBarracks));
 	}
 
 	private void DrawLoginScreen()

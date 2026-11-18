@@ -32,6 +32,7 @@ namespace AndijonSaltanatlar.Units
             SpriteKey = SpriteKeys.UnitPatrol;
             Speed = speed;
             GaitScale = 0.85f; // askar — biroz sekin
+            CanRank = true;    // patrul askari — unvon ola oladi
             Attack = 6;
             SetHitPoints(90);
             PatrolPoints.AddRange(patrolPoints);

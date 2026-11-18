@@ -49,6 +49,7 @@ namespace AndijonSaltanatlar.Units
             SetHitPoints(30);
             PauseTime = 0.8f + (float)Rng.NextDouble() * 1.6f;
             GaitScale = 0.7f; // oddiy fuqaro — eng sekin, bemalol yuradi
+            CanRank = false;  // fuqaro — harbiy unvon olmaydi
         }
 
         /// <summary>Figurani haqiqiy fuqaroga bog'laydi va ko'rsatiladigan ism/tavsifni yangilaydi.</summary>
