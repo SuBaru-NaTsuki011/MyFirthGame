@@ -276,7 +276,7 @@ public sealed class Game1 : Game
 		if (_opt.Time.HasValue)
 		{
 			_state.Clock.Set(1, _opt.Time.Value);
-			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction));
+			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction), TimePrefs.VisualSeason(_state.Season));
 		}
 		if (_opt.PopTax.HasValue)
 		{
@@ -1463,7 +1463,7 @@ public sealed class Game1 : Game
 		if (_updateScreen != null)
 		{
 			_updateScreen.Update(_input);
-			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction));
+			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction), TimePrefs.VisualSeason(_state.Season));
 			_time += num;
 			_perf?.EndUpdate();
 			_perf?.EndFrame();
@@ -1483,7 +1483,7 @@ public sealed class Game1 : Game
 			_onlinePanel.Update(_input, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height, num);
 			_units.Update(num * 0.6f);
 			_map.Update(num);
-			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction));
+			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction), TimePrefs.VisualSeason(_state.Season));
 			_time += num;
 			_frames++;
 			if (_opt.ScreenshotPath != null && !_opt.ScreenshotAfterLogin && _frames >= (_opt.ScreenshotFrames ?? 6))
@@ -1527,7 +1527,7 @@ public sealed class Game1 : Game
 			_birds?.Update(num * 0.6f, _dayNight.NightAmount, null);
 			_livestock?.Update(num * 0.6f);
 			_map.Update(num);
-			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction));
+			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction), TimePrefs.VisualSeason(_state.Season));
 			_frames++;
 			if (_opt.ScreenshotPath != null && _frames >= (_opt.ScreenshotFrames ?? 6))
 			{
@@ -1831,7 +1831,7 @@ public sealed class Game1 : Game
 			}
 		}
 		_time += num;
-		_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction));
+		_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction), TimePrefs.VisualSeason(_state.Season));
 		_ui.PhaseName = _dayNight.PhaseName;
 		AnnounceSeason();
 		// Avtomatik saqlash: har 30 soniyada va yer ochilganda darhol (o'yin doim serverda).

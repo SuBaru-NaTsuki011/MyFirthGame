@@ -31,6 +31,7 @@ namespace AndijonSaltanatlar.Units
             Description = "Sallali navkar. Ko‘chalarni aylanib, tartibni saqlaydi.";
             SpriteKey = SpriteKeys.UnitPatrol;
             Speed = speed;
+            GaitScale = 0.85f; // askar — biroz sekin
             Attack = 6;
             SetHitPoints(90);
             PatrolPoints.AddRange(patrolPoints);
@@ -62,7 +63,7 @@ namespace AndijonSaltanatlar.Units
             Vector2 target = PatrolPoints[_targetIndex];
             Vector2 delta = target - Position;
             float dist = delta.Length();
-            float step = Speed * SpeedScale * dt;
+            float step = Speed * SpeedScale * GaitScale * dt;
             if (dist <= step)
             {
                 Position = target;

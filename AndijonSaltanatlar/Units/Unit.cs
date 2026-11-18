@@ -80,6 +80,9 @@ namespace AndijonSaltanatlar.Units
         public float Speed { get; protected set; }
         /// <summary>Tezlik koeffitsienti (kun-tun ritmi: tunda fuqarolar sekinlashadi).</summary>
         public float SpeedScale { get; set; } = 1f;
+        /// <summary>Yurish qadami (tur bo'yicha): fuqaro 0.7, askar 0.85, shoh 0.8. Animatsiya masofaga
+        /// bog'liq bo'lgani uchun bu tezlikni kamaytirsa ham odam sirpanmasdan sekinroq yuradi.</summary>
+        public float GaitScale { get; set; } = 1f;
         public UnitState State { get; protected set; } = UnitState.Idle;
         /// <summary>Hozir ko'rsatilayotgan kadr.</summary>
         public Texture2D Texture { get; private set; }
@@ -486,7 +489,7 @@ namespace AndijonSaltanatlar.Units
             if (State == UnitState.Walking)
             {
                 // Harakat tezligiga mos keladigan animatsiya (spring-based eprimas)
-                float rawSpeed = Speed * SpeedScale;
+                float rawSpeed = Speed * SpeedScale * GaitScale;
                 float walkCycle = WalkCyclePerTile * rawSpeed; // sekundlik sikl
                 float cycleFreq = Math.Max(0.1f, walkCycle);
                 float phaseDelta = dt / cycleFreq;             // fase o'zgarishi

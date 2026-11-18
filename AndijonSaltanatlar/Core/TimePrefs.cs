@@ -14,8 +14,10 @@ namespace AndijonSaltanatlar.Core
     /// </summary>
     public sealed class TimePrefs
     {
-        /// <summary>Bir o'yin kuni necha real daqiqa (standart 60).</summary>
-        public int DayMinutes { get; set; } = 60;
+        /// <summary>Bir o'yin kuni necha real daqiqa (standart 120).</summary>
+        public int DayMinutes { get; set; } = 120;
+        /// <summary>Sozlama formati versiyasi (migratsiya uchun). 0 — eski (DayMinutes standarti 60 edi).</summary>
+        public int Version { get; set; } = 0;
         public TimeLock Lock { get; set; } = TimeLock.Auto;
         /// <summary>Ko'rinadigan fasl: -1 — avto (haqiqiy fasl), 0..3 — Bahor/Yoz/Kuz/Qish.</summary>
         public int SeasonView { get; set; } = -1;
@@ -24,7 +26,17 @@ namespace AndijonSaltanatlar.Core
         /// <summary>Yon tomondagi missiya kartasi yashirilgan (o'rnida kichik "MISSIYA" tugmasi qoladi).</summary>
         public bool QuestTrackerHidden { get; set; }
 
-        public static readonly int[] DayPresets = { 10, 30, 60, 120 };
+        public static readonly int[] DayPresets = { 30, 60, 120, 240 };
+
+        /// <summary>Hozirgi sozlama formati versiyasi.</summary>
+        public const int CurrentVersion = 1;
+
+        /// <summary>
+        /// Eski saqlangan sozlamani yangi standartga ko'chiradi: versiya 0 va eski standart (60 daqiqa)
+        /// bo'lsa — 120 ga o'tkaziladi. O'yinchi o'zi boshqa qiymat tanlagan bo'lsa (masalan 30), tegilmaydi.
+        /// </summary>
+        public static int MigratedDayMinutes(int dayMinutes, int version)
+            => (version < 1 && dayMinutes == 60) ? 120 : dayMinutes;
 
         public static TimePrefs Current { get; private set; } = new TimePrefs();
 
@@ -41,6 +53,9 @@ namespace AndijonSaltanatlar.Core
                 if (File.Exists(p)) Current = JsonSerializer.Deserialize<TimePrefs>(File.ReadAllText(p)) ?? new TimePrefs();
             }
             catch { Current = new TimePrefs(); }
+            // Eski sozlamani yangi standartga ko'chirish (60 → 120), so'ng versiyani belgilash.
+            Current.DayMinutes = MigratedDayMinutes(Current.DayMinutes, Current.Version);
+            Current.Version = CurrentVersion;
             Current.DayMinutes = Math.Clamp(Current.DayMinutes, 1, 240);
             Current.SeasonView = Math.Clamp(Current.SeasonView, -1, 3);
             Current.Quality = Math.Clamp(Current.Quality, 0, 2);

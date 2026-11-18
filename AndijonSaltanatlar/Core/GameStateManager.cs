@@ -439,7 +439,10 @@ public sealed class GameStateManager
 		{
 			if (building.BuildProgress < 1f)
 			{
-				building.BuildProgress = Math.Min(1f, building.BuildProgress + num * 0.4f);
+				// Qurilish o'yin soatiga bog'liq (real sekundga emas): kun uzaysa qurilish ham
+				// mantiqiy ravishda uzoqroq davom etadi. 120 daqiqalik standart kunda avvalgi
+				// tezlik saqlanadi (soatiga 120 = 0.4/sek, 7200 sek/kunda).
+				building.BuildProgress = Math.Min(1f, building.BuildProgress + GameClock.GameHours(num, Clock.SecondsPerDay) * 120f);
 				if (building.BuildProgress >= 1f)
 				{
 					ShowMessage(building.Name + " qurilishi yakunlandi");

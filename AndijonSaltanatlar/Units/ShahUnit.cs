@@ -20,6 +20,7 @@ namespace AndijonSaltanatlar.Units
             ExternallyControlled = true;
             Attack = 12;
             Speed = 1.2f;
+            GaitScale = 0.8f; // shoh — viqor bilan, shoshmay yuradi
             SetHitPoints(220);
         }
 

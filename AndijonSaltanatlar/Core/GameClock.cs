@@ -45,6 +45,14 @@ namespace AndijonSaltanatlar.Core
         /// <summary>Joriy soat (0..23).</summary>
         public int Hour => (int)(DayFraction * 24f) % 24;
 
+        /// <summary>
+        /// Real soniyalarni o'yin soatiga aylantiradi (ishlar — qurilish, hosil — real sekundga emas,
+        /// o'yin soatiga bog'lanishi uchun). Kun uzun bo'lsa bir soniyada kamroq o'yin soati o'tadi,
+        /// shuning uchun ishlar ham mantiqiy ravishda uzoqroq davom etadi.
+        /// </summary>
+        public static float GameHours(float realSeconds, float secondsPerDay)
+            => secondsPerDay <= 0f ? 0f : realSeconds / secondsPerDay * 24f;
+
         /// <summary>Saqlangan o'yindan tiklash uchun.</summary>
         public void Set(int day, float fraction)
         {

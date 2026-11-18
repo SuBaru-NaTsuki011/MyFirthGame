@@ -48,6 +48,7 @@ namespace AndijonSaltanatlar.Units
             SpriteKey = SpriteKeys.UnitCitizen + k;
             SetHitPoints(30);
             PauseTime = 0.8f + (float)Rng.NextDouble() * 1.6f;
+            GaitScale = 0.7f; // oddiy fuqaro — eng sekin, bemalol yuradi
         }
 
         /// <summary>Figurani haqiqiy fuqaroga bog'laydi va ko'rsatiladigan ism/tavsifni yangilaydi.</summary>

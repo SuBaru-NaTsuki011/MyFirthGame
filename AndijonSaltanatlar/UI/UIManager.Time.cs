@@ -37,11 +37,11 @@ namespace AndijonSaltanatlar.UI
         {
             _timeOpts.Clear();
             if (!TimePanelOpen) return;
-            int w = Math.Min(vw - 40, 640), h = 400;
+            int w = Math.Min(vw - 40, 640), h = 426;
             _timeBox = new Rectangle(vw / 2 - w / 2, Math.Max(TopH + 8, vh / 2 - h / 2), w, h);
             int bh = Touch ? 36 : 30;
             _timeClose = new Rectangle(_timeBox.Right - 12 - bh, _timeBox.Y + 10, bh, bh);
-            int x = _timeBox.X + 20, y = _timeBox.Y + 100, cw = w - 40, g = 6;
+            int x = _timeBox.X + 20, y = _timeBox.Y + 124, cw = w - 40, g = 6;
 
             void Row(int group, int n, int yy)
             {
@@ -92,6 +92,10 @@ namespace AndijonSaltanatlar.UI
             _font.Draw(sb, "Hozir: " + TimePrefs.ClockText(_state.Clock.DayFraction) + "  " + SeasonManager.Name(_state.Season) + ", " + _state.Day + "-kun  (" +
                            SeasonVisuals.ComfortName(SeasonVisuals.ComfortOf(_state.Season, _state.Weather.Current, _state.Clock.DayFraction)) + ")",
                        new Vector2(x, _timeBox.Y + 50), Cream, 2, 1);
+            // Fasl bo'yicha quyosh chiqishi va botishi (ko'rinadigan fasl bo'yicha).
+            Season vseason = TimePrefs.VisualSeason(_state.Season);
+            _font.Draw(sb, SeasonManager.Name(vseason) + ":  tong " + SeasonClock.SunriseText(vseason) + "   shom " + SeasonClock.SunsetText(vseason),
+                       new Vector2(x, _timeBox.Y + 76), Gold, 2, 1);
 
             TimePrefs p = TimePrefs.Current;
             string[] titles = { "KO'RINADIGAN VAQT", "KO'RINADIGAN FASL", "1 KUN UZUNLIGI (REAL DAQIQA)", "EFFEKTLAR SIFATI" };
