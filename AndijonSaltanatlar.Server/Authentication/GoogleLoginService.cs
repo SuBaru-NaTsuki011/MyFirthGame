@@ -69,6 +69,9 @@ namespace AndijonSaltanatlar.Server.Authentication
         public string DisplayName { get; set; } = "";
         public string Email { get; set; } = "";
         public bool Delivered { get; set; }
+        /// <summary>PKCE code_verifier va OpenID nonce (faqat serverda saqlanadi).</summary>
+        public string CodeVerifier { get; init; } = "";
+        public string Nonce { get; init; } = "";
     }
 
     public sealed class GoogleLoginService
@@ -93,7 +96,7 @@ namespace AndijonSaltanatlar.Server.Authentication
         public GoogleLoginSession Create()
         {
             Cleanup();
-            var s = new GoogleLoginSession { Id = RandomToken(), PollKey = RandomToken() };
+            var s = new GoogleLoginSession { Id = RandomToken(), PollKey = RandomToken(), CodeVerifier = RandomToken(48), Nonce = RandomToken() };
             _sessions[s.Id] = s;
             return s;
         }
@@ -137,8 +140,16 @@ namespace AndijonSaltanatlar.Server.Authentication
             return baseUrl.TrimEnd('/') + "/auth/google/callback";
         }
 
+        /// <summary>PKCE S256: code_challenge = BASE64URL(SHA256(verifier)).</summary>
+        public static string Challenge(string verifier)
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            return Convert.ToBase64String(sha.ComputeHash(Encoding.ASCII.GetBytes(verifier))).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        }
+
         public string AuthorizeUrl(string sessionId, string redirectUri)
         {
+            GoogleLoginSession s = Get(sessionId);
             var q = new Dictionary<string, string>
             {
                 ["client_id"] = Options.ClientId,
@@ -149,6 +160,12 @@ namespace AndijonSaltanatlar.Server.Authentication
                 ["prompt"] = "select_account",
                 ["access_type"] = "online"
             };
+            if (s != null)
+            {
+                q["code_challenge"] = Challenge(s.CodeVerifier);
+                q["code_challenge_method"] = "S256";
+                q["nonce"] = s.Nonce;
+            }
             return AuthorizeEndpoint + "?" + string.Join("&", q.Select(kv => Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(kv.Value)));
         }
 
@@ -157,23 +174,25 @@ namespace AndijonSaltanatlar.Server.Authentication
         /// id_token to'g'ridan-to'g'ri Google'dan TLS orqali (client secret bilan) olingani uchun OpenID Connect
         /// (3.1.3.7, 6-band) bo'yicha imzo tekshiruvi shart emas; aud, iss, exp va email_verified tekshiriladi.
         /// </summary>
-        public async Task<GoogleIdentity> ExchangeCodeAsync(string code, string redirectUri)
+        public async Task<GoogleIdentity> ExchangeCodeAsync(string code, string redirectUri, GoogleLoginSession session = null)
         {
             HttpClient http = _http.CreateClient("google");
-            using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+            var fields = new Dictionary<string, string>
             {
                 ["code"] = code,
                 ["client_id"] = Options.ClientId,
                 ["client_secret"] = Options.ClientSecret,
                 ["redirect_uri"] = redirectUri,
                 ["grant_type"] = "authorization_code"
-            });
+            };
+            if (session != null && !string.IsNullOrEmpty(session.CodeVerifier)) fields["code_verifier"] = session.CodeVerifier;
+            using var form = new FormUrlEncodedContent(fields);
             HttpResponseMessage resp = await http.PostAsync(TokenEndpoint, form);
             string body = await resp.Content.ReadAsStringAsync();
             if (!resp.IsSuccessStatusCode) throw new InvalidOperationException("Google token xatosi: " + (int)resp.StatusCode);
             using JsonDocument doc = JsonDocument.Parse(body);
             string idToken = doc.RootElement.GetProperty("id_token").GetString();
-            return ParseIdToken(idToken, Options.ClientId);
+            return ParseIdToken(idToken, Options.ClientId, session?.Nonce);
         }
 
         /// <summary>
@@ -189,7 +208,7 @@ namespace AndijonSaltanatlar.Server.Authentication
             return new GoogleIdentity { Sub = payload.Subject, Email = payload.Email ?? "", Name = payload.Name ?? "", EmailVerified = payload.EmailVerified };
         }
 
-        public static GoogleIdentity ParseIdToken(string idToken, string expectedAudience)
+        public static GoogleIdentity ParseIdToken(string idToken, string expectedAudience, string expectedNonce = null)
         {
             string[] parts = (idToken ?? "").Split('.');
             if (parts.Length < 2) throw new InvalidOperationException("id_token noto'g'ri formatda");
@@ -204,6 +223,11 @@ namespace AndijonSaltanatlar.Server.Authentication
             if (aud != expectedAudience) throw new InvalidOperationException("id_token: noto'g'ri aud");
             long exp = r.TryGetProperty("exp", out JsonElement e) ? e.GetInt64() : 0;
             if (DateTimeOffset.FromUnixTimeSeconds(exp) < DateTimeOffset.UtcNow.AddMinutes(-5)) throw new InvalidOperationException("id_token muddati o'tgan");
+            if (!string.IsNullOrEmpty(expectedNonce))
+            {
+                string nonce = r.TryGetProperty("nonce", out JsonElement nn) ? nn.GetString() : "";
+                if (nonce != expectedNonce) throw new InvalidOperationException("id_token: noto'g'ri nonce");
+            }
 
             var id = new GoogleIdentity
             {
@@ -221,7 +245,7 @@ namespace AndijonSaltanatlar.Server.Authentication
         /// Google shaxsi bo'yicha foydalanuvchini topadi yoki yaratadi. Avval GoogleSub bo'yicha, keyin tasdiqlangan
         /// email bo'yicha (eski hisobni bog'lash). Yangi o'yinchiga noyob o'yin nomi beriladi.
         /// </summary>
-        public static AppUser FindOrCreateUser(GameDbContext db, GoogleIdentity g)
+        public static AppUser FindOrCreateUser(GameDbContext db, GoogleIdentity g, VipOptions vip = null)
         {
             AppUser user = db.Users.FirstOrDefault(u => u.GoogleSub == g.Sub);
             if (user == null && g.EmailVerified && !string.IsNullOrEmpty(g.Email))
@@ -244,11 +268,18 @@ namespace AndijonSaltanatlar.Server.Authentication
                     Email = email,
                     Username = UniqueUsername(db, g),
                     PasswordHash = "",
-                    DisplayName = string.IsNullOrWhiteSpace(g.Name) ? null : g.Name.Trim()
+                    DisplayName = null   // yangi o'yinchi taxallusni o'zi tanlaydi (haqiqiy ism majburan ko'rsatilmaydi)
                 };
                 db.Users.Add(user);
             }
-            else if (!string.IsNullOrWhiteSpace(g.Name)) user.DisplayName = g.Name.Trim();
+            else if (!user.ProfileCompleted && user.KingdomId != null)
+            {
+                // Eski o'yinchi (saltanati bor): qayta so'ramaymiz — mavjud ism taxallus bo'lib qoladi
+                if (string.IsNullOrWhiteSpace(user.DisplayName)) user.DisplayName = user.Username;
+                user.ProfileCompleted = true;
+            }
+            // VIP ro'yxati server sozlamasida; har kirishda qayta tekshiriladi (ro'yxatdan olib tashlansa — bekor bo'ladi).
+            if (vip != null) user.IsVip = vip.IsVip(g.Email);
             user.LastLoginAt = DateTime.UtcNow;
             db.SaveChanges();
             return user;
@@ -271,9 +302,9 @@ namespace AndijonSaltanatlar.Server.Authentication
             return name;
         }
 
-        public void Complete(GoogleLoginSession s, AppUser user, JwtTokenService jwt)
+        public void Complete(GoogleLoginSession s, AppUser user, SessionTokenService sessions, GameDbContext db, string device)
         {
-            s.Auth = new AuthResponse { Token = jwt.Create(user.Id, user.Username), Username = user.Username, KingdomId = user.KingdomId };
+            s.Auth = sessions.Issue(db, user, device);
             s.DisplayName = user.DisplayName ?? user.Username;
             s.Email = user.Email;
             s.Status = "ok";

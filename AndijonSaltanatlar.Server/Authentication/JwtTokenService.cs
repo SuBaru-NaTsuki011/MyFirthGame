@@ -20,15 +20,19 @@ namespace AndijonSaltanatlar.Server.Authentication
                 : key;
         }
 
-        public string Create(int userId, string username)
+        public string Create(int userId, string username) => Create(userId, username, null, TimeSpan.FromDays(7));
+
+        /// <summary>Kirish tokeni: sessiya (sid) bilan bog'langan — sessiya bekor qilinsa token ham rad etiladi.</summary>
+        public string Create(int userId, string username, string sessionId, TimeSpan lifetime)
         {
-            var claims = new[]
+            var claims = new System.Collections.Generic.List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
                 new Claim(ClaimTypes.Name, username)
             };
+            if (!string.IsNullOrEmpty(sessionId)) claims.Add(new Claim("sid", sessionId));
             var creds = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_key)), SecurityAlgorithms.HmacSha256);
-            var token = new JwtSecurityToken(claims: claims, expires: DateTime.UtcNow.AddDays(7), signingCredentials: creds);
+            var token = new JwtSecurityToken(claims: claims, expires: DateTime.UtcNow.Add(lifetime), signingCredentials: creds);
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 

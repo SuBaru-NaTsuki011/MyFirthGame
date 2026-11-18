@@ -197,6 +197,14 @@ namespace AndijonSaltanatlar.Online
         /// Google orqali olingan token bilan onlayn dunyoga ulanadi (parol so'ralmaydi).
         /// CloudSession kirgandan keyin Game1 shu metodni chaqiradi.
         /// </summary>
+        /// <summary>Kirish tokeni yangilandi (sessiya rotation) — keyingi so'rovlar va SignalR yangi tokenni ishlatadi.</summary>
+        public void UpdateToken(string token)
+        {
+            if (string.IsNullOrEmpty(token) || _token == null) return;
+            _token = token;
+            if (_http != null) _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+        }
+
         public void LoginWithToken(string serverUrl, string token, string username)
         {
             string url = NormalizeUrl(serverUrl);

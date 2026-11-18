@@ -4,7 +4,46 @@ namespace AndijonSaltanatlar.Shared.DTOs
 {
     public sealed class RegisterRequest { public string Username { get; set; } = ""; public string Email { get; set; } = ""; public string Password { get; set; } = ""; }
     public sealed class LoginRequest { public string Email { get; set; } = ""; public string Password { get; set; } = ""; }
-    public sealed class AuthResponse { public string Token { get; set; } = ""; public string Username { get; set; } = ""; public int? KingdomId { get; set; } }
+    public sealed class AuthResponse
+    {
+        /// <summary>Qisqa muddatli kirish tokeni (JWT).</summary>
+        public string Token { get; set; } = "";
+        public string Username { get; set; } = "";
+        public int? KingdomId { get; set; }
+        /// <summary>Uzoq muddatli yangilash tokeni (har yangilashda almashadi). Qurilmada faqat shifrlangan holda saqlanadi.</summary>
+        public string RefreshToken { get; set; } = "";
+        public int ExpiresInSeconds { get; set; }
+        /// <summary>O'yindagi taxallus (Google'dagi haqiqiy ism emas).</summary>
+        public string DisplayName { get; set; } = "";
+        /// <summary>Yangi o'yinchi: taxallus va avatar tanlashi kerak (YANGI HUKMDOR).</summary>
+        public bool NeedsProfile { get; set; }
+        public int AvatarId { get; set; }
+        /// <summary>VIP hisob: barcha imkoniyatlar (binolar, texnologiyalar, yer, xos navkar) ochilgan.</summary>
+        public bool IsVip { get; set; }
+    }
+
+    public sealed class RefreshRequest { public string RefreshToken { get; set; } = ""; }
+    public sealed class ProfileRequest { public string Nickname { get; set; } = ""; public int AvatarId { get; set; } }
+
+    /// <summary>Taxallus qoidalari (client va server bir xil tekshiradi).</summary>
+    public static class ProfileRules
+    {
+        public const int MinLen = 3, MaxLen = 16, Avatars = 6;
+
+        public static string Clean(string s) => System.Text.RegularExpressions.Regex.Replace((s ?? "").Trim(), "\\s+", " ");
+
+        /// <summary>null — to'g'ri; aks holda o'zbekcha xato matni.</summary>
+        public static string Validate(string nick)
+        {
+            if (nick.Length < MinLen) return "Taxallus kamida " + MinLen + " harf bo'lsin.";
+            if (nick.Length > MaxLen) return "Taxallus ko'pi bilan " + MaxLen + " harf bo'lsin.";
+            foreach (char c in nick)
+                if (!(char.IsLetterOrDigit(c) || c == ' ' || c == '_' || c == '-' || c == '\'' || c == '\u2018' || c == '\u2019'))
+                    return "Taxallusda faqat harf, raqam, bo'shliq, _ va - bo'lsin.";
+            if (nick.Contains("@")) return "Taxallusda email bo'lmasin.";
+            return null;
+        }
+    }
 
     // --- Google orqali kirish (brauzer + so'rov/poll oqimi, Windows va Android uchun bir xil) ---
     public sealed class GoogleLoginStartResponse
@@ -47,6 +86,10 @@ namespace AndijonSaltanatlar.Shared.DTOs
         public string DisplayName { get; set; } = "";
         public string Email { get; set; } = "";
         public int? KingdomId { get; set; }
+        public bool NeedsProfile { get; set; }
+        public int AvatarId { get; set; }
+        /// <summary>VIP hisob.</summary>
+        public bool IsVip { get; set; }
     }
 
     // --- Bulutdagi saqlash ---

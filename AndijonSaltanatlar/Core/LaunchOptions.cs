@@ -100,6 +100,9 @@ public sealed class LaunchOptions
 	/// <summary>Sinov: jang maydoni (mashq jangi) darhol ochiladi.</summary>
 	public bool Arena;
 
+	/// <summary>Sinov: kirish ekrani bosqichi (login, profile, welcome) — skrinshot uchun.</summary>
+	public string AuthStage;
+
 	/// <summary>Sinov: fasldan qat'i nazar odamlar cho'miladi.</summary>
 	public bool Swim;
 
@@ -303,6 +306,10 @@ public sealed class LaunchOptions
 				break;
 			case "--swim":
 				launchOptions.Swim = true;
+				break;
+			case "--auth-stage":
+				launchOptions.AuthStage = text;
+				i++;
 				break;
 			case "--arena":
 				launchOptions.Arena = true;

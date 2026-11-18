@@ -40,7 +40,17 @@ builder.Services.AddScoped<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
 // --- JWT autentifikatsiya ---
 string jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("ANDIJON_JWT_KEY") ?? "";
 if (jwtKey.Length < 32) jwtKey = "DEV-ONLY-INSECURE-KEY-change-me-in-production-32b"; // faqat lokal dev uchun
-builder.Services.AddSingleton(new JwtTokenService(jwtKey));
+var jwtService = new JwtTokenService(jwtKey);
+builder.Services.AddSingleton(jwtService);
+builder.Services.AddSingleton(new AndijonSaltanatlar.Server.Authentication.SessionTokenService(jwtService));
+// Kirish endpoint'larini suiiste'moldan himoya: har IP uchun daqiqasiga 20 so'rov
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = 429;
+    o.AddPolicy("auth", ctx => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "?",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
+});
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
     {
@@ -62,6 +72,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/gamehub"))
                     ctx.Token = accessToken;
                 return System.Threading.Tasks.Task.CompletedTask;
+            },
+            // Bekor qilingan (chiqilgan) sessiyaning tokeni muddati tugamagan bo'lsa ham rad etiladi
+            OnTokenValidated = ctx =>
+            {
+                string sid = ctx.Principal?.FindFirst("sid")?.Value;
+                if (!string.IsNullOrEmpty(sid))
+                {
+                    var db = ctx.HttpContext.RequestServices.GetRequiredService<GameDbContext>();
+                    if (AndijonSaltanatlar.Server.Authentication.SessionTokenService.IsRevoked(db, sid)) ctx.Fail("Sessiya bekor qilingan");
+                }
+                return System.Threading.Tasks.Task.CompletedTask;
             }
         };
     });
@@ -70,6 +91,8 @@ builder.Services.AddAuthorization();
 // --- Google orqali kirish (yagona kirish usuli) ---
 var googleOptions = AndijonSaltanatlar.Server.Authentication.GoogleAuthOptions.From(builder.Configuration);
 builder.Services.AddSingleton(googleOptions);
+var vipOptions = AndijonSaltanatlar.Server.Authentication.VipOptions.From(builder.Configuration);
+builder.Services.AddSingleton(vipOptions);
 builder.Services.AddHttpClient("google", c => c.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.AddSingleton<AndijonSaltanatlar.Server.Authentication.GoogleLoginService>();
 
@@ -113,10 +136,19 @@ else
 // Faqat shu kompyuterdagi proksi (localhost) sarlavhalariga ishoniladi (standart KnownProxies = loopback).
 app.UseForwardedHeaders(new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto });
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapGet("/", () => "Andijon: Saltanatlar — Server ishlayapti. API: /api/auth/google, /api/save, /api/game, /api/online, Hub: /gamehub");
 app.MapGet("/health", () => Results.Ok(new { ok = true, provider, utc = DateTime.UtcNow }));
+// Kirish ekranidagi havolalar (Google OAuth rozilik ekrani uchun ham kerak)
+app.MapGet("/privacy", () => Results.Content(AndijonSaltanatlar.Server.Controllers.LoginPages.Message("Maxfiylik siyosati",
+    "O'yin Google hisobingizdan faqat identifikator (sub), email va ismni oladi (openid, email, profile). Parolingiz va pochtangiz o'qilmaydi. " +
+    "Email faqat hisobingizni tiklash uchun saqlanadi va boshqa o'yinchilarga ko'rsatilmaydi — ular faqat siz tanlagan taxallusni ko'radi. " +
+    "Sessiya tokenlari qurilmangizda shifrlangan holda saqlanadi; \"Hisobdan chiqish\" ularni o'chiradi. Ma'lumotlarni o'chirish uchun server administratoriga murojaat qiling.", true), "text/html; charset=utf-8"));
+app.MapGet("/terms", () => Results.Content(AndijonSaltanatlar.Server.Controllers.LoginPages.Message("Foydalanish shartlari",
+    "Andijon: Saltanatlar — tarixiy strategiya o'yini. Boshqa o'yinchilarni haqoratlamang, xatolardan foydalanib o'yin muvozanatini buzmang, " +
+    "bir kishi bir hisobdan foydalansin. Qoidabuzar hisoblar cheklanishi mumkin. O'yin \"boricha\" taqdim etiladi.", true), "text/html; charset=utf-8"));
 app.MapControllers();
 app.MapHub<GameHub>("/gamehub");
 

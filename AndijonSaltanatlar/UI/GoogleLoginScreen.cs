@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using AndijonSaltanatlar.Core;
 using AndijonSaltanatlar.Online;
+using AndijonSaltanatlar.Shared.DTOs;
 using AndijonSaltanatlar.UI.Design;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -12,22 +13,44 @@ using Microsoft.Xna.Framework.Input;
 namespace AndijonSaltanatlar.UI
 {
     /// <summary>
-    /// O'yinga kirish ekrani — yagona usul: Google hisobi. Orqa fonda tirik Asaka shahri (Game1 chizadi).
-    /// Holatlar: kirilmagan → "Google bilan kirish"; brauzer kutilmoqda → ko'rsatma + "Bekor qilish";
-    /// token tekshirilmoqda / o'yin yuklanmoqda → jarayon; xato → xabar + "Qayta urinish".
-    /// Server manzili kichik "Server" qatorida (telefonda kompyuter/domen manzili kiritiladi).
+    /// Kirish ekrani (yagona usul — Google). Orqa fonda tirik Asaka shahri (Game1 chizadi) + yumshoq qoraytirish.
+    ///   Login   — "GOOGLE ORQALI KIRISH"; holatlar: kutish, tekshirish, bekor, xato, internet yo'q;
+    ///   Profile — YANGI HUKMDOR: taxallus, avatar, til → "DAVOM ETISH" (Google ismi/emaili boshqalarga ko'rsatilmaydi);
+    ///   Welcome — XUSH KELIBSIZ! taxallus → "O'YINNI DAVOM ETTIRISH" (qaytgan o'yinchi).
     /// </summary>
     public sealed class GoogleLoginScreen
     {
+        public enum Stage { Login, Profile, Welcome }
+
         private readonly CloudSession _cloud;
         private InputManager _input;
         private string _server;
         private bool _editServer;
         private string _pendingKeyboard;
+        private string _nick = "";
+        private int _avatar;
+        private float _stageTime = -1f;
+        private Stage _lastStage = (Stage)(-1);
 
         public UiKit Ui { get; set; }
         /// <summary>Kirgandan keyin o'yin yuklanayotgan payt (Game1 o'rnatadi).</summary>
         public string Busy { get; set; }
+        public Stage Mode { get; set; } = Stage.Login;
+        /// <summary>Welcome: "O'YINNI DAVOM ETTIRISH" bosildi.</summary>
+        public Action ContinueRequested;
+        /// <summary>Profile: taxallus saqlandi.</summary>
+        public Action ProfileDone;
+        private string _profileError;
+        private bool _profileBusy;
+
+        private static readonly Color Gold = new Color(222, 178, 92);
+        private static readonly Color SoftBlue = new Color(120, 168, 226);
+        private static readonly Color[] AvatarColors =
+        {
+            new Color(196, 70, 60), new Color(60, 120, 200), new Color(70, 150, 96),
+            new Color(214, 160, 40), new Color(130, 80, 170), new Color(40, 150, 160)
+        };
+        private static readonly string[] AvatarLetters = { "Q", "S", "K", "T", "B", "O" };
 
         public GoogleLoginScreen(CloudSession cloud, string defaultServer)
         {
@@ -41,7 +64,11 @@ namespace AndijonSaltanatlar.UI
             _input = input;
             input.MouseOverUI = true;
             string kb = _pendingKeyboard;
-            if (kb != null) { _server = kb; _pendingKeyboard = null; }
+            if (kb != null)
+            {
+                if (Mode == Stage.Profile) _nick = kb; else _server = kb;
+                _pendingKeyboard = null;
+            }
         }
 
         public void Draw(SpriteBatch sb, int vw, int vh, float time)
@@ -49,104 +76,242 @@ namespace AndijonSaltanatlar.UI
             if (Ui == null || _input == null) return;
             UiKit ui = Ui;
             ui.Begin(sb, _input, vw, vh, time);
-            ThemeTokens T = ui.T;
-            ui.Fill(new Rectangle(0, 0, vw, vh), T.Scrim);
+            if (Mode != _lastStage) { _lastStage = Mode; _stageTime = time; }
+            float appear = MathHelper.Clamp((time - _stageTime) / 0.35f, 0f, 1f);
+            ui.Fill(new Rectangle(0, 0, vw, vh), new Color(10, 12, 18) * 0.55f);
+            ui.Fill(new Rectangle(0, vh / 2, vw, vh / 2), new Color(10, 12, 18) * 0.25f);
+            switch (Mode)
+            {
+                case Stage.Profile: DrawProfile(ui, sb, vw, vh, time, appear); break;
+                case Stage.Welcome: DrawWelcome(ui, sb, vw, vh, time, appear); break;
+                default: DrawLogin(ui, sb, vw, vh, time, appear); break;
+            }
+            ui.End();
+        }
 
-            int h = ui.ControlH + (ui.IsTouch ? 4 : 6), gap = ui.Gap;
-            int titleW = (int)ui.Type.Measure("ANDIJON: SALTANATLAR", TextStyle.MainTitle).X + 64;
-            int cardW = Math.Min(vw - 32, Math.Max(titleW, ui.Compact ? 620 : 560));
-            float titleH = ui.Type.LineHeight(TextStyle.MainTitle), bodyH = ui.Type.LineHeight(TextStyle.Body), capH = ui.Type.LineHeight(TextStyle.Secondary);
-            // Karta balandligi mazmunga qarab: asosiy tugma + xabar + server qatori (+ xato/kutish holatida qo'shimcha tugma).
-            bool extraRow = _cloud.State == CloudLoginState.Error || _cloud.State == CloudLoginState.WaitingForBrowser;
-            int cardH = (int)(titleH + bodyH + 2 * capH) + (extraRow ? 3 : 2) * h + 6 * gap + 56;
-            cardH = Math.Min(vh - 24, cardH);
-            var card = new Rectangle((vw - cardW) / 2, (vh - cardH) / 2, cardW, cardH);
+        private static Rectangle Card(UiKit ui, int vw, int vh, int w, int h, float appear)
+        {
+            w = Math.Min(vw - 32, w);
+            h = Math.Min(vh - 24, h);
+            var card = new Rectangle((vw - w) / 2, (vh - h) / 2 + (int)((1f - appear) * 24), w, h);
             ui.Panel(card);
-            ui.Rounded(new Rectangle(card.X, card.Y, card.Width, 6), T.Accent, 3);
+            ui.Rounded(new Rectangle(card.X, card.Y, card.Width, 5), Gold, 3);
+            ui.Fill(new Rectangle(card.X + 24, card.Y + 6, card.Width - 48, 2), SoftBlue * 0.6f);
+            return card;
+        }
 
-            int x = card.X + 28, w = card.Width - 56, y = card.Y + 22;
-            ui.Type.DrawFitted(sb, "ANDIJON: SALTANATLAR", new Rectangle(card.X + 16, y, card.Width - 32, (int)titleH), TextStyle.MainTitle, T.Primary, 1);
-            y += (int)titleH + 2;
-            ui.Type.DrawFitted(sb, "Saltanatingiz serverda saqlanadi",
-                new Rectangle(card.X + 16, y, card.Width - 32, (int)bodyH), TextStyle.Secondary, T.TextSecondary, 1);
-            y += (int)bodyH + gap * 2;
+        private static void Title(UiKit ui, SpriteBatch sb, Rectangle card, ref int y, string title, string sub)
+        {
+            float th = ui.Type.LineHeight(TextStyle.MainTitle), bh = ui.Type.LineHeight(TextStyle.Body);
+            ui.Type.DrawFitted(sb, title, new Rectangle(card.X + 16, y, card.Width - 32, (int)th), TextStyle.MainTitle, Gold, 1);
+            y += (int)th + 2;
+            if (sub == null) return;
+            ui.Type.DrawFitted(sb, sub, new Rectangle(card.X + 16, y, card.Width - 32, (int)bh), TextStyle.Body, SoftBlue, 1);
+            y += (int)bh;
+        }
 
+        // ------------------------------------------------------------------ 1) Kirish
+        private void DrawLogin(UiKit ui, SpriteBatch sb, int vw, int vh, float time, float appear)
+        {
+            ThemeTokens T = ui.T;
+            int h = ui.ControlH + (ui.IsTouch ? 8 : 10), gap = ui.Gap;
+            float capH = ui.Type.LineHeight(TextStyle.Secondary);
+            int titleW = (int)ui.Type.Measure("ANDIJON: SALTANATLAR", TextStyle.MainTitle).X + 72;
             CloudLoginState st = _cloud.State;
+            bool extraRow = st == CloudLoginState.Error || st == CloudLoginState.WaitingForBrowser;
+            int cardH = (int)(ui.Type.LineHeight(TextStyle.MainTitle) + ui.Type.LineHeight(TextStyle.Body) + 5 * capH) + (extraRow ? 3 : 2) * h + 8 * gap + 70;
+            Rectangle card = Card(ui, vw, vh, Math.Max(titleW, ui.Compact ? 640 : 580), cardH, appear);
+
+            int x = card.X + 28, w = card.Width - 56, y = card.Y + 24;
+            Title(ui, sb, card, ref y, "ANDIJON: SALTANATLAR", "O'z saltanatingni yarat!");
+            y += gap * 2;
+
             bool working = Busy != null || st == CloudLoginState.CheckingToken || st == CloudLoginState.SignedIn;
             var main = new Rectangle(x, y, w, h);
-
             if (working)
             {
-                string text = Busy ?? (st == CloudLoginState.CheckingToken ? "Serverga ulanmoqda…" : "Saltanat yuklanmoqda…");
+                string text = Busy ?? (st == CloudLoginState.CheckingToken ? "Profil yuklanmoqda" : "Saltanat yuklanmoqda");
                 ui.RoundedBorder(main, T.Border, T.SurfaceAlt, 8);
-                ui.Type.DrawFitted(sb, text + Dots(time), new Rectangle(main.X + 8, main.Y, main.Width - 16, main.Height), TextStyle.Button, T.TextPrimary, 1);
+                Spinner(ui, new Vector2(main.X + 22, main.Center.Y), time);
+                ui.Type.DrawFitted(sb, text + Dots(time), new Rectangle(main.X + 40, main.Y, main.Width - 48, main.Height), TextStyle.Button, T.TextPrimary, 1);
                 y += h + gap;
             }
             else if (st == CloudLoginState.WaitingForBrowser)
             {
-                ui.RoundedBorder(main, T.Primary, T.SurfaceAlt, 8);
-                string wait = _cloud.UsingNativePicker ? "Google akkauntini tanlang" : "Google oynasi kutilmoqda";
-                ui.Type.DrawFitted(sb, wait + Dots(time), new Rectangle(main.X + 8, main.Y, main.Width - 16, main.Height), TextStyle.Button, T.TextPrimary, 1);
+                ui.RoundedBorder(main, SoftBlue, T.SurfaceAlt, 8);
+                Spinner(ui, new Vector2(main.X + 22, main.Center.Y), time);
+                string wait = _cloud.UsingNativePicker ? "Google akkauntini tanlang" : "Brauzerda Google orqali kiring";
+                ui.Type.DrawFitted(sb, wait + Dots(time), new Rectangle(main.X + 40, main.Y, main.Width - 48, main.Height), TextStyle.Button, T.TextPrimary, 1);
                 y += h + gap;
                 if (_cloud.UsingNativePicker)
                 {
-                    if (ui.Button(new Rectangle(x, y, w, h - 6), "Bekor qilish", ButtonKind.Ghost, true)) _cloud.CancelLogin();
+                    if (ui.Button(new Rectangle(x, y, w, h - 8), "BEKOR QILISH", ButtonKind.Ghost, true)) _cloud.CancelLogin();
                 }
                 else
                 {
                     int bw = (w - gap) / 2;
-                    if (ui.Button(new Rectangle(x, y, bw, h - 6), "Brauzerni qayta ochish", ButtonKind.Secondary, true)) _cloud.StartGoogleLogin(_server);
-                    if (ui.Button(new Rectangle(x + bw + gap, y, bw, h - 6), "Bekor qilish", ButtonKind.Ghost, true)) _cloud.CancelLogin();
+                    if (ui.Button(new Rectangle(x, y, bw, h - 8), "BRAUZERNI QAYTA OCHISH", ButtonKind.Secondary, true)) _cloud.StartGoogleLogin(_server);
+                    if (ui.Button(new Rectangle(x + bw + gap, y, bw, h - 8), "BEKOR QILISH", ButtonKind.Ghost, true)) _cloud.CancelLogin();
                 }
                 y += h + gap;
             }
             else
             {
-                if (GoogleButton(ui, sb, main, "Google bilan kirish")) { ui.FocusId = null; _cloud.StartGoogleLogin(_server); }
+                if (GoogleButton(ui, sb, main, "GOOGLE ORQALI KIRISH")) { ui.FocusId = null; _cloud.StartGoogleLogin(_server); }
                 y += h + gap;
             }
 
-            // Holat / xato xabari (bir necha qatorga bo'linadi, kartadan chiqmaydi).
             string msg = _cloud.Message;
             if (string.IsNullOrEmpty(msg) && st == CloudLoginState.SignedOut)
-                msg = "Kirish faqat Google hisobi orqali. Parol kerak emas.";
+                msg = "Faqat Google hisobi — parol so'ralmaydi. Saltanatingiz serverda saqlanadi.";
             if (!string.IsNullOrEmpty(msg))
                 y += (int)ui.Paragraph(msg, new Rectangle(x, y, w, (int)(capH * 3)), TextStyle.Secondary, _cloud.MessageIsError ? T.Danger : T.TextSecondary, 3) + gap;
 
             if (st == CloudLoginState.Error && !working)
             {
-                if (ui.Button(new Rectangle(x, y, w, h - 6), "Qayta urinish", ButtonKind.Secondary, true))
+                if (ui.Button(new Rectangle(x, y, w, h - 8), "QAYTA URINISH", ButtonKind.Secondary, true))
                 {
-                    if (!string.IsNullOrEmpty(StoredAuth.Load()?.Token)) _cloud.TryResume(_server);
+                    if (SecureTokenStorage.Load() != null || !string.IsNullOrEmpty(StoredAuth.Load()?.Token)) _cloud.TryResume(_server);
                     else _cloud.StartGoogleLogin(_server);
                 }
                 y += h + gap;
             }
 
-            // Server manzili (pastki qator): odatda yashirin, "o'zgartirish" bilan ochiladi.
-            int sy = card.Bottom - h - 12;
+            // Pastki qator: havolalar va server manzili
+            int ly = card.Bottom - (int)capH - 14;
+            string l1 = "MAXFIYLIK SIYOSATI", l2 = "FOYDALANISH SHARTLARI";
+            float w1 = ui.Type.Measure(l1, TextStyle.Caption).X, w2 = ui.Type.Measure(l2, TextStyle.Caption).X;
+            var r1 = new Rectangle(x, ly, (int)w1 + 4, (int)capH);
+            var r2 = new Rectangle(r1.Right + 22, ly, (int)w2 + 4, (int)capH);
+            ui.Text(l1, new Vector2(r1.X, r1.Y), TextStyle.Caption, ui.Hover(r1) ? Gold : SoftBlue);
+            ui.Text("·", new Vector2(r1.Right + 8, ly), TextStyle.Caption, T.TextSecondary);
+            ui.Text(l2, new Vector2(r2.X, r2.Y), TextStyle.Caption, ui.Hover(r2) ? Gold : SoftBlue);
+            if (ui.Clicked(r1)) CloudSession.OpenUrl(CloudSession.NormalizeUrl(_server) + "/privacy");
+            if (ui.Clicked(r2)) CloudSession.OpenUrl(CloudSession.NormalizeUrl(_server) + "/terms");
+
+            int sy = ly - h - 4;
             if (!working && st != CloudLoginState.WaitingForBrowser && sy > y - 4)
             {
                 if (_editServer)
                 {
                     int lw = (int)ui.Type.Measure("Server:", TextStyle.Secondary).X + 10;
-                    ui.Text("Server:", new Vector2(x, sy + (h - 6 - capH) / 2), TextStyle.Secondary, T.TextSecondary);
-                    _server = ui.TextInput(new Rectangle(x + lw, sy, w - lw, h - 6), "login_server", _server, "https://server-manzili yoki 192.168.1.5:5080", false, AndroidKeyboard);
+                    ui.Text("Server:", new Vector2(x, sy + (h - 8 - capH) / 2), TextStyle.Secondary, T.TextSecondary);
+                    _server = ui.TextInput(new Rectangle(x + lw, sy, w - lw, h - 8), "login_server", _server, "https://server-manzili yoki 192.168.1.5:5080", false, AndroidKeyboard);
                 }
                 else
                 {
                     string label = "Server: " + (string.IsNullOrEmpty(_server) ? "-" : _server);
                     int bw = Math.Min(w / 2, (int)ui.Type.Measure("O'zgartirish", TextStyle.Button).X + 28);
-                    ui.TextFit(label, new Rectangle(x, sy, w - bw - gap, h - 6), TextStyle.Secondary, T.TextSecondary);
-                    if (ui.Button(new Rectangle(x + w - bw, sy, bw, h - 6), "O'zgartirish", ButtonKind.Ghost, true)) { _editServer = true; ui.FocusId = "login_server"; }
+                    ui.TextFit(label, new Rectangle(x, sy, w - bw - gap, h - 8), TextStyle.Caption, T.TextSecondary);
+                    if (ui.Button(new Rectangle(x + w - bw, sy, bw, h - 8), "O'zgartirish", ButtonKind.Ghost, true)) { _editServer = true; ui.FocusId = "login_server"; }
                 }
             }
-            ui.End();
         }
 
+        // ------------------------------------------------------------------ 2) YANGI HUKMDOR
+        private void DrawProfile(UiKit ui, SpriteBatch sb, int vw, int vh, float time, float appear)
+        {
+            ThemeTokens T = ui.T;
+            int h = ui.ControlH + (ui.IsTouch ? 8 : 10), gap = ui.Gap;
+            float capH = ui.Type.LineHeight(TextStyle.Secondary);
+            int av = ui.IsTouch ? 64 : 56;
+            int cardH = (int)(ui.Type.LineHeight(TextStyle.MainTitle) + ui.Type.LineHeight(TextStyle.Body) + capH * 7) + 2 * h + av + 8 * gap + 60;
+            Rectangle card = Card(ui, vw, vh, ui.Compact ? 680 : 620, cardH, appear);
+            int x = card.X + 28, w = card.Width - 56, y = card.Y + 22;
+            Title(ui, sb, card, ref y, "YANGI HUKMDOR", "Saltanatingiz uchun taxallus tanlang");
+            y += gap;
+
+            ui.Text("Taxallus (" + ProfileRules.MinLen + "-" + ProfileRules.MaxLen + " harf)", new Vector2(x, y), TextStyle.Secondary, T.TextSecondary);
+            y += (int)capH + 4;
+            _nick = ui.TextInput(new Rectangle(x, y, w, h - 6), "profile_nick", _nick, "Masalan: Bobur Mirzo", false, AndroidNickKeyboard) ?? "";
+            if (_nick.Length > ProfileRules.MaxLen) _nick = _nick.Substring(0, ProfileRules.MaxLen);
+            y += h + gap;
+
+            ui.Text("Avatar", new Vector2(x, y), TextStyle.Secondary, T.TextSecondary);
+            y += (int)capH + 4;
+            int n = AvatarColors.Length, ag = Math.Max(6, (w - n * av) / Math.Max(1, n - 1));
+            for (int i = 0; i < n; i++)
+            {
+                var r = new Rectangle(x + i * (av + ag), y, av, av);
+                bool sel = i == _avatar;
+                ui.RoundedBorder(r, sel ? Gold : T.Border, AvatarColors[i] * (sel ? 1f : 0.65f), 10);
+                ui.Type.DrawFitted(sb, AvatarLetters[i], r, TextStyle.PanelTitle, Color.White, 1);
+                if (ui.Clicked(r)) _avatar = i;
+            }
+            y += av + gap;
+            ui.Paragraph("Til: O'zbek. Haqiqiy ismingiz va emailingiz boshqa o'yinchilarga ko'rsatilmaydi.", new Rectangle(x, y, w, (int)(capH * 3)), TextStyle.Caption, T.TextSecondary, 3);
+            y += (int)(capH * 3) + 4;
+
+            string clean = ProfileRules.Clean(_nick);
+            string rule = ProfileRules.Validate(clean);
+            string err = _profileError ?? (_nick.Length > 0 ? rule : null);
+            if (err != null) ui.Paragraph(err, new Rectangle(x, y, w, (int)(capH * 2)), TextStyle.Secondary, T.Danger, 2);
+
+            var btn = new Rectangle(x, card.Bottom - h - 18, w, h);
+            if (ui.Button(btn, _profileBusy ? "SAQLANMOQDA" + Dots(time) : "DAVOM ETISH", ButtonKind.Primary, rule == null && !_profileBusy))
+            {
+                _profileBusy = true;
+                _profileError = null;
+                _cloud.SubmitProfile(clean, _avatar, e =>
+                {
+                    _profileBusy = false;
+                    _profileError = e;
+                    if (e == null) ProfileDone?.Invoke();
+                });
+            }
+        }
+
+        // ------------------------------------------------------------------ 3) XUSH KELIBSIZ
+        private void DrawWelcome(UiKit ui, SpriteBatch sb, int vw, int vh, float time, float appear)
+        {
+            ThemeTokens T = ui.T;
+            int h = ui.ControlH + (ui.IsTouch ? 10 : 12), gap = ui.Gap;
+            int av = ui.IsTouch ? 72 : 64;
+            float capH = ui.Type.LineHeight(TextStyle.Secondary), ph = ui.Type.LineHeight(TextStyle.PanelTitle);
+            int cardH = (int)(ui.Type.LineHeight(TextStyle.MainTitle) + ph + capH) + av + 2 * h + 7 * gap + 50;
+            Rectangle card = Card(ui, vw, vh, ui.Compact ? 620 : 540, cardH, appear);
+            int x = card.X + 28, w = card.Width - 56, y = card.Y + 22;
+            Title(ui, sb, card, ref y, "XUSH KELIBSIZ!", null);
+            y += gap;
+            var ar = new Rectangle(card.Center.X - av / 2, y, av, av);
+            int a = Math.Clamp(_cloud.AvatarId, 0, AvatarColors.Length - 1);
+            ui.RoundedBorder(ar, Gold, AvatarColors[a], 12);
+            ui.Type.DrawFitted(sb, AvatarLetters[a], ar, TextStyle.ScreenTitle, Color.White, 1);
+            y += av + gap;
+            ui.Type.DrawFitted(sb, _cloud.DisplayName ?? "", new Rectangle(x, y, w, (int)ph), TextStyle.PanelTitle, T.TextPrimary, 1);
+            y += (int)ph + 2;
+            ui.Type.DrawFitted(sb, _cloud.IsVip ? "VIP HUKMDOR · Barcha imkoniyatlar ochiq" : "Saltanatingiz sizni kutmoqda",
+                new Rectangle(x, y, w, (int)capH), TextStyle.Secondary, _cloud.IsVip ? Gold : T.TextSecondary, 1);
+
+            var go = new Rectangle(x, card.Bottom - 2 * h - gap - 12, w, h);
+            if (Busy != null)
+            {
+                ui.RoundedBorder(go, T.Border, T.SurfaceAlt, 8);
+                Spinner(ui, new Vector2(go.X + 22, go.Center.Y), time);
+                ui.Type.DrawFitted(sb, Busy + Dots(time), new Rectangle(go.X + 40, go.Y, go.Width - 48, go.Height), TextStyle.Button, T.TextPrimary, 1);
+            }
+            else if (ui.Button(go, "O'YINNI DAVOM ETTIRISH", ButtonKind.Primary, true)) ContinueRequested?.Invoke();
+            if (ui.Button(new Rectangle(x, go.Bottom + gap, w, h - 10), "BOSHQA HISOB BILAN KIRISH", ButtonKind.Ghost, Busy == null))
+            {
+                _cloud.SignOut();
+                Mode = Stage.Login;
+            }
+        }
+
+        // ------------------------------------------------------------------ yordamchilar
         private static string Dots(float time) => new string('.', 1 + (int)(time * 2.5f) % 3);
 
-        /// <summary>Google uslubidagi oq tugma: rangli "G" belgisi + matn.</summary>
+        private static void Spinner(UiKit ui, Vector2 c, float time)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                float a = i / 8f * MathF.PI * 2f + time * 5f;
+                var p = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * 8f;
+                ui.Fill(new Rectangle((int)p.X - 2, (int)p.Y - 2, 4, 4), Gold * ((i + 1) / 8f));
+            }
+        }
+
+        /// <summary>"Sign in with Google" uslubidagi oq tugma: to'rt rangli "G" belgisi + matn.</summary>
         private static bool GoogleButton(UiKit ui, SpriteBatch sb, Rectangle r, string label)
         {
             bool hover = ui.Hover(r);
@@ -161,22 +326,29 @@ namespace AndijonSaltanatlar.UI
             return ui.Clicked(r);
         }
 
-        /// <summary>Soddalashtirilgan to'rt rangli "G" (piksel to'rtburchaklardan).</summary>
         private static void DrawGLogo(UiKit ui, Rectangle r)
         {
             int s = r.Width, t = Math.Max(3, s / 5);
             Color red = new Color(234, 67, 53), yellow = new Color(251, 188, 5), green = new Color(52, 168, 83), blue = new Color(66, 133, 244);
-            ui.Fill(new Rectangle(r.X + t, r.Y, s - 2 * t, t), red);                 // tepa
-            ui.Fill(new Rectangle(r.X, r.Y + t, t, s - 2 * t), yellow);              // chap
-            ui.Fill(new Rectangle(r.X + t, r.Bottom - t, s - 2 * t, t), green);      // past
-            ui.Fill(new Rectangle(r.Right - t, r.Y + s / 2, t, s / 2 - t), blue);    // o'ng-past
-            ui.Fill(new Rectangle(r.X + s / 2, r.Y + s / 2 - t / 2, s / 2, t), blue); // ko'ndalang
+            ui.Fill(new Rectangle(r.X + t, r.Y, s - 2 * t, t), red);
+            ui.Fill(new Rectangle(r.X, r.Y + t, t, s - 2 * t), yellow);
+            ui.Fill(new Rectangle(r.X + t, r.Bottom - t, s - 2 * t, t), green);
+            ui.Fill(new Rectangle(r.Right - t, r.Y + s / 2, t, s / 2 - t), blue);
+            ui.Fill(new Rectangle(r.X + s / 2, r.Y + s / 2 - t / 2, s / 2, t), blue);
         }
 
         private void AndroidKeyboard()
         {
 #if ANDROID
             Task<string> t = KeyboardInput.Show("Server manzili", "", _server, false);
+            t.ContinueWith(r => { if (r.Status == TaskStatus.RanToCompletion && r.Result != null) _pendingKeyboard = r.Result; });
+#endif
+        }
+
+        private void AndroidNickKeyboard()
+        {
+#if ANDROID
+            Task<string> t = KeyboardInput.Show("Taxallus", "3-16 harf", _nick, false);
             t.ContinueWith(r => { if (r.Status == TaskStatus.RanToCompletion && r.Result != null) _pendingKeyboard = r.Result; });
 #endif
         }

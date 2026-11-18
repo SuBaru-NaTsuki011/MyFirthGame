@@ -14,10 +14,19 @@ namespace AndijonSaltanatlar.Online
 {
     public enum CloudLoginState { SignedOut, CheckingToken, WaitingForBrowser, SignedIn, Error }
 
+    /// <summary>Qurilmada SHIFRLANGAN holda saqlanadigan sessiya (SecureTokenStorage).</summary>
+    internal sealed class SecureSession
+    {
+        public string Access { get; set; } = "";
+        public string Refresh { get; set; } = "";
+        public DateTime AccessExpiresUtc { get; set; }
+    }
+
     /// <summary>Qurilmada saqlanadigan kirish ma'lumoti (parol yo'q — faqat server bergan token).</summary>
     public sealed class StoredAuth
     {
         public string ServerUrl { get; set; } = "";
+        /// <summary>Eski versiyalar (shifrlanmagan) — faqat bir martalik ko'chirish uchun o'qiladi, endi yozilmaydi.</summary>
         public string Token { get; set; } = "";
         public string Username { get; set; } = "";
         public string DisplayName { get; set; } = "";
@@ -66,6 +75,17 @@ namespace AndijonSaltanatlar.Online
         public CloudLoginState State { get; private set; } = CloudLoginState.SignedOut;
         public string ServerUrl { get; private set; } = "";
         public string Token { get; private set; }
+        private string _refresh = "";
+        private DateTime _accessExpiresUtc = DateTime.MaxValue;
+        private bool _renewing;
+        private float _renewWait;
+        /// <summary>Yangi o'yinchi: taxallus tanlashi kerak (YANGI HUKMDOR).</summary>
+        public bool NeedsProfile { get; private set; }
+        public int AvatarId { get; private set; }
+        /// <summary>VIP hisob: barcha imkoniyatlar ochilgan (server qaytaradi).</summary>
+        public bool IsVip { get; private set; }
+        /// <summary>Kirish tokeni yangilandi — onlayn ulanish ham yangi tokenni oladi.</summary>
+        public Action<string> TokenRenewed;
         public string Username { get; private set; } = "";
         public string DisplayName { get; private set; } = "";
         public string Email { get; private set; } = "";
@@ -96,7 +116,7 @@ namespace AndijonSaltanatlar.Online
         /// <summary>Sinov uchun: brauzer ochilmaydi, login manzili shu faylga yoziladi (Playwright o'zi ochadi).</summary>
         public string LoginUrlFile { get; set; }
 
-        public string AccountLabel => string.IsNullOrEmpty(Email) ? DisplayName : DisplayName + " (" + Email + ")";
+        public string AccountLabel => (string.IsNullOrEmpty(Email) ? DisplayName : DisplayName + " (" + Email + ")") + (IsVip ? "  ·  VIP" : "");
 
         public void Pump()
         {
@@ -151,29 +171,43 @@ namespace AndijonSaltanatlar.Online
         {
             StoredAuth a = StoredAuth.Load();
             ServerUrl = NormalizeUrl(a?.ServerUrl ?? defaultServer);
-            if (a == null || string.IsNullOrEmpty(a.Token) || ServerUrl.Length == 0) { State = CloudLoginState.SignedOut; return; }
+            SecureSession sec = LoadSecure();
+            string legacy = a?.Token;
+            if ((sec == null || string.IsNullOrEmpty(sec.Refresh)) && string.IsNullOrEmpty(legacy) || ServerUrl.Length == 0) { State = CloudLoginState.SignedOut; return; }
             State = CloudLoginState.CheckingToken;
             Message = "Serverga ulanmoqda...";
             MessageIsError = false;
-            string url = ServerUrl, token = a.Token;
+            string url = ServerUrl;
             Task.Run(async () =>
             {
                 try
                 {
-                    HttpResponseMessage r = await Send(url, HttpMethod.Get, "api/auth/me", token: token);
-                    if (r.StatusCode == HttpStatusCode.Unauthorized || r.StatusCode == HttpStatusCode.Forbidden)
+                    AuthResponse auth = null;
+                    if (sec != null && !string.IsNullOrEmpty(sec.Refresh))
                     {
-                        StoredAuth.Clear();
-                        Post(() => { State = CloudLoginState.SignedOut; Message = "Kirish muddati tugadi — Google bilan qayta kiring."; MessageIsError = false; });
-                        return;
+                        // Sessiyani yangilash (rotation): yangi kirish + yangi yangilash tokeni
+                        HttpResponseMessage rr = await Send(url, HttpMethod.Post, "api/auth/refresh", JsonContent.Create(new RefreshRequest { RefreshToken = sec.Refresh }, options: Json));
+                        if (rr.StatusCode == HttpStatusCode.Unauthorized) { Expired(); return; }
+                        rr.EnsureSuccessStatusCode();
+                        auth = await rr.Content.ReadFromJsonAsync<AuthResponse>(Json);
                     }
+                    else
+                    {
+                        // Eski versiyadan: ochiq saqlangan token bir marta shifrlangan sessiyaga almashtiriladi
+                        HttpResponseMessage ur = await Send(url, HttpMethod.Post, "api/auth/upgrade", token: legacy);
+                        if (ur.StatusCode == HttpStatusCode.Unauthorized || ur.StatusCode == HttpStatusCode.Forbidden) { Expired(); return; }
+                        ur.EnsureSuccessStatusCode();
+                        auth = await ur.Content.ReadFromJsonAsync<AuthResponse>(Json);
+                    }
+                    HttpResponseMessage r = await Send(url, HttpMethod.Get, "api/auth/me", token: auth.Token);
                     r.EnsureSuccessStatusCode();
                     MeResponse me = await r.Content.ReadFromJsonAsync<MeResponse>(Json);
-                    Post(() => FinishSignIn(url, token, me.Username, me.DisplayName, me.Email));
+                    Post(() => FinishSignIn(url, auth, me.Email));
                 }
                 catch (Exception ex)
                 {
-                    Post(() => { State = CloudLoginState.Error; Message = "Serverga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring." + Detail(ex); MessageIsError = true; });
+                    bool net = ex is HttpRequestException || ex is TaskCanceledException;
+                    Post(() => { State = CloudLoginState.Error; Message = (net ? "INTERNET ALOQASI YO'Q yoki SERVERGA ULANIB BO'LMADI." : "SERVERGA ULANIB BO'LMADI.") + Detail(ex); MessageIsError = true; });
                 }
             });
         }
@@ -220,8 +254,7 @@ namespace AndijonSaltanatlar.Online
                         if (res.Status == "pending") continue;
                         if (res.Status == "ok" && res.Auth != null)
                         {
-                            string token = res.Auth.Token;
-                            Post(() => FinishSignIn(url, token, res.Auth.Username, res.DisplayName, res.Email));
+                            Post(() => FinishSignIn(url, res.Auth, res.Email));
                             return;
                         }
                         Post(() => { State = CloudLoginState.Error; Message = string.IsNullOrEmpty(res.MessageUz) ? "Kirib bo'lmadi" : res.MessageUz; MessageIsError = true; });
@@ -271,7 +304,7 @@ namespace AndijonSaltanatlar.Online
                 JsonContent.Create(new GoogleIdTokenRequest { IdToken = idToken }, options: Json), ct: ct);
             if (!r.IsSuccessStatusCode) { await FailFrom(r, "Google hisobini tasdiqlab bo'lmadi"); return true; }
             GoogleLoginPollResponse res = await r.Content.ReadFromJsonAsync<GoogleLoginPollResponse>(Json, ct);
-            Post(() => { UsingNativePicker = false; FinishSignIn(url, res.Auth.Token, res.Auth.Username, res.DisplayName, res.Email); });
+            Post(() => { UsingNativePicker = false; FinishSignIn(url, res.Auth, res.Email); });
             return true;
         }
 
@@ -282,18 +315,226 @@ namespace AndijonSaltanatlar.Online
             if (State == CloudLoginState.WaitingForBrowser) { State = CloudLoginState.SignedOut; Message = ""; }
         }
 
-        private void FinishSignIn(string url, string token, string username, string displayName, string email)
+        private void FinishSignIn(string url, AuthResponse auth, string email)
         {
             ServerUrl = url;
-            Token = token;
-            Username = username ?? "";
-            DisplayName = string.IsNullOrEmpty(displayName) ? Username : displayName;
-            Email = email ?? "";
+            ApplyAuth(auth);
+            Username = auth.Username ?? "";
+            DisplayName = string.IsNullOrEmpty(auth.DisplayName) ? Username : auth.DisplayName;
+            NeedsProfile = auth.NeedsProfile;
+            AvatarId = auth.AvatarId;
+            IsVip = auth.IsVip;
+            Email = email ?? "";   // faqat shu qurilmada ko'rsatiladi (diskka yozilmaydi)
             State = CloudLoginState.SignedIn;
             Message = "Xush kelibsiz, " + DisplayName + "!";
             MessageIsError = false;
-            new StoredAuth { ServerUrl = url, Token = token, Username = Username, DisplayName = DisplayName, Email = Email }.Save();
+            // Ochiq faylda faqat server manzili va taxallus (tokenlar — shifrlangan faylda)
+            new StoredAuth { ServerUrl = url, Token = "", Username = Username, DisplayName = DisplayName, Email = "" }.Save();
             SignedIn?.Invoke();
+        }
+
+        private void ApplyAuth(AuthResponse auth)
+        {
+            Token = auth.Token;
+            if (!string.IsNullOrEmpty(auth.RefreshToken)) _refresh = auth.RefreshToken;
+            _accessExpiresUtc = auth.ExpiresInSeconds > 0 ? DateTime.UtcNow.AddSeconds(auth.ExpiresInSeconds) : DateTime.UtcNow.AddDays(6);
+            SaveSecure();
+        }
+
+        private void SaveSecure()
+        {
+            if (string.IsNullOrEmpty(_refresh)) return;
+            SecureTokenStorage.Save(JsonSerializer.Serialize(new SecureSession { Access = Token ?? "", Refresh = _refresh, AccessExpiresUtc = _accessExpiresUtc }));
+        }
+
+        private static SecureSession LoadSecure()
+        {
+            string s = SecureTokenStorage.Load();
+            if (string.IsNullOrEmpty(s)) return null;
+            try { return JsonSerializer.Deserialize<SecureSession>(s); } catch { return null; }
+        }
+
+        private void Expired()
+        {
+            SecureTokenStorage.Clear();
+            IsVip = false;
+            NeedsProfile = false;
+            StoredAuth a = StoredAuth.Load();
+            if (a != null) { a.Token = ""; a.Save(); }
+            Post(() => { State = CloudLoginState.SignedOut; Message = "SESSIYA MUDDATI TUGADI. Google orqali qayta kiring."; MessageIsError = true; });
+        }
+
+        /// <summary>
+        /// Har kadr: kirish tokeni tugashiga 5 daqiqa qolganda fonda yangilanadi (o'yin to'xtamaydi).
+        /// Internet yo'q bo'lsa 30 soniyadan keyin qayta uriniladi; sessiya bekor qilingan bo'lsa — kirish ekrani.
+        /// </summary>
+        public void Tick(float dt)
+        {
+            if (State != CloudLoginState.SignedIn || string.IsNullOrEmpty(_refresh) || _renewing) return;
+            if (_renewWait > 0f) { _renewWait -= dt; return; }
+            if (DateTime.UtcNow < _accessExpiresUtc.AddMinutes(-5)) return;
+            _renewing = true;
+            string url = ServerUrl, refresh = _refresh;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    HttpResponseMessage r = await Send(url, HttpMethod.Post, "api/auth/refresh", JsonContent.Create(new RefreshRequest { RefreshToken = refresh }, options: Json));
+                    if (r.StatusCode == HttpStatusCode.Unauthorized)
+                    {
+                        Post(() => { _renewing = false; Token = null; SessionLost?.Invoke(); });
+                        Expired();
+                        return;
+                    }
+                    r.EnsureSuccessStatusCode();
+                    AuthResponse a = await r.Content.ReadFromJsonAsync<AuthResponse>(Json);
+                    Post(() => { _renewing = false; ApplyAuth(a); TokenRenewed?.Invoke(Token); });
+                }
+                catch
+                {
+                    Post(() => { _renewing = false; _renewWait = 30f; });   // internet uzildi — keyinroq yana
+                }
+            });
+        }
+
+        /// <summary>Sessiya serverda bekor qilingan/muddati tugagan — Game1 kirish ekraniga qaytaradi (progress saqlanadi).</summary>
+        public Action SessionLost;
+
+        /// <summary>YANGI HUKMDOR: taxallus va avatarni serverga saqlaydi. done(xato) — null bo'lsa muvaffaqiyat.</summary>
+        public void SubmitProfile(string nickname, int avatar, Action<string> done)
+        {
+            string url = ServerUrl, token = Token;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    HttpResponseMessage r = await Send(url, HttpMethod.Post, "api/auth/profile",
+                        JsonContent.Create(new ProfileRequest { Nickname = nickname, AvatarId = avatar }, options: Json), token: token);
+                    if (!r.IsSuccessStatusCode)
+                    {
+                        string err = "Saqlab bo'lmadi";
+                        try { using var doc = JsonDocument.Parse(await r.Content.ReadAsStringAsync()); if (doc.RootElement.TryGetProperty("messageUz", out var m)) err = m.GetString(); } catch { }
+                        Post(() => done?.Invoke(err));
+                        return;
+                    }
+                    MeResponse me = await r.Content.ReadFromJsonAsync<MeResponse>(Json);
+                    Post(() =>
+                    {
+                        DisplayName = me.DisplayName;
+                        AvatarId = me.AvatarId;
+                        IsVip = me.IsVip;
+                        NeedsProfile = false;
+                        new StoredAuth { ServerUrl = url, Token = "", Username = Username, DisplayName = DisplayName, Email = "" }.Save();
+                        done?.Invoke(null);
+                    });
+                }
+                catch { Post(() => done?.Invoke("SERVERGA ULANIB BO'LMADI")); }
+            });
+        }
+
+        // ------------------------------------------------------------------
+        // DUNYONI TANLASH / boshlang'ich yurt (kirgandan keyin, o'yin boshlanishidan oldin)
+        // ------------------------------------------------------------------
+        /// <summary>Mavjud dunyolar va o'z saltanati qaysi dunyoda ekani.</summary>
+        public void LoadWorlds(Action<WorldsResponse, string> done)
+        {
+            string url = ServerUrl, token = Token;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    HttpResponseMessage r = await Send(url, HttpMethod.Get, "api/online/worlds", token: token);
+                    if (r.StatusCode == HttpStatusCode.Unauthorized) { Expired(); Post(() => done?.Invoke(null, "SESSIYA MUDDATI TUGADI.")); return; }
+                    if (!r.IsSuccessStatusCode) { Post(() => done?.Invoke(null, "DUNYOLARNI YUKLAB BO'LMADI.")); return; }
+                    WorldsResponse dto = await r.Content.ReadFromJsonAsync<WorldsResponse>(Json);
+                    Post(() => done?.Invoke(dto, null));
+                }
+                catch (Exception ex) { Post(() => done?.Invoke(null, "SERVERGA ULANIB BO'LMADI." + Detail(ex))); }
+            });
+        }
+
+        /// <summary>Tanlangan dunyoga qo'shilish (yangi o'yinchi uchun saltanat yaratiladi, yurt keyin tanlanadi).</summary>
+        public void JoinWorld(int worldId, Action<OnlineStateDto, string> done)
+        {
+            string url = ServerUrl, token = Token;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    HttpResponseMessage r = await Send(url, HttpMethod.Post, "api/online/join",
+                        JsonContent.Create(new JoinWorldRequest { WorldId = worldId, ChooseStart = true }, options: Json), token);
+                    if (r.StatusCode == HttpStatusCode.Unauthorized) { Expired(); Post(() => done?.Invoke(null, "SESSIYA MUDDATI TUGADI.")); return; }
+                    if (!r.IsSuccessStatusCode) { string e = await ReadError(r, "DUNYOGA QO'SHILIB BO'LMADI."); Post(() => done?.Invoke(null, e)); return; }
+                    OnlineStateDto dto = await r.Content.ReadFromJsonAsync<OnlineStateDto>(Json);
+                    Post(() => done?.Invoke(dto, null));
+                }
+                catch (Exception ex) { Post(() => done?.Invoke(null, "SERVERGA ULANIB BO'LMADI." + Detail(ex))); }
+            });
+        }
+
+        /// <summary>Bo'sh hududlar ro'yxati (faqat dunyoga qo'shilgandan keyin).</summary>
+        public void LoadStartRegions(Action<StartRegionsDto, string> done)
+        {
+            string url = ServerUrl, token = Token;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    HttpResponseMessage r = await Send(url, HttpMethod.Get, "api/online/start-regions", token: token);
+                    if (r.StatusCode == HttpStatusCode.Unauthorized) { Expired(); Post(() => done?.Invoke(null, "SESSIYA MUDDATI TUGADI.")); return; }
+                    if (!r.IsSuccessStatusCode) { Post(() => done?.Invoke(null, "HUDUDLARNI YUKLAB BO'LMADI.")); return; }
+                    StartRegionsDto dto = await r.Content.ReadFromJsonAsync<StartRegionsDto>(Json);
+                    Post(() => done?.Invoke(dto, null));
+                }
+                catch (Exception ex) { Post(() => done?.Invoke(null, "SERVERGA ULANIB BO'LMADI." + Detail(ex))); }
+            });
+        }
+
+        /// <summary>
+        /// Boshlang'ich hududni tanlash (server bandlikni qayta tekshiradi va bir marta saqlaydi).
+        /// <paramref name="done"/>: (holat, xato, hududBand) — hududBand true bo'lsa ro'yxat eskirgan, qayta yuklash kerak.
+        /// </summary>
+        public void ChooseStart(int regionId, string kingdomName, string flag, Action<OnlineStateDto, string, bool> done)
+        {
+            string url = ServerUrl, token = Token;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    HttpResponseMessage r = await Send(url, HttpMethod.Post, "api/online/start",
+                        JsonContent.Create(new ChooseStartRequest
+                        {
+                            CommandId = Guid.NewGuid().ToString("N"),
+                            RegionId = regionId,
+                            KingdomName = kingdomName ?? "",
+                            Flag = flag ?? ""
+                        }, options: Json), token);
+                    if (r.StatusCode == HttpStatusCode.Unauthorized) { Expired(); Post(() => done?.Invoke(null, "SESSIYA MUDDATI TUGADI.", false)); return; }
+                    if (!r.IsSuccessStatusCode)
+                    {
+                        bool taken = r.StatusCode == HttpStatusCode.Conflict;
+                        string e = await ReadError(r, "HUDUDNI TANLAB BO'LMADI.");
+                        Post(() => done?.Invoke(null, e, taken));
+                        return;
+                    }
+                    OnlineStateDto dto = await r.Content.ReadFromJsonAsync<OnlineStateDto>(Json);
+                    Post(() => done?.Invoke(dto, null, false));
+                }
+                catch (Exception ex) { Post(() => done?.Invoke(null, "SERVERGA ULANIB BO'LMADI." + Detail(ex), false)); }
+            });
+        }
+
+        private static async Task<string> ReadError(HttpResponseMessage r, string fallback)
+        {
+            string msg = fallback;
+            try
+            {
+                using JsonDocument doc = JsonDocument.Parse(await r.Content.ReadAsStringAsync());
+                if (doc.RootElement.TryGetProperty("messageUz", out JsonElement m) && !string.IsNullOrWhiteSpace(m.GetString()))
+                    msg = m.GetString();
+            }
+            catch { }
+            return msg;
         }
 
         /// <summary>Kirgandan keyingi xato (masalan saqlashni yuklab bo'lmadi) — kirish ekrani xabar va "Qayta urinish" ko'rsatadi.</summary>
@@ -307,12 +548,38 @@ namespace AndijonSaltanatlar.Online
         public void SignOut()
         {
             CancelLogin();
-            StoredAuth.Clear();
+            // Serverda shu qurilma sessiyasi bekor qilinadi (fonda; internet bo'lmasa ham qurilmadan o'chiriladi)
+            string url = ServerUrl, token = Token;
+            if (!string.IsNullOrEmpty(token) && url.Length > 0)
+                Task.Run(async () => { try { await Send(url, HttpMethod.Post, "api/auth/logout", token: token); } catch { } });
+            StoredAuth a = StoredAuth.Load();
+            if (a != null) { a.Token = ""; a.Username = ""; a.DisplayName = ""; a.Save(); }   // server manzili qoladi
+            SecureTokenStorage.Clear();
+            _refresh = "";
+            NeedsProfile = false;
+            IsVip = false;
+            AvatarId = 0;
             Token = null;
             SaveVersion = 0;
             State = CloudLoginState.SignedOut;
             Message = "Hisobdan chiqdingiz.";
             MessageIsError = false;
+        }
+
+        /// <summary>Tizim brauzerida manzil ochish (maxfiylik siyosati va h.k.).</summary>
+        public static void OpenUrl(string url)
+        {
+            try
+            {
+#if ANDROID
+                var intent = new Android.Content.Intent(Android.Content.Intent.ActionView, Android.Net.Uri.Parse(url));
+                intent.AddFlags(Android.Content.ActivityFlags.NewTask);
+                Android.App.Application.Context.StartActivity(intent);
+#else
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+#endif
+            }
+            catch { }
         }
 
         private void OpenBrowser(string url)

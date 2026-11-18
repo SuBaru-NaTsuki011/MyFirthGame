@@ -27,17 +27,24 @@ namespace AndijonSaltanatlar.Server.Controllers
     {
         private readonly GoogleLoginService _google;
         private readonly GameDbContext _db;
-        private readonly JwtTokenService _jwt;
+        private readonly SessionTokenService _sessions;
+        private readonly VipOptions _vip;
         private readonly ILogger<GoogleAuthController> _log;
 
-        public GoogleAuthController(GoogleLoginService google, GameDbContext db, JwtTokenService jwt, ILogger<GoogleAuthController> log)
+        public GoogleAuthController(GoogleLoginService google, GameDbContext db, SessionTokenService sessions, VipOptions vip, ILogger<GoogleAuthController> log)
         {
-            _google = google; _db = db; _jwt = jwt; _log = log;
+            _google = google; _db = db; _sessions = sessions; _vip = vip; _log = log;
+        }
+
+        private string Device
+        {
+            get { string ua = Request.Headers.UserAgent.ToString(); return ua.Length > 0 ? ua : "game"; }
         }
 
         private string RequestBaseUrl => Request.Scheme + "://" + Request.Host.Value;
 
         [HttpPost("api/auth/google/start")]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
         public IActionResult Start()
         {
             if (!_google.Options.IsConfigured && !_google.Options.DevLogin)
@@ -67,6 +74,7 @@ namespace AndijonSaltanatlar.Server.Controllers
         /// Token imzosi serverda tekshiriladi; muvaffaqiyatli bo'lsa o'yin tokeni qaytadi.
         /// </summary>
         [HttpPost("api/auth/google/idtoken")]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
         public async Task<IActionResult> IdToken([FromBody] GoogleIdTokenRequest req)
         {
             if (!_google.Options.IsConfigured)
@@ -80,9 +88,9 @@ namespace AndijonSaltanatlar.Server.Controllers
                 _log.LogWarning("Google ID token rad etildi: {Msg}", ex.Message);
                 return Unauthorized(new { messageUz = "Google hisobini tasdiqlab bo'lmadi." });
             }
-            AppUser user = GoogleLoginService.FindOrCreateUser(_db, id);
+            AppUser user = GoogleLoginService.FindOrCreateUser(_db, id, _vip);
             var tmp = new GoogleLoginSession();
-            _google.Complete(tmp, user, _jwt);
+            _google.Complete(tmp, user, _sessions, _db, Device);
             return Ok(new GoogleLoginPollResponse { Status = "ok", Auth = tmp.Auth, DisplayName = tmp.DisplayName, Email = tmp.Email });
         }
 
@@ -98,7 +106,7 @@ namespace AndijonSaltanatlar.Server.Controllers
             int id = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
             AppUser u = _db.Users.FirstOrDefault(x => x.Id == id);
             if (u == null) return Unauthorized(new { messageUz = "Hisob topilmadi." });
-            return Ok(new MeResponse { UserId = u.Id, Username = u.Username, DisplayName = u.DisplayName ?? u.Username, Email = u.Email, KingdomId = u.KingdomId });
+            return Ok(new MeResponse { UserId = u.Id, Username = u.Username, DisplayName = u.DisplayName ?? u.Username, Email = u.Email, KingdomId = u.KingdomId, NeedsProfile = !u.ProfileCompleted, AvatarId = u.AvatarId, IsVip = u.IsVip });
         }
 
         /// <summary>Brauzer shu yerdan Google'ga yo'naltiriladi (yoki sinov rejimida sinov sahifasi ko'rsatiladi).</summary>
@@ -127,9 +135,9 @@ namespace AndijonSaltanatlar.Server.Controllers
             }
             try
             {
-                GoogleIdentity id = await _google.ExchangeCodeAsync(code, _google.RedirectUri(RequestBaseUrl));
-                AppUser user = GoogleLoginService.FindOrCreateUser(_db, id);
-                _google.Complete(session, user, _jwt);
+                GoogleIdentity id = await _google.ExchangeCodeAsync(code, _google.RedirectUri(RequestBaseUrl), session);
+                AppUser user = GoogleLoginService.FindOrCreateUser(_db, id, _vip);
+                _google.Complete(session, user, _sessions, _db, "browser");
                 return Html(LoginPages.Success(user.DisplayName ?? user.Username));
             }
             catch (Exception ex)
@@ -156,8 +164,8 @@ namespace AndijonSaltanatlar.Server.Controllers
                 return Html(LoginPages.DevLogin(session.Id, "Email manzilini to'g'ri kiriting.", needCode), 400);
 
             var id = new GoogleIdentity { Sub = "dev:" + email, Email = email, Name = string.IsNullOrWhiteSpace(name) ? email.Split('@')[0] : name.Trim(), EmailVerified = true };
-            AppUser user = GoogleLoginService.FindOrCreateUser(_db, id);
-            _google.Complete(session, user, _jwt);
+            AppUser user = GoogleLoginService.FindOrCreateUser(_db, id, _vip);
+            _google.Complete(session, user, _sessions, _db, "dev");
             return Html(LoginPages.Success(user.DisplayName ?? user.Username));
         }
 

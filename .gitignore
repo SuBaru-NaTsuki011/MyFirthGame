@@ -18,6 +18,9 @@ tools/e2e_last_state.json
 **/smoke_test_result.txt
 *.log
 
+# Test chiqishlari (lokal)
+.testout/
+
 # Playwright MCP vaqtinchalik fayllari
 .playwright-mcp/
 

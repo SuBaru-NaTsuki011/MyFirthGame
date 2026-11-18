@@ -167,7 +167,7 @@ namespace AndijonSaltanatlar.Tests
 
             using GameDbContext db = NewDb();
             AppUser u = GoogleLoginService.FindOrCreateUser(db, new GoogleIdentity { Sub = "dev:t@t.uz", Email = "t@t.uz", Name = "T", EmailVerified = true });
-            svc.Complete(s, u, new JwtTokenService(""));
+            svc.Complete(s, u, new SessionTokenService(new JwtTokenService("")), db, "test");
 
             Assert.Equal("error", svc.Poll(s.Id, "noto'g'ri-kalit").Status);
             GoogleLoginPollResponse ok = svc.Poll(s.Id, s.PollKey);
@@ -182,7 +182,7 @@ namespace AndijonSaltanatlar.Tests
             using GameDbContext db = NewDb();
             var log = Microsoft.Extensions.Logging.Abstractions.NullLogger<GoogleAuthController>.Instance;
             var configured = new GoogleLoginService(new GoogleAuthOptions { ClientId = "web.apps.googleusercontent.com", ClientSecret = "x" }, null);
-            var c = new GoogleAuthController(configured, db, new JwtTokenService(""), log);
+            var c = new GoogleAuthController(configured, db, new SessionTokenService(new JwtTokenService("")), new VipOptions(), log);
 
             var cfg = Assert.IsType<OkObjectResult>(c.Config());
             Assert.Equal("web.apps.googleusercontent.com", ((GoogleClientConfig)cfg.Value).WebClientId);
@@ -193,7 +193,7 @@ namespace AndijonSaltanatlar.Tests
             Assert.IsType<UnauthorizedObjectResult>(await c.IdToken(new GoogleIdTokenRequest { IdToken = forged }));
             Assert.False(db.Users.Any(u => u.GoogleSub == "hacker"));
 
-            var dev = new GoogleAuthController(new GoogleLoginService(new GoogleAuthOptions { DevLogin = true }, null), db, new JwtTokenService(""), log);
+            var dev = new GoogleAuthController(new GoogleLoginService(new GoogleAuthOptions { DevLogin = true }, null), db, new SessionTokenService(new JwtTokenService("")), new VipOptions(), log);
             var devCfg = (GoogleClientConfig)Assert.IsType<OkObjectResult>(dev.Config()).Value;
             Assert.False(devCfg.Configured);
             Assert.Equal("", devCfg.WebClientId);
@@ -206,7 +206,7 @@ namespace AndijonSaltanatlar.Tests
             using GameDbContext db = NewDb();
             var log = Microsoft.Extensions.Logging.Abstractions.NullLogger<GoogleAuthController>.Instance;
             var svc = new GoogleLoginService(new GoogleAuthOptions { DevLogin = true, DevLoginCode = "K7PX2M" }, null);
-            var c = new GoogleAuthController(svc, db, new JwtTokenService(""), log);
+            var c = new GoogleAuthController(svc, db, new SessionTokenService(new JwtTokenService("")), new VipOptions(), log);
             GoogleLoginSession s = svc.Create();
 
             // Kod noto'g'ri yoki yo'q — 403, foydalanuvchi yaratilmaydi.

@@ -8,6 +8,7 @@ namespace AndijonSaltanatlar.Server.Data
         public GameDbContext(DbContextOptions<GameDbContext> options) : base(options) { }
 
         public DbSet<AppUser> Users => Set<AppUser>();
+        public DbSet<PlayerSessionEntity> PlayerSessions => Set<PlayerSessionEntity>();
         public DbSet<World> Worlds => Set<World>();
         public DbSet<Kingdom> Kingdoms => Set<Kingdom>();
         public DbSet<KingdomResource> KingdomResources => Set<KingdomResource>();
@@ -54,6 +55,10 @@ namespace AndijonSaltanatlar.Server.Data
             b.Entity<AppUser>().HasIndex(u => u.Email).IsUnique();
             b.Entity<AppUser>().HasIndex(u => u.Username).IsUnique();
             b.Entity<AppUser>().HasIndex(u => u.GoogleSub).IsUnique();
+            b.Entity<PlayerSessionEntity>().HasKey(s => s.Id);
+            b.Entity<PlayerSessionEntity>().HasIndex(s => s.RefreshTokenHash).IsUnique();
+            b.Entity<PlayerSessionEntity>().HasIndex(s => s.PreviousTokenHash);
+            b.Entity<PlayerSessionEntity>().HasIndex(s => s.UserId);
             b.Entity<CloudSaveEntity>().HasIndex(c => c.UserId).IsUnique();
             // PROMPT 25: takror qarorlar, takror raund natijalari va ikki marta qo'shilgan guruhlar DB darajasida ham mumkin emas.
             b.Entity<KingdomWarStateEntity>().HasIndex(w => w.KingdomId).IsUnique();

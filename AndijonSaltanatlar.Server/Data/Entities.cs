@@ -15,8 +15,27 @@ namespace AndijonSaltanatlar.Server.Data
         public string PreferredLanguage { get; set; } = "uz";
         /// <summary>Google hisobining doimiy identifikatori ("sub"). Kirish faqat Google orqali.</summary>
         public string GoogleSub { get; set; }
-        /// <summary>Google'dagi ism (o'yinda ko'rsatiladi).</summary>
+        /// <summary>O'yindagi taxallus (yangi o'yinchi o'zi tanlaydi; Google'dagi ism majburan ko'rsatilmaydi).</summary>
         public string DisplayName { get; set; }
+        /// <summary>O'yinchi taxallus va avatarni tanlaganmi (YANGI HUKMDOR ekrani o'tilgan).</summary>
+        public bool ProfileCompleted { get; set; }
+        public int AvatarId { get; set; }
+        /// <summary>VIP hisob: barcha imkoniyatlar ochilgan (serverdagi Vip:Accounts ro'yxati bo'yicha).</summary>
+        public bool IsVip { get; set; }
+    }
+
+    /// <summary>Qurilma sessiyasi: yangilash tokeni (faqat xesh), muddati, bekor qilinganligi.</summary>
+    public class PlayerSessionEntity
+    {
+        public string Id { get; set; }
+        public int UserId { get; set; }
+        public string RefreshTokenHash { get; set; }
+        public string PreviousTokenHash { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime ExpiresAt { get; set; }
+        public DateTime? LastUsedAt { get; set; }
+        public DateTime? RevokedAt { get; set; }
+        public string DeviceLabel { get; set; }
     }
 
     /// <summary>
