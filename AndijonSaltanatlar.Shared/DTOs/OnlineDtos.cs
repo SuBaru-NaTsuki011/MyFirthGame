@@ -67,6 +67,8 @@ namespace AndijonSaltanatlar.Shared.DTOs
         public int RegionId { get; set; }
         public string KingdomName { get; set; } = "";
         public string Flag { get; set; } = "";
+        /// <summary>true — server eng mos bo'sh hududni o'zi tanlaydi (AVTO JOY). RegionId e'tiborsiz.</summary>
+        public bool Auto { get; set; }
     }
 
     public sealed class SetFlagRequest

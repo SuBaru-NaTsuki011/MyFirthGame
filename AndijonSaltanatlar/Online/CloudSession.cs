@@ -494,7 +494,7 @@ namespace AndijonSaltanatlar.Online
         /// Boshlang'ich hududni tanlash (server bandlikni qayta tekshiradi va bir marta saqlaydi).
         /// <paramref name="done"/>: (holat, xato, hududBand) — hududBand true bo'lsa ro'yxat eskirgan, qayta yuklash kerak.
         /// </summary>
-        public void ChooseStart(int regionId, string kingdomName, string flag, Action<OnlineStateDto, string, bool> done)
+        public void ChooseStart(int regionId, string kingdomName, string flag, Action<OnlineStateDto, string, bool> done, bool auto = false)
         {
             string url = ServerUrl, token = Token;
             Task.Run(async () =>
@@ -507,7 +507,8 @@ namespace AndijonSaltanatlar.Online
                             CommandId = Guid.NewGuid().ToString("N"),
                             RegionId = regionId,
                             KingdomName = kingdomName ?? "",
-                            Flag = flag ?? ""
+                            Flag = flag ?? "",
+                            Auto = auto
                         }, options: Json), token);
                     if (r.StatusCode == HttpStatusCode.Unauthorized) { Expired(); Post(() => done?.Invoke(null, "SESSIYA MUDDATI TUGADI.", false)); return; }
                     if (!r.IsSuccessStatusCode)

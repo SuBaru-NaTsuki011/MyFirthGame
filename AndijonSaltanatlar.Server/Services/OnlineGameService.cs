@@ -190,6 +190,69 @@ namespace AndijonSaltanatlar.Server.Services
             return dto;
         }
 
+        /// <summary>
+        /// AVTO JOY: bo'sh hududlarni moslik bo'yicha tartiblaydi (eng yaxshisi birinchi).
+        /// Ball: boshqa saltanatlardan uzoqlik (yangi o'yinchi darhol hujumga uchramasin) — asosiy;
+        /// aholisi o'rtachaga yaqin bo'lsa afzal; rivojlangan (suv/yer sifati taxminiy) yerga oz bonus.
+        /// Har pick hududни band qilgani uchun keyingi yangi o'yinchilar ham bir-biridan uzoqqa tushadi.
+        /// </summary>
+        public async Task<List<int>> PickAutoRegionsAsync(int worldId)
+        {
+            await EnsureWorldAsync(worldId);
+            var regions = await _db.Regions.AsNoTracking().Where(r => r.WorldId == worldId).ToListAsync();
+            var free = regions.FindAll(r => r.OwnerKingdomId == 0);
+            if (free.Count == 0) return new List<int>();
+            var occupied = regions.FindAll(r => r.OwnerKingdomId != 0);
+            var ids = regions.ConvertAll(r => r.Id);
+            var pops = await _db.Cities.AsNoTracking().Where(c => ids.Contains(c.RegionId))
+                .GroupBy(c => c.RegionId).Select(g => new { g.Key, Pop = g.Sum(c => c.Population) })
+                .ToDictionaryAsync(x => x.Key, x => x.Pop);
+            var freePops = new List<int>();
+            foreach (var r in free) freePops.Add(pops.GetValueOrDefault(r.Id));
+            freePops.Sort();
+            double median = freePops.Count == 0 ? 0 : freePops[freePops.Count / 2];
+
+            // Har bo'sh hudud uchun eng yaqin band saltanatgacha masofa (band yo'q bo'lsa — hammasi teng).
+            var minDist = new Dictionary<int, double>();
+            double maxMinDist = 0.0001;
+            foreach (var r in free)
+            {
+                double md = 1.0;
+                if (occupied.Count > 0)
+                {
+                    md = double.MaxValue;
+                    foreach (var o in occupied)
+                    {
+                        double dx = r.Latitude - o.Latitude, dy = r.Longitude - o.Longitude;
+                        double d = System.Math.Sqrt(dx * dx + dy * dy);
+                        if (d < md) md = d;
+                    }
+                }
+                minDist[r.Id] = md;
+                if (md > maxMinDist) maxMinDist = md;
+            }
+            int maxDev = 1;
+            foreach (var r in free) if (r.Development > maxDev) maxDev = r.Development;
+
+            // Ball: masofa ASOSIY (boshqalardan uzoq — xavfsiz), aholi o'rtachaga yaqinligi va yer sifati — qo'shimcha.
+            var score = new Dictionary<int, double>();
+            foreach (var r in free)
+            {
+                double distNorm = minDist[r.Id] / maxMinDist;               // 0..1 (uzoqroq = yaxshi)
+                double pop = pops.GetValueOrDefault(r.Id);
+                double popPenalty = median <= 0 ? 0 : System.Math.Abs(pop - median) / System.Math.Max(1.0, median);
+                double devNorm = (double)r.Development / maxDev;            // 0..1 (suv/yer sifati taxminiy)
+                score[r.Id] = distNorm * 1.0 - popPenalty * 0.3 + devNorm * 0.1;
+            }
+
+            free.Sort((a, b) =>
+            {
+                int c = score[b.Id].CompareTo(score[a.Id]);
+                return c != 0 ? c : a.Id.CompareTo(b.Id);
+            });
+            return free.ConvertAll(r => r.Id);
+        }
+
         /// <summary>Yurt tanlash: saltanat nomi va bayrog'i ham shu yerda o'rnatiladi. Natija: null — muvaffaqiyat, aks holda sabab.</summary>
         public async Task<string> ChooseStartAsync(Kingdom me, ChooseStartRequest req)
         {
@@ -197,10 +260,29 @@ namespace AndijonSaltanatlar.Server.Services
             string name = (req.KingdomName ?? "").Trim();
             if (name.Length > 0 && (name.Length < 3 || name.Length > 40)) return "Saltanat nomi 3–40 harf bo'lsin.";
             if (!string.IsNullOrEmpty(req.Flag) && !FlagSpec.TryParse(req.Flag, out _)) return "Bayroq noto'g'ri.";
-            string err;
-            try { err = await WorldSeeder.ChooseStartAsync(_db, me, req.RegionId); }
-            catch (InvalidOperationException) { err = "Bu hudud hozirgina band bo'ldi — boshqasini tanlang."; }
-            if (err != null) return err;
+            if (req.Auto)
+            {
+                // AVTO JOY: eng mos bo'sh hududni server tanlaydi; band bo'lsa keyingi eng yaxshisini oladi.
+                List<int> order = await PickAutoRegionsAsync(me.WorldId);
+                string autoErr = "Bo'sh hudud qolmadi — birozdan so'ng urining.";
+                bool placed = false;
+                foreach (int rid in order)
+                {
+                    string e;
+                    try { e = await WorldSeeder.ChooseStartAsync(_db, me, rid); }
+                    catch (InvalidOperationException) { continue; } // shu zahoti band bo'ldi — keyingisi
+                    if (e == null) { placed = true; break; }
+                    if (!e.Contains("band")) return e; // masalan: yurti allaqachon bor
+                }
+                if (!placed) return autoErr;
+            }
+            else
+            {
+                string err;
+                try { err = await WorldSeeder.ChooseStartAsync(_db, me, req.RegionId); }
+                catch (InvalidOperationException) { err = "Bu hudud hozirgina band bo'ldi — boshqasini tanlang."; }
+                if (err != null) return err;
+            }
             await _db.Kingdoms.Where(k => k.Id == me.Id).ExecuteUpdateAsync(s => s
                 .SetProperty(k => k.Name, k => name.Length > 0 ? name : k.Name)
                 .SetProperty(k => k.Flag, k => !string.IsNullOrEmpty(req.Flag) ? req.Flag : k.Flag)

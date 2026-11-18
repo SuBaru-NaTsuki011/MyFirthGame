@@ -196,6 +196,15 @@ namespace AndijonSaltanatlar.UI
             ui.TextFit("Yashil belgili hududlar bo'sh. Band hududlarni keyinroq urush yoki diplomatiya bilan olish mumkin.", new Rectangle(x, y, w, (int)capH), TextStyle.Caption, T.TextSecondary);
             y += (int)capH + gap;
 
+            // AVTO JOY — server eng mos (boshqalardan uzoq, xavfsiz) bo'sh hududni o'zi tanlaydi.
+            bool nameFine = (_kingdomName ?? "").Trim().Length == 0 || NameOk();
+            int autoH = ui.ControlH + 6;
+            if (ui.Button(new Rectangle(x, y, w, autoH), _busy ? "QURILMOQDA..." : "AVTO JOY (tavsiya)", ButtonKind.Accent, !_busy && nameFine))
+                BuildKingdom(true);
+            y += autoH + 4;
+            ui.TextFit("yoki quyidagi ro'yxatdan o'zingiz tanlang:", new Rectangle(x, y, w, (int)capH), TextStyle.Caption, T.TextSecondary);
+            y += (int)capH + gap;
+
             bool wide = w >= 640;
             int footerH = (wide ? h : h * 2 + gap) + gap + (int)capH * 2 + 18;
             var view = new Rectangle(x, y, w, card.Bottom - footerH - y - 8);
@@ -230,14 +239,14 @@ namespace AndijonSaltanatlar.UI
                 _kingdomName = ui.TextInput(new Rectangle(x, by, iw, h), "kingdom_name", _kingdomName, "Masalan: Asaka sultonligi", false, AndroidKeyboard) ?? "";
                 if (_kingdomName.Length > 40) _kingdomName = _kingdomName.Substring(0, 40);
                 if (ui.Button(new Rectangle(x + iw + gap, by, w - iw - gap, h), _busy ? "QURILMOQDA..." : "DAVOM ETISH",
-                        ButtonKind.Primary, !_busy && _regionId > 0 && NameOk())) BuildKingdom();
+                        ButtonKind.Primary, !_busy && _regionId > 0 && NameOk())) BuildKingdom(false);
             }
             else
             {
                 _kingdomName = ui.TextInput(new Rectangle(x, by, w, h), "kingdom_name", _kingdomName, "Masalan: Asaka sultonligi", false, AndroidKeyboard) ?? "";
                 if (_kingdomName.Length > 40) _kingdomName = _kingdomName.Substring(0, 40);
                 if (ui.Button(new Rectangle(x, by + h + gap, w, h), _busy ? "QURILMOQDA..." : "DAVOM ETISH",
-                        ButtonKind.Primary, !_busy && _regionId > 0 && NameOk())) BuildKingdom();
+                        ButtonKind.Primary, !_busy && _regionId > 0 && NameOk())) BuildKingdom(false);
             }
             if (_error != null)
                 ui.Paragraph(_error, new Rectangle(x, card.Bottom - 16 - (int)capH, w, (int)capH), TextStyle.Caption, T.Danger, 1);
@@ -334,12 +343,13 @@ namespace AndijonSaltanatlar.UI
             return n.Length >= 3 && n.Length <= 40;
         }
 
-        private void BuildKingdom()
+        private void BuildKingdom(bool auto)
         {
-            if (_busy || _regionId <= 0) return;
+            if (_busy) return;
+            if (!auto && _regionId <= 0) return;
             _busy = true;
             _error = null;
-            _cloud.ChooseStart(_regionId, (_kingdomName ?? "").Trim(), _starts?.Flag ?? "", (state, e, taken) =>
+            _cloud.ChooseStart(auto ? 0 : _regionId, (_kingdomName ?? "").Trim(), _starts?.Flag ?? "", (state, e, taken) =>
             {
                 _busy = false;
                 if (e != null || state == null)
@@ -349,7 +359,7 @@ namespace AndijonSaltanatlar.UI
                     return;
                 }
                 WorldChosen?.Invoke(state.WorldId);
-            });
+            }, auto);
         }
 
         /// <summary>Band hudud xatosidan keyin bo'sh hududlar ro'yxatini qayta yuklaydi (nom saqlanadi).</summary>
