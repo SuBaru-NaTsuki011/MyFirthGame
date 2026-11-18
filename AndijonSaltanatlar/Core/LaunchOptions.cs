@@ -100,6 +100,9 @@ public sealed class LaunchOptions
 	/// <summary>Sinov: jang maydoni (mashq jangi) darhol ochiladi.</summary>
 	public bool Arena;
 
+	/// <summary>Sinov: barcha dalalarga ekin ekib, o'sishni shu ulushga (0..1) yetkazadi va kamerani eng yaqin dalaga qaratadi.</summary>
+	public float? FarmDemo;
+
 	/// <summary>Sinov: saltanat xaritasida shu hududga yurish boshlanadi.</summary>
 	public int? MarchRegion;
 
@@ -289,6 +292,10 @@ public sealed class LaunchOptions
 				break;
 			case "--march":
 				launchOptions.MarchRegion = int.Parse(text, CultureInfo.InvariantCulture);
+				i++;
+				break;
+			case "--farm-demo":
+				launchOptions.FarmDemo = float.Parse(text, CultureInfo.InvariantCulture);
 				i++;
 				break;
 			case "--arena":

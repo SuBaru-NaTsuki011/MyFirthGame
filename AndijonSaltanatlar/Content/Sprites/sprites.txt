@@ -101,6 +101,10 @@ unit_citizen3_2
 unit_citizen3_b0
 unit_citizen3_b1
 unit_citizen3_b2
+unit_citizen3_bh0
+unit_citizen3_bh1
+unit_citizen3_bh2
+unit_citizen3_bh3
 unit_citizen3_bw0
 unit_citizen3_bw1
 unit_citizen3_bw2
@@ -109,6 +113,10 @@ unit_citizen3_bw4
 unit_citizen3_bw5
 unit_citizen3_bw6
 unit_citizen3_bw7
+unit_citizen3_h0
+unit_citizen3_h1
+unit_citizen3_h2
+unit_citizen3_h3
 unit_citizen3_w0
 unit_citizen3_w1
 unit_citizen3_w2

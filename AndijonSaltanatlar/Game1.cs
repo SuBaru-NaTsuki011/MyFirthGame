@@ -391,6 +391,18 @@ public sealed class Game1 : Game
 		}
 		// Sinov: kirishsiz rejimda ham to'liq kuchaytirish (suratga olish uchun)
 		if (_opt.FullUpgrade && !_loginMode && !_fullUpgradeDone) { _fullUpgradeDone = true; ApplyFullUpgrade(); }
+		if (_opt.FarmDemo.HasValue)
+		{
+			Building hallF = _buildings.Buildings.FirstOrDefault(b => b.Type == BuildingType.MainHall);
+			Farm first = null;
+			foreach (Farm fm in _buildings.Buildings.OfType<Farm>().OrderBy(b => hallF == null ? 0 : Vector2.DistanceSquared(new Vector2(b.Position.X, b.Position.Y), new Vector2(hallF.Position.X, hallF.Position.Y))))
+			{
+				first ??= fm;
+				if (fm.CropStage == FarmCropStage.Empty) fm.PlantCrop();
+				fm.AdvanceGrowth(_opt.FarmDemo.Value);
+			}
+			if (first != null) _camera.Jump(IsoMath.TileToWorld(new Vector2(first.Position.X + 2, first.Position.Y + 2)), 2.2f);
+		}
 		if (_opt.RaidGate.HasValue)
 		{
 			_combat.StartRaidNow(_opt.RaidGate.Value);
@@ -1664,6 +1676,7 @@ public sealed class Game1 : Game
 		}
 		_units.Update(dt * (_combat?.TimeScale ?? 1f));
 		_farmWork.Update(dt, _map, _buildings, _units, _state);
+		_renderer.Tick(dt);
 		_birds?.Update(dt, _dayNight.NightAmount, _combat.Possessed);
 		_livestock?.Update(dt);
 		_citizenSocial.Update(_units, dt);

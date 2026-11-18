@@ -10,34 +10,50 @@ using Microsoft.Xna.Framework;
 namespace AndijonSaltanatlar.World
 {
     /// <summary>
-    /// Dalada ishlaydigan dehqonlar: har fermaga (eng ko'pi MaxWorkers) bitta dehqon chiqadi — dala chetini aylanib
-    /// ekadi / sug'oradi / hosil o'radi va hosilni bozorga (bo'lmasa saroyga) olib boradi. Nima qilayotganini aytadi.
-    /// Haqiqiy hosil hisobi GameStateManager'da (kunlik); bu — ko'rinish va jonlilik.
+    /// Dehqonlar o'z fermasida ishlaydi (eng ko'pi MaxWorkers ta dala): qo'lida ketmon bilan
+    ///   1) dalaga boradi, 2) yerni chopadi va urug' ekadi, 3) ekin o'sguncha chopiq/sug'orish qiladi (ekin ko'z oldida
+    ///   kattalashadi), 4) pishgach o'radi, 5) hosilni bozorga olib borib sotadi (tanga xazinaga), 6) dalasiga qaytadi.
+    /// Bozor bo'lmasa hosil saroy omboriga (oziq-ovqat) topshiriladi. Dehqoni bor dalani kunlik avtomatik hisob boshqarmaydi.
     /// </summary>
     public sealed class FarmWorkController
     {
         public const int MaxWorkers = 6;
-        private readonly Dictionary<int, CitizenUnit> _workers = new Dictionary<int, CitizenUnit>();
-        private readonly Dictionary<CitizenUnit, float> _talk = new Dictionary<CitizenUnit, float>();
+        private enum Phase { ToField, Work, ToMarket, Sell }
+
+        private sealed class Job
+        {
+            public Farm Farm;
+            public CitizenUnit Worker;
+            public Phase Phase;
+            public Vector2 Target;
+            public float Timer, TalkTimer;
+            public int Carry;
+            public Building Market;
+        }
+
+        private readonly Dictionary<int, Job> _jobs = new Dictionary<int, Job>();
         private UnitManager _owner;
-        private float _timer;
+        private MapManager _map;
+        private float _syncTimer;
         private readonly Random _rng = new Random();
 
-        public int WorkerCount => _workers.Count;
+        public int WorkerCount => _jobs.Count;
 
         public void Update(float dt, MapManager map, BuildingManager buildings, UnitManager units, GameStateManager state)
         {
-            if (!ReferenceEquals(units, _owner)) { _workers.Clear(); _talk.Clear(); _owner = units; _timer = 0f; }
-            _timer -= dt;
-            if (_timer <= 0f)
-            {
-                _timer = 2f;
-                Sync(map, buildings, units);
-            }
-            Talk(dt, buildings, state);
+            if (!ReferenceEquals(units, _owner)) { _jobs.Clear(); _owner = units; _syncTimer = 0f; }
+            _map = map;
+            _syncTimer -= dt;
+            if (_syncTimer <= 0f) { _syncTimer = 2f; Sync(buildings, units); }
+
+            // O'yin soati: ekin o'sishi va ish tezligi o'yin tezligiga bog'liq
+            float gameDt = state.Paused ? 0f : dt * state.Speed;
+            float hours = gameDt / Math.Max(1f, state.Clock.SecondsPerDay) * 24f;
+            foreach (Job j in _jobs.Values) Step(j, dt, gameDt, hours, buildings, state);
         }
 
-        private void Sync(MapManager map, BuildingManager buildings, UnitManager units)
+        // ------------------------------------------------------------------ dehqonlarni dalalarga biriktirish
+        private void Sync(BuildingManager buildings, UnitManager units)
         {
             Building hall = buildings.Buildings.FirstOrDefault(b => b.Type == BuildingType.MainHall);
             Vector2 center = hall != null ? new Vector2(hall.Position.X, hall.Position.Y) : Vector2.Zero;
@@ -45,69 +61,177 @@ namespace AndijonSaltanatlar.World
                 .OrderBy(f => Vector2.DistanceSquared(new Vector2(f.Position.X, f.Position.Y), center))
                 .Take(MaxWorkers).ToList();
             var keep = new HashSet<int>(farms.Select(f => f.Id));
+            foreach (Farm f in buildings.Buildings.OfType<Farm>()) f.Tended = keep.Contains(f.Id) && _jobs.ContainsKey(f.Id);
 
-            // Fermasi buzilgan/ko'chirilgan dehqonlar ketadi (ko'chirilsa yangi yo'l bilan qaytadi)
-            foreach (int id in _workers.Keys.ToList())
+            foreach (int id in _jobs.Keys.ToList())
             {
-                Farm f = farms.FirstOrDefault(x => x.Id == id);
-                if (f == null || !keep.Contains(id) || Vector2.Distance(_workers[id].PatrolPoints.Count > 0 ? _workers[id].PatrolPoints[0] : Vector2.Zero, FieldFront(f)) > 6f)
-                {
-                    units.Remove(_workers[id]);
-                    _talk.Remove(_workers[id]);
-                    _workers.Remove(id);
-                }
+                Job j = _jobs[id];
+                bool gone = !keep.Contains(id) || !buildings.Buildings.Contains(j.Farm) || !units.Units.Contains(j.Worker);
+                if (!gone) continue;
+                units.Remove(j.Worker);
+                j.Farm.Tended = false;
+                _jobs.Remove(id);
             }
 
             foreach (Farm f in farms)
             {
-                if (_workers.ContainsKey(f.Id)) continue;
-                Building market = buildings.Buildings.Where(b => b.Type == BuildingType.Market)
-                    .OrderBy(b => Vector2.DistanceSquared(new Vector2(b.Position.X, b.Position.Y), new Vector2(f.Position.X, f.Position.Y)))
-                    .FirstOrDefault() ?? hall;
-                var route = new List<Vector2>
-                {
-                    FieldFront(f),
-                    new Vector2(f.Position.X + f.Size.X + 0.5f, f.Position.Y + f.Size.Y / 2f),   // dala sharqiy cheti
-                    new Vector2(f.Position.X + f.Size.X / 2f, f.Position.Y - 0.5f),            // shimoliy cheti
-                    FieldFront(f),
-                };
-                if (market != null) route.Add(new Vector2(market.FrontEntranceTile.X + 0.5f, market.FrontEntranceTile.Y + 0.5f));
-                var worker = units.Add(new CitizenUnit(route, CitizenArt.Farmer, 0.75f));
-                PatrolController.RouteUnit(map, worker);
+                if (_jobs.ContainsKey(f.Id)) continue;
+                Vector2 start = FieldFront(f);
+                var worker = units.Add(new CitizenUnit(new[] { start, start + new Vector2(0.3f, 0f) }, CitizenArt.Farmer, 0.8f));
                 worker.PauseTime = 0f;
-                _workers[f.Id] = worker;
-                _talk[worker] = 2f + (float)_rng.NextDouble() * 6f;
+                var job = new Job { Farm = f, Worker = worker, Phase = Phase.ToField, TalkTimer = 2f + (float)_rng.NextDouble() * 4f };
+                _jobs[f.Id] = job;
+                f.Tended = true;
+                GoTo(job, Phase.ToField, start);
             }
         }
 
         private static Vector2 FieldFront(Farm f) => new Vector2(f.FrontEntranceTile.X + 0.5f, f.FrontEntranceTile.Y + 0.5f);
 
-        /// <summary>Dehqon nima qilayotganini aytadi: dala yonida — ekin holatiga qarab, bozorda — hosil topshirdim.</summary>
-        private void Talk(float dt, BuildingManager buildings, GameStateManager state)
+        /// <summary>Dala jo'yaklari bo'ylab ish nuqtalari (dehqon qator bo'ylab yurib chopadi).</summary>
+        private static List<Vector2> FieldRows(Farm f)
         {
-            foreach (var kv in _workers)
+            var pts = new List<Vector2>();
+            for (int row = 0; row < 5; row++)
             {
-                CitizenUnit w = kv.Value;
-                if (!_talk.TryGetValue(w, out float t)) t = 5f;
-                t -= dt;
-                if (t > 0f) { _talk[w] = t; continue; }
-                _talk[w] = 7f + (float)_rng.NextDouble() * 7f;
-                Farm f = buildings.Buildings.OfType<Farm>().FirstOrDefault(x => x.Id == kv.Key);
-                if (f == null || !string.IsNullOrEmpty(w.SpeechText)) continue;
-                bool atField = Vector2.Distance(w.Position, new Vector2(f.Position.X + f.Size.X / 2f, f.Position.Y + f.Size.Y / 2f)) < f.Size.X;
-                string line;
-                if (atField)
+                float y = f.Position.Y + 0.75f + row * 0.62f;
+                bool rev = row % 2 == 1;
+                for (int c = 0; c < 4; c++)
                 {
-                    switch (f.CropStage)
-                    {
-                        case FarmCropStage.Empty: line = state.Farming.Seeds > 0 ? "Urug' sepyapman" : "Urug' tugadi! Sotib olish kerak"; break;
-                        case FarmCropStage.Growing: line = (f.GrowthDays % 2 == 0) ? "Ekinni sug'oryapman" : "Begona o'tlarni yulyapman"; break;
-                        default: line = "Hosil pishdi — o'ryapman!"; break;
-                    }
+                    int cc = rev ? 3 - c : c;
+                    pts.Add(new Vector2(f.Position.X + 0.7f + cc * 0.85f, y));
                 }
-                else line = f.StoredProduce > 0 || f.CropStage == FarmCropStage.Mature ? "Hosilni bozorga olib ketyapman" : "Bozordan qaytyapman";
-                w.Say(line, 3f);
             }
+            return pts;
+        }
+
+        /// <summary>Yo'lga chiqaradi: ko'cha bo'ylab (A*) borish manziliga.</summary>
+        private void GoTo(Job j, Phase phase, Vector2 target)
+        {
+            j.Phase = phase;
+            j.Target = target;
+            j.Worker.Working = false;
+            j.Worker.PatrolPoints.Clear();
+            j.Worker.PatrolPoints.Add(j.Worker.Position);
+            j.Worker.PatrolPoints.Add(target);
+            if (_map != null) PatrolController.RouteUnit(_map, j.Worker);
+            j.Worker.PauseTime = 0f;
+            j.Worker.ResetRoute();
+        }
+
+        // ------------------------------------------------------------------ bitta dehqonning ishi
+        private void Step(Job j, float dt, float gameDt, float hours, BuildingManager buildings, GameStateManager state)
+        {
+            Farm f = j.Farm;
+            CitizenUnit w = j.Worker;
+            // Ekin dehqon parvarishida o'sadi (dehqon dalada bo'lsa tezroq — chopiq va sug'orish)
+            if (f.CropStage == FarmCropStage.Growing)
+                f.AdvanceGrowth(hours / Farm.TendedGrowHours * (j.Phase == Phase.Work ? 1.25f : 0.8f));
+
+            switch (j.Phase)
+            {
+                case Phase.ToField:
+                    if (Vector2.Distance(w.Position, j.Target) < 0.7f)
+                    {
+                        // Dalaga yetdi: jo'yaklar bo'ylab ishlash (to'g'ridan-to'g'ri yuradi, har nuqtada to'xtab chopadi)
+                        j.Phase = Phase.Work;
+                        w.PatrolPoints.Clear();
+                        w.PatrolPoints.AddRange(FieldRows(f));
+                        w.PauseTime = 2.6f;
+                        w.ResetRoute();
+                        j.Timer = 0f;
+                    }
+                    break;
+
+                case Phase.Work:
+                    w.Working = true;
+                    j.Timer += gameDt;
+                    if (f.CropStage == FarmCropStage.Empty && j.Timer > 4f)
+                    {
+                        if (state.Farming.TryConsumeSeed())
+                        {
+                            f.PlantCrop();
+                            w.Say("Urug' sepdim!", 2.5f);
+                        }
+                        else if (j.Timer > 12f) { w.Say("Urug' tugadi...", 3f); j.Timer = 4f; }
+                    }
+                    else if (f.CropStage == FarmCropStage.Mature)
+                    {
+                        // O'rim: biroz ishlaydi, keyin hosilni yig'ib bozorga
+                        if (j.Timer > 6f)
+                        {
+                            int harvest = f.HarvestCrop();
+                            int total = state.Farming.ApplyYieldBonus(harvest);
+                            f.SellStoredProduce();   // dalada saqlanmaydi — dehqon o'zi olib ketadi
+                            j.Carry = total;
+                            j.Market = NearestMarket(f, buildings);
+                            w.Say(total + " qop hosil — bozorga!", 3f);
+                            Vector2 dest = j.Market != null ? EntranceOf(j.Market) : FieldFront(f);
+                            GoTo(j, Phase.ToMarket, dest);
+                        }
+                    }
+                    else j.Timer = Math.Min(j.Timer, 5f);
+                    break;
+
+                case Phase.ToMarket:
+                    if (j.Market == null || Vector2.Distance(w.Position, j.Target) < 0.8f)
+                    {
+                        j.Phase = Phase.Sell;
+                        j.Timer = 0f;
+                        w.PatrolPoints.Clear();
+                        w.PatrolPoints.Add(w.Position);
+                        w.ResetRoute();
+                    }
+                    break;
+
+                case Phase.Sell:
+                    j.Timer += dt;
+                    if (j.Timer > 2f)
+                    {
+                        if (j.Carry > 0)
+                        {
+                            bool market = j.Market != null && j.Market.Type == BuildingType.Market;
+                            if (market)
+                            {
+                                int coins = j.Carry * 2;
+                                state.Coins += coins;
+                                w.Say("Sotdim: +" + coins + " tanga", 3f);
+                                state.ShowMessage("Dehqon bozorda " + j.Carry + " qop hosil sotdi: +" + coins + " tanga");
+                            }
+                            else
+                            {
+                                state.Food += j.Carry;
+                                w.Say("Omborga topshirdim", 3f);
+                            }
+                            j.Carry = 0;
+                        }
+                        GoTo(j, Phase.ToField, FieldFront(f));
+                    }
+                    break;
+            }
+            if (j.Phase != Phase.Work) w.Working = false;
+            else if (w.State == UnitState.Walking) w.Working = false;
+
+            // Ishlayotganda vaqti-vaqti bilan gapiradi
+            j.TalkTimer -= dt;
+            if (j.TalkTimer <= 0f && string.IsNullOrEmpty(w.SpeechText))
+            {
+                j.TalkTimer = 9f + (float)_rng.NextDouble() * 8f;
+                string line = j.Phase == Phase.Work
+                    ? (f.CropStage == FarmCropStage.Growing ? (f.Growth < 0.5f ? "Yerni chopyapman" : "Ekin yaxshi o'syapti") : f.CropStage == FarmCropStage.Mature ? "O'rim vaqti!" : "Yer haydayapman")
+                    : j.Phase == Phase.ToMarket ? "Hosilni bozorga olib ketyapman" : j.Phase == Phase.ToField ? "Dalamga ketyapman" : null;
+                if (line != null) w.Say(line, 3f);
+            }
+        }
+
+        private static Vector2 EntranceOf(Building b) => new Vector2(b.FrontEntranceTile.X + 0.5f, b.FrontEntranceTile.Y + 0.5f);
+
+        private static Building NearestMarket(Farm f, BuildingManager buildings)
+        {
+            var from = new Vector2(f.Position.X, f.Position.Y);
+            return buildings.Buildings.Where(b => b.Type == BuildingType.Market && b.BuildProgress >= 1f)
+                       .OrderBy(b => Vector2.DistanceSquared(new Vector2(b.Position.X, b.Position.Y), from)).FirstOrDefault()
+                   ?? buildings.Buildings.FirstOrDefault(b => b.Type == BuildingType.MainHall);
         }
     }
 }

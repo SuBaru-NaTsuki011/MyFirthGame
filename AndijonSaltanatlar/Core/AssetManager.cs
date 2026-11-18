@@ -193,6 +193,21 @@ namespace AndijonSaltanatlar.Core
                         Register(bk, () => CitizenArt.Frame(kk, ff));
                 }
 
+            // Ekin bosqichlari (dehqon parvarishida o'sadi)
+            for (int st = 0; st < 5; st++)
+            {
+                int s = st;
+                Register("crop_" + s, () => DecorArt.Crop(s));
+            }
+            // Dehqonning ketmon chopishi: key_h0..h3 (orqa: key_bh0..bh3) — 3D modeldan, fayl bo'lsa
+            for (int k = 0; k < SpriteKeys.CitizenKinds; k++)
+                for (int i = 0; i < 4; i++)
+                    foreach (string p in new[] { "_h", "_bh" })
+                    {
+                        string hk = SpriteKeys.UnitCitizen + k + p + i;
+                        if (File.Exists(Path.Combine(_spriteDir, hk + ".png")) || Bundled.Contains(hk))
+                            Register(hk, () => new Canvas(48, 60));
+                    }
             Register(SpriteKeys.IconCoin, DecorArt.IconCoin);
             Register(SpriteKeys.IconFood, DecorArt.IconFood);
             Register(SpriteKeys.IconPopulation, DecorArt.IconPopulation);
@@ -376,7 +391,7 @@ namespace AndijonSaltanatlar.Core
             }
 
             // 3D modeldan olingan yuqori aniqlikdagi odam rasmi (HR marta katta) — mipmapli, chizishda 1/HR masshtab
-            bool hiRes = key.StartsWith("unit_") && canvas.Height >= 120;
+            bool hiRes = (key.StartsWith("unit_") && canvas.Height >= 120) || key.StartsWith("crop_");
             Texture2D tex = hiRes ? canvas.ToTextureMipmapped(_gd) : canvas.ToTexture(_gd);
             if (hiRes) HiRes.Add(tex);
             tex.Name = key;

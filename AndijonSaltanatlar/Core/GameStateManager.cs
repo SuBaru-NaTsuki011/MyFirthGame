@@ -460,6 +460,7 @@ public sealed class GameStateManager
 		{
 			if (!(building is Farm farm)) continue;
 			farmCount++;
+			if (farm.Tended) continue;   // ekish, o'rish, bozorga olib borish — dalaning o'z dehqoni (FarmWorkController)
 			// Ekish urug' sarflaydi: urug' tugasa dala bo'sh qoladi (fermerlar sotib olishni so'raydi)
 			if (hasFarmers && farm.CropStage == FarmCropStage.Empty && !farm.IsPlayerControlled && !Farming.TryConsumeSeed()) continue;
 			int harvest = farm.WorkAutonomously(hasFarmers);

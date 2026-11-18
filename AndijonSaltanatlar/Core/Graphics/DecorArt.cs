@@ -9,6 +9,44 @@ namespace AndijonSaltanatlar.Core.Graphics
     /// </summary>
     public static class DecorArt
     {
+        /// <summary>
+        /// Ekin (bug'doy) o'sish bosqichi, 3x aniqlikda (o'yinda 1/3 masshtabda chiziladi):
+        /// 0 — urug' (tuproqda), 1 — nihol, 2 — yosh, 3 — yashil poya, 4 — pishgan oltin boshoq.
+        /// </summary>
+        public static Canvas Crop(int stage)
+        {
+            const int W = 30, H = 66;
+            var c = new Canvas(W, H);
+            float cx = W / 2f, by = H - 3;
+            if (stage == 0)
+            {
+                c.FillEllipse(cx, by - 2, 7, 3, new Color(92, 62, 38));
+                c.FillEllipse(cx - 2, by - 3, 1.6f, 1.2f, new Color(214, 190, 120));
+                c.FillEllipse(cx + 3, by - 2, 1.6f, 1.2f, new Color(214, 190, 120));
+                return c;
+            }
+            float hgt = stage == 1 ? 16 : stage == 2 ? 32 : stage == 3 ? 50 : 58;
+            Color stem = stage == 4 ? new Color(206, 168, 70) : new Color(72, 148, 62);
+            Color leaf = stage == 4 ? new Color(228, 190, 88) : new Color(96, 178, 74);
+            int blades = stage == 1 ? 2 : stage == 2 ? 3 : 5;
+            for (int i = 0; i < blades; i++)
+            {
+                float t = blades == 1 ? 0 : i / (float)(blades - 1) - 0.5f;
+                float topX = cx + t * (stage == 1 ? 10 : 16);
+                float topY = by - hgt * (0.82f + 0.18f * (1 - Math.Abs(t) * 2));
+                c.Line(new Vector2(cx + t * 3, by), new Vector2(topX, topY), i % 2 == 0 ? stem : leaf, stage >= 3 ? 2 : 2);
+                if (stage == 4)
+                {
+                    // boshoq
+                    for (int k = 0; k < 5; k++)
+                        c.FillEllipse(topX + (k % 2 == 0 ? -1.5f : 1.5f), topY + k * 2.6f, 2.0f, 1.6f, new Color(238, 200, 96));
+                }
+                else if (stage == 3)
+                    c.FillEllipse(topX, topY + 2, 1.8f, 3.2f, new Color(126, 196, 92));
+            }
+            return c;
+        }
+
         private static readonly Color Outline = new Color(40, 28, 20);
 
         /// <summary>Berilgan tuvalga daraxt chizadi. (x, baseY) — tana tagi.</summary>

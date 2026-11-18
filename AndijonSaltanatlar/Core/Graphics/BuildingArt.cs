@@ -521,13 +521,9 @@ namespace AndijonSaltanatlar.Core.Graphics
             for (int row = 0; row < 5; row++)
             {
                 float y = 0.52f + row * 0.62f;
+                // Haydalgan jo'yak (ekinlar alohida chiziladi va dehqon parvarishida o'sadi)
+                ic.Top(0.45f, y - 0.12f, 3.55f, y, 7, new Color(96, 66, 40));
                 ic.QuadSW(0.45f, 3.55f, y, 4, 7, new Color(82, 57, 36));
-                for (int col = 0; col < 9; col++)
-                {
-                    float x = 0.56f + col * 0.36f;
-                    ic.Pole(x, y, 7, 17 + (col % 3) * 2, new Color(63, 130, 59), 2);
-                    ic.QuadSW(x - 0.08f, x + 0.08f, y, 14, 17, new Color(178, 160, 62));
-                }
             }
             ic.Box(3.28f, 0.24f, 3.78f, 0.38f, 0, 12, Pal.Wood, 3);
             ic.Box(3.72f, 0.24f, 3.86f, 3.72f, 0, 12, Pal.Wood, 3);

@@ -141,7 +141,11 @@ namespace AndijonSaltanatlar.World
                     sb.Draw(bsil, pos, null, new Color(244, 248, 255) * (bsnow * 0.3f), 0f, Vector2.Zero, 1f,
                         o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
 
-                if (o is Farm farm && farm.BuildProgress >= 1f) DrawFarmStatus(sb, o, farm);
+                if (o is Farm farm && farm.BuildProgress >= 1f)
+                {
+                    DrawCrops(sb, farm);
+                    DrawFarmStatus(sb, o, farm);
+                }
 
                 // Bino daraja nishoni (evolyutsiya belgisi) — BuildingEvolution
                 if (o is Building b2 && b2.BuildProgress >= 1f)
@@ -189,11 +193,41 @@ namespace AndijonSaltanatlar.World
             _font.DrawCentered(sb, citizen.SpeechText, new Vector2(box.Center.X, box.Center.Y), new Color(60, 42, 30), 1, 0);
         }
 
+        /// <summary>
+        /// Dalada ekinlar: 5 qator x 9 tup. Ekilganda urug', keyin nihol -> yosh -> yashil -> pishgan oltin boshoq;
+        /// o'rilganda dala yana bo'sh (haydalgan) qoladi. Yuqori darajali fermada poydevor balandligi hisobga olinadi.
+        /// </summary>
+        private void DrawCrops(SpriteBatch sb, Farm farm)
+        {
+            if (farm.CropStage == FarmCropStage.Empty) return;
+            float g = farm.Growth;
+            int stage = farm.CropStage == FarmCropStage.Mature ? 4 : g < 0.06f ? 0 : g < 0.3f ? 1 : g < 0.6f ? 2 : 3;
+            Texture2D tex = _assets.TryGet("crop_" + stage);
+            if (tex == null) return;
+            float k = AssetManager.ScaleOf(tex);
+            int podium = farm.Level >= 5 ? 10 : farm.Level >= 4 ? 7 : 0;
+            // o'sish ichida biroz kattalashadi (bosqichlar orasida silliq)
+            float grow = stage == 0 || stage == 4 ? 1f : 0.8f + 0.4f * ((g * 4f) % 1f) * 0.5f;
+            var origin = new Vector2(tex.Width / 2f, tex.Height - 3 / k);
+            for (int row = 0; row < 5; row++)
+                for (int col = 0; col < 9; col++)
+                {
+                    float x = 0.56f + col * 0.36f, y = 0.46f + row * 0.62f;
+                    Vector2 w = IsoMath.TileToWorld(new Vector2(farm.Position.X + x, farm.Position.Y + y)) + new Vector2(0, -7 - podium);
+                    float sway = stage >= 2 ? 0.04f * MathF.Sin(_time * 1.7f + col * 0.7f + row) : 0f;
+                    sb.Draw(tex, new Vector2(MathF.Round(w.X), MathF.Round(w.Y)), null, Color.White, sway, origin, k * grow, (col + row) % 2 == 0 ? SpriteEffects.None : SpriteEffects.FlipHorizontally, 0f);
+                }
+        }
+
+        private float _time;
+        /// <summary>Shamolda chayqalish uchun vaqt (Game1 har kadr beradi).</summary>
+        public void Tick(float dt) => _time += dt;
+
         private void DrawFarmStatus(SpriteBatch sb, IWorldObject building, Farm farm)
         {
             string text = farm.CropStage == FarmCropStage.Empty
-                ? "DALA: BO'SH"
-                : farm.CropStage == FarmCropStage.Mature ? "HOSIL TAYYOR" : "EKIN O'SMOQDA";
+                ? (farm.StoredProduce > 0 ? "HOSIL O'RILDI" : "DALA: BO'SH")
+                : farm.CropStage == FarmCropStage.Mature ? "HOSIL TAYYOR" : "EKIN O'SMOQDA " + (int)(farm.Growth * 100) + "%";
             Vector2 size = _font.Measure(text, 1, 0);
             int width = (int)size.X + 8;
             int x = (int)MathF.Round(building.DrawPosition.X + building.Texture.Width / 2f - width / 2f);

@@ -22,6 +22,26 @@ namespace AndijonSaltanatlar.Buildings
         public int StoredProduce { get; private set; }
         public bool IsPlayerControlled { get; set; }
 
+        /// <summary>Dalaga o'z dehqoni biriktirilgan: ekish, o'rish va bozorga olib borishni dehqon o'zi qiladi.</summary>
+        public bool Tended { get; set; }
+
+        /// <summary>Dehqon parvarishida o'sish (o'yin soati bo'yicha): shuncha soatda pishadi.</summary>
+        public const float TendedGrowHours = 8f;
+        private float _growth;
+
+        /// <summary>Ekin o'sishi 0..1 (ko'rinish uchun: nihol -> yosh -> yashil -> oltin).</summary>
+        public float Growth => CropStage == FarmCropStage.Mature ? 1f
+            : CropStage == FarmCropStage.Growing ? Math.Max(_growth, GrowthDays / (float)CropGrowthDays) : 0f;
+
+        /// <summary>Parvarishdagi dalada ekinni o'stiradi (ulush). Pishsa Mature bo'ladi.</summary>
+        public void AdvanceGrowth(float amount)
+        {
+            if (CropStage != FarmCropStage.Growing || amount <= 0f) return;
+            _growth = Math.Max(_growth, GrowthDays / (float)CropGrowthDays) + amount;
+            GrowthDays = Math.Min(CropGrowthDays - 1, (int)(_growth * CropGrowthDays));
+            if (_growth >= 1f) { _growth = 1f; CropStage = FarmCropStage.Mature; GrowthDays = 0; }
+        }
+
         public Farm(Point position) : base(position)
         {
             Type = BuildingType.Farm;
@@ -39,6 +59,7 @@ namespace AndijonSaltanatlar.Buildings
             if (CropStage != FarmCropStage.Empty) return false;
             CropStage = FarmCropStage.Growing;
             GrowthDays = 0;
+            _growth = 0f;
             return true;
         }
 
@@ -47,6 +68,7 @@ namespace AndijonSaltanatlar.Buildings
             if (CropStage != FarmCropStage.Mature) return 0;
             CropStage = FarmCropStage.Empty;
             GrowthDays = 0;
+            _growth = 0f;
             StoredProduce += CropYield;
             return CropYield;
         }

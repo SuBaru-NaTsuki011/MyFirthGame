@@ -46,6 +46,15 @@ namespace AndijonSaltanatlar.Units
         /// shuning uchun oyoq yerda sirpanmaydi va qadam tezligi yurish tezligiga mos keladi.
         /// </summary>
         public float WalkCycleTiles { get; set; } = 0.85f;
+
+        /// <summary>Ish kadrlari (masalan ketmon chopish: ko'tarish, tushirish, urish, qaytish); orqa tomoni ham.</summary>
+        public Texture2D[] WorkFrames { get; set; }
+        public Texture2D[] BackWorkFrames { get; set; }
+        /// <summary>Unit joyida ishlayapti (dehqon yer chopyapti) — ish kadrlari aylanadi.</summary>
+        public bool Working { get; set; }
+        /// <summary>Bir ish harakati (ketmonni ko'tarib urish) davomiyligi, soniya.</summary>
+        public float WorkCycle { get; set; } = 0.95f;
+        private float _workTime;
         private float _moveNoise;
         private bool _facingDirVested;
 
@@ -446,6 +455,16 @@ namespace AndijonSaltanatlar.Units
             float moved = float.IsNaN(_animLastPos.X) ? 0f : Vector2.Distance(Position, _animLastPos);
             _animLastPos = Position;
             if (moved < 1f) _walkDist += moved;
+
+            // Ish: dehqon yer chopyapti (joyida turgan paytda ish kadrlari aylanadi)
+            if (Working && WorkFrames != null && WorkFrames.Length > 0 && State != UnitState.Walking)
+            {
+                _workTime += dt;
+                Texture2D[] wf = FacingAway && BackWorkFrames != null && BackWorkFrames.Length == WorkFrames.Length ? BackWorkFrames : WorkFrames;
+                int wi = (int)(_workTime / MathF.Max(0.2f, WorkCycle) * wf.Length + PerEntityPhaseOffset) % wf.Length;
+                Texture = wf[wi];
+                return;
+            }
 
             // Yurish: kadr = sikl ichidagi joy (masofa / sikl uzunligi). 3D modeldan 8 kadrli silliq sikl,
             // eski rasmlarda 2 kadr. 

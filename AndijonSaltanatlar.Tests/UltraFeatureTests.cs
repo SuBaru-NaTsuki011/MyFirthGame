@@ -163,6 +163,23 @@ namespace AndijonSaltanatlar.Tests
         }
 
         [Fact]
+        public void TendedFarm_GrowsVisiblyThenHarvests()
+        {
+            var farm = (Farm)BuildingFactory.Create(BuildingType.Farm, Point.Zero);
+            Assert.Equal(0f, farm.Growth);
+            Assert.True(farm.PlantCrop());
+            farm.AdvanceGrowth(0.4f);
+            Assert.Equal(FarmCropStage.Growing, farm.CropStage);
+            Assert.InRange(farm.Growth, 0.39f, 0.41f);
+            farm.AdvanceGrowth(0.7f);
+            Assert.Equal(FarmCropStage.Mature, farm.CropStage);
+            Assert.Equal(1f, farm.Growth);
+            Assert.Equal(Farm.CropYield, farm.HarvestCrop());
+            Assert.Equal(FarmCropStage.Empty, farm.CropStage);
+            Assert.Equal(0f, farm.Growth);
+        }
+
+        [Fact]
         public void Farming_YieldBonus_FromToolsAndFertilizer()
         {
             var f = new FarmingManager { ToolsLevel = 2, FertilizerCharges = 1 };

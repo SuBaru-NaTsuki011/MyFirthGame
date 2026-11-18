@@ -17,6 +17,14 @@ namespace AndijonSaltanatlar.Units
         public float PauseTime { get; set; } = 1.5f;
         public Vector2 NextPatrolPoint => PatrolPoints.Count == 0 ? Position : PatrolPoints[_targetIndex % PatrolPoints.Count];
 
+        /// <summary>Yangi yo'nalish berilgandan keyin: birinchi nuqtadan (hozirgi joy) keyingisiga qarab yuradi.</summary>
+        public void ResetRoute()
+        {
+            _targetIndex = PatrolPoints.Count > 1 ? 1 : 0;
+            _waitTimer = 0f;
+            State = PatrolPoints.Count > 1 ? UnitState.Walking : UnitState.Idle;
+        }
+
         public PatrolUnit(IEnumerable<Vector2> patrolPoints, float speed = 1.1f) : base(Vector2.Zero)
         {
             Name = "Patrul askari";

@@ -69,7 +69,8 @@ namespace AndijonSaltanatlar.Buildings
         public Texture2D Texture => SpriteTexture;
         public Vector2 DrawPosition { get; set; }
         public bool Flipped { get; set; }
-        public float Depth => Position.X + Position.Y + Size.X;
+        /// <summary>Chizish tartibi. Ferma — yer kabi tekis: ustida yurgan dehqon va odamlar undan keyin chiziladi.</summary>
+        public float Depth => Type == BuildingType.Farm ? Position.X + Position.Y : Position.X + Position.Y + Size.X;
         public int SortLayer => 0;
 
         protected Building(Point position)

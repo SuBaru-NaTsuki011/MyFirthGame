@@ -26,6 +26,8 @@ namespace AndijonSaltanatlar.Units
             LoadFrames(unit.SpriteKey, out var frames, out var back);
             unit.SetFrames(frames);
             unit.BackFrames = back;
+            unit.WorkFrames = LoadSet(unit.SpriteKey + "_h", 4);
+            unit.BackWorkFrames = LoadSet(unit.SpriteKey + "_bh", 4);
             var attack = new Texture2D[UnitArt.AttackKinds * UnitArt.AttackPhases];
             bool any = false;
             for (int i = 0; i < attack.Length; i++)
@@ -51,6 +53,14 @@ namespace AndijonSaltanatlar.Units
         }
 
         public const int WalkFrames = 8;
+
+        /// <summary>prefix0..prefix{n-1} — hammasi bo'lsa qaytadi, aks holda null.</summary>
+        private Texture2D[] LoadSet(string prefix, int n)
+        {
+            var a = new Texture2D[n];
+            for (int i = 0; i < n; i++) { a[i] = _assets.TryGet(prefix + i); if (a[i] == null) return null; }
+            return a;
+        }
 
         /// <summary>
         /// Kadrlar: [turish, yurish...]. 3D modeldan 8 kadrli yurish sikli (key_w0..w7, orqa: key_bw0..bw7) bo'lsa — shu,
