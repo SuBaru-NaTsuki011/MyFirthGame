@@ -133,6 +133,10 @@ public sealed class Game1 : Game
 	private AndijonSaltanatlar.Online.UpdateInfo _pendingUpdate;
 	private AndijonSaltanatlar.UI.UpdateScreen _updateScreen;
 
+	// Kirish videosi (studio intro): o'yin ochilganda birinchi bo'lib ko'rsatiladi.
+	private bool _introMode;
+	private AndijonSaltanatlar.UI.IntroScreen _introScreen;
+
 	private bool _loginMode;
 
 	private bool _loadingCloud;
@@ -207,7 +211,7 @@ public sealed class Game1 : Game
 
 	protected override void Initialize()
 	{
-		Window.Title = "ANDIJON: SALTANATLAR";
+		Window.Title = "ANDIJON: TAXTLAR JANGI";
 #if !ANDROID
 		Window.AllowUserResizing = true;
 #endif
@@ -387,6 +391,10 @@ public sealed class Game1 : Game
 		}
 		// Oddiy ishga tushirish: avval Google bilan kirish (o'yin doimiy onlayn). Sinov parametrlari bilan — to'g'ridan-to'g'ri.
 		bool testLaunch = _opt.ScreenshotPath != null || _opt.Tab != null || _opt.Map || _opt.Civ || _opt.Story || _opt.QuestJournal || _opt.Online || _opt.Menu;
+		// Kirish videosi faqat oddiy ishga tushirishda (sinov/avtomatlashtirishda emas).
+		_introMode = !testLaunch && _opt.LoginUrlFile == null && !_opt.Login;
+		if (_introMode)
+			_introScreen = new AndijonSaltanatlar.UI.IntroScreen(GraphicsDevice, _assets.Pixel);
 		_menuMode = _opt.Menu;
 		_loginMode = _opt.Login || _opt.AuthStage != null || !testLaunch;
 		if (_loginMode)
@@ -1431,6 +1439,15 @@ public sealed class Game1 : Game
 	{
 		_perf?.BeginFrame();
 		_perf?.BeginUpdate();
+		if (_introMode && _introScreen != null)
+		{
+			_introScreen.Update((float)gameTime.ElapsedGameTime.TotalSeconds, IsActive);
+			if (_introScreen.Done) { _introScreen.Dispose(); _introScreen = null; _introMode = false; }
+			_perf?.EndUpdate();
+			_perf?.EndFrame();
+			base.Update(gameTime);
+			return;
+		}
 		if (TimePrefs.Dirty && _state != null)
 		{
 			_state.Clock.SetDayLength(TimePrefs.Current.DayMinutes * 60f);
@@ -2257,6 +2274,14 @@ public sealed class Game1 : Game
 			return;
 		}
 		_perf?.BeginDraw();
+		if (_introMode && _introScreen != null)
+		{
+			GraphicsDevice.Clear(Color.Black);
+			_introScreen.Draw(_sb, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+			_perf?.EndDraw();
+			base.Draw(gameTime);
+			return;
+		}
 		SeasonVisuals.Current = TimePrefs.VisualSeason(_state.Season);
 		SeasonVisuals.Weather = _state.Weather.Current;
 		bool flag = _captureNextDraw && _opt.ScreenshotPath != null;

@@ -116,14 +116,14 @@ namespace AndijonSaltanatlar.UI
             ThemeTokens T = ui.T;
             int h = ui.ControlH + (ui.IsTouch ? 8 : 10), gap = ui.Gap;
             float capH = ui.Type.LineHeight(TextStyle.Secondary);
-            int titleW = (int)ui.Type.Measure("ANDIJON: SALTANATLAR", TextStyle.MainTitle).X + 72;
+            int titleW = (int)ui.Type.Measure("ANDIJON: TAXTLAR JANGI", TextStyle.MainTitle).X + 72;
             CloudLoginState st = _cloud.State;
             bool extraRow = st == CloudLoginState.Error || st == CloudLoginState.WaitingForBrowser;
             int cardH = (int)(ui.Type.LineHeight(TextStyle.MainTitle) + ui.Type.LineHeight(TextStyle.Body) + 5 * capH) + (extraRow ? 3 : 2) * h + 8 * gap + 70;
             Rectangle card = Card(ui, vw, vh, Math.Max(titleW, ui.Compact ? 640 : 580), cardH, appear);
 
             int x = card.X + 28, w = card.Width - 56, y = card.Y + 24;
-            Title(ui, sb, card, ref y, "ANDIJON: SALTANATLAR", "O'z saltanatingni yarat!");
+            Title(ui, sb, card, ref y, "ANDIJON: TAXTLAR JANGI", "O'z saltanatingni yarat!");
             y += gap * 2;
 
             bool working = Busy != null || st == CloudLoginState.CheckingToken || st == CloudLoginState.SignedIn;

@@ -331,7 +331,7 @@ namespace AndijonSaltanatlar.UI
             int cw = Math.Min(win.Width - 32, 520);
             int x = win.X + (win.Width - cw) / 2;
             int y = win.Y + Math.Max(20, (win.Height - (3 * h + 4 * gap + 120)) / 2);
-            ui.Text("ANDIJON: SALTANATLAR", new Vector2(x, y), TextStyle.ScreenTitle, T.Accent);
+            ui.Text("ANDIJON: TAXTLAR JANGI", new Vector2(x, y), TextStyle.ScreenTitle, T.Accent);
             y += (int)ui.Type.LineHeight(TextStyle.ScreenTitle) + 4;
             string status = _client.Busy ? "Onlayn dunyoga ulanmoqda…" : "Onlayn dunyoga ulanilmagan";
             y += (int)ui.Paragraph(status, new Rectangle(x, y, cw, 60), TextStyle.Body, _client.Busy ? T.Accent : T.TextPrimary) + gap;

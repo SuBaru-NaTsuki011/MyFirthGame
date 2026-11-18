@@ -2,7 +2,7 @@ namespace AndijonSaltanatlar;
 
 public static class GameConfig
 {
-	public const string Title = "ANDIJON: SALTANATLAR";
+	public const string Title = "ANDIJON: TAXTLAR JANGI";
 
 	public const string CityName = "ASAKA";
 

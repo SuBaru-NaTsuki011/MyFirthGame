@@ -54,7 +54,7 @@ namespace AndijonSaltanatlar.UI
 
             int h = ui.ControlH + (ui.IsTouch ? 4 : 6), gap = ui.Gap;
             // Karta eni sarlavhaga moslashadi (piksel shrift keng) — sarlavha kartadan chiqmaydi.
-            int titleW = (int)ui.Type.Measure("ANDIJON: SALTANATLAR", TextStyle.MainTitle).X + 64;
+            int titleW = (int)ui.Type.Measure("ANDIJON: TAXTLAR JANGI", TextStyle.MainTitle).X + 64;
             int cardW = Math.Min(vw - 32, Math.Max(titleW, ui.Compact && vw > vh ? 760 : 520));
             bool twoCols = ui.Compact && vw > vh && cardW >= 700;
             int rows = twoCols ? (_items.Length + 1) / 2 : _items.Length;
@@ -65,7 +65,7 @@ namespace AndijonSaltanatlar.UI
             ui.Rounded(new Rectangle(card.X, card.Y, card.Width, 6), T.Accent, 3);
 
             int x = card.X + 28, y = card.Y + 26, w = card.Width - 56;
-            ui.Type.DrawFitted(sb, "ANDIJON: SALTANATLAR", new Rectangle(card.X + 16, y, card.Width - 32, (int)ui.Type.LineHeight(TextStyle.MainTitle)), TextStyle.MainTitle, T.Primary, 1);
+            ui.Type.DrawFitted(sb, "ANDIJON: TAXTLAR JANGI", new Rectangle(card.X + 16, y, card.Width - 32, (int)ui.Type.LineHeight(TextStyle.MainTitle)), TextStyle.MainTitle, T.Primary, 1);
             y += (int)ui.Type.LineHeight(TextStyle.MainTitle) + 4;
             ui.Type.DrawFitted(sb, "Bir shahardan buyuk saltanat sari", new Rectangle(card.X + 16, y, card.Width - 32, (int)ui.Type.LineHeight(TextStyle.Body)), TextStyle.Body, T.TextSecondary, 1);
             y += (int)ui.Type.LineHeight(TextStyle.Body) + 24;

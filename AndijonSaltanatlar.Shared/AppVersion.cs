@@ -9,7 +9,7 @@ namespace AndijonSaltanatlar.Shared
     public static class AppVersion
     {
         /// <summary>Joriy ilova versiyasi (Android ApplicationDisplayVersion bilan bir xil bo'lsin).</summary>
-        public const string Current = "0.20.0";
+        public const string Current = "0.21.0";
 
         // --- Yangilash manbasi: GitHub Releases ---
         public const string GitHubOwner = "anvarovmuhammadamin011-ops";

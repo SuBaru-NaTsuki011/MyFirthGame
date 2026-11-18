@@ -6,7 +6,7 @@ namespace AndijonSaltanatlar.UI
     /// </summary>
     public static class Texts
     {
-        public const string Title = "ANDIJON: SALTANATLAR";
+        public const string Title = "ANDIJON: TAXTLAR JANGI";
 
         // Bino nomlari
         public const string House = "Uy";

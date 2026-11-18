@@ -8,5 +8,5 @@
     usesCleartextTraffic: lokal Wi-Fi sinovi uchun http:// (masalan http://192.168.1.94:5080) ruxsat etilgan.
     Internet orqali o'ynashda server HTTPS bilan ishlashi kerak — shunda bu qatorni false qiling.
   -->
-  <application android:label="Andijon: Saltanatlar" android:usesCleartextTraffic="true" android:hardwareAccelerated="true" />
+  <application android:label="Andijon: Taxtlar Jangi" android:usesCleartextTraffic="true" android:hardwareAccelerated="true" />
 </manifest>
