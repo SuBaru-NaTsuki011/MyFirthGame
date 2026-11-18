@@ -129,6 +129,10 @@ public sealed class Game1 : Game
 	// Yangi hukmdor: profil saqlangach DUNYONI TANLASH / YURTNI TANLASH.
 	private WorldSelectionScreen _worldSelect;
 
+	// Yangilash: GitHub'da yangi reliz bo'lsa ko'rsatiladigan modal oyna.
+	private AndijonSaltanatlar.Online.UpdateInfo _pendingUpdate;
+	private AndijonSaltanatlar.UI.UpdateScreen _updateScreen;
+
 	private bool _loginMode;
 
 	private bool _loadingCloud;
@@ -240,6 +244,8 @@ public sealed class Game1 : Game
 		_renderer = new WorldRenderer(_assets, _font);
 		_glow = BuildGlow();
 		_mainMenu = new MainMenuScreen(_assets, _font) { Ui = _uiKit };
+		// Fonda GitHub'dan yangilash tekshiriladi (internet yo'q bo'lsa jim o'tadi, o'yinni bloklamaydi).
+		StartUpdateCheck();
 		_cloud = new AndijonSaltanatlar.Online.CloudSession { LoginUrlFile = _opt.LoginUrlFile };
 		_cloud.NativeAccountPicker = NativeAccountPicker;
 		_cloud.SignedIn = OnCloudSignedIn;
@@ -1447,6 +1453,23 @@ public sealed class Game1 : Game
 		_input.Update(IsActive);
 		_cloud?.Pump();
 		_cloud?.Tick((float)gameTime.ElapsedGameTime.TotalSeconds);
+		// Yangilash oynasi (modal): GitHub'da yangi versiya topilsa, har qanday rejim ustidan ko'rsatiladi.
+		if (_updateScreen == null && _pendingUpdate != null && _uiKit != null)
+		{
+			_updateScreen = new AndijonSaltanatlar.UI.UpdateScreen(_pendingUpdate) { Ui = _uiKit };
+			_updateScreen.Dismissed = () => { _updateScreen = null; _pendingUpdate = null; };
+			_updateScreen.Downloaded = () => { _updateScreen = null; _pendingUpdate = null; };
+		}
+		if (_updateScreen != null)
+		{
+			_updateScreen.Update(_input);
+			_dayNight.Update(TimePrefs.VisualFraction(_state.Clock.DayFraction));
+			_time += num;
+			_perf?.EndUpdate();
+			_perf?.EndFrame();
+			base.Update(gameTime);
+			return;
+		}
 		if (_loginMode)
 		{
 			if (_worldSelect != null) _worldSelect.Update(_input);
@@ -2290,6 +2313,7 @@ public sealed class Game1 : Game
 				DrawOnline();
 			}
 		}
+		DrawUpdateOverlay();
 		if (flag)
 		{
 			GraphicsDevice.SetRenderTarget(null);
@@ -2497,6 +2521,29 @@ public sealed class Game1 : Game
 		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
 		if (_worldSelect != null) _worldSelect.Draw(_sb, viewport.Width, viewport.Height, _time);
 		else _loginScreen.Draw(_sb, viewport.Width, viewport.Height, _time);
+		_sb.End();
+	}
+
+	// Fonda GitHub Releases'dan yangilashni tekshiradi; yangi versiya bo'lsa _pendingUpdate ga qo'yadi.
+	private void StartUpdateCheck()
+	{
+		try
+		{
+			System.Threading.Tasks.Task.Run(async () =>
+			{
+				var info = await AndijonSaltanatlar.Online.UpdateChecker.CheckAsync();
+				if (info != null && info.Available) _pendingUpdate = info; // asosiy tsikl buni o'qiydi
+			});
+		}
+		catch { /* yangilash tekshiruvi hech qachon o'yinni buzmasin */ }
+	}
+
+	private void DrawUpdateOverlay()
+	{
+		if (_updateScreen == null) return;
+		Viewport viewport = GraphicsDevice.Viewport;
+		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+		_updateScreen.Draw(_sb, viewport.Width, viewport.Height, _time);
 		_sb.End();
 	}
 

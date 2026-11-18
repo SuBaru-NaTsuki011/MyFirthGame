@@ -13,8 +13,8 @@
     <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
     <OutputType>Exe</OutputType>
     <ApplicationId>uz.andijon.saltanatlar</ApplicationId>
-    <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>0.19.0</ApplicationDisplayVersion>
+    <ApplicationVersion>2</ApplicationVersion>
+    <ApplicationDisplayVersion>0.20.0</ApplicationDisplayVersion>
     <RootNamespace>AndijonSaltanatlar</RootNamespace>
     <AssemblyName>AndijonSaltanatlar.Android</AssemblyName>
     <Nullable>disable</Nullable>
