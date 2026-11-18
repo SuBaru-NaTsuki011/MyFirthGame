@@ -58,6 +58,8 @@ public sealed class Game1 : Game
 
 	private AndijonSaltanatlar.NPC.CitizenSocialSystem _citizenSocial;
 
+	private AndijonSaltanatlar.CityLife.CitizenSocialSimulation _citizenLife;
+
 	private AndijonSaltanatlar.NPC.NPCInteractionManager _npcInteractions;
 
 	private GladiatorUnit _arenaGladiatorOne;
@@ -74,6 +76,14 @@ public sealed class Game1 : Game
 
 	// Chorva: cho'ponlarning qo'y, echki va mollari (har kuni ko'payadi)
 	private LivestockSystem _livestock;
+
+	// Soliq g'alayoni: aholi solig'i 30%+ bo'lsa xalq saroy oldiga chiqib tosh otadi
+	private AndijonSaltanatlar.CityLife.TaxRiotSystem _taxRiot;
+
+	// Fasllar ko'rinishi: bahor guli, kuz xazoni, qish qori (yer, daraxt, tomlar)
+	private SeasonVisuals _seasonVisuals;
+
+	private Season? _announcedSeason;
 
 	private readonly System.Collections.Generic.List<IWorldObject> _worldExtras = new System.Collections.Generic.List<IWorldObject>();
 
@@ -217,6 +227,8 @@ public sealed class Game1 : Game
 		_perf = new Core.PerformanceMonitor();
 		_onlinePanel = new OnlinePanel(_assets, _font, _online, _uiKit);
 		_renderer = new WorldRenderer(_assets, _font);
+		_seasonVisuals = new SeasonVisuals(GraphicsDevice, _assets.Get(SpriteKeys.Tiles));
+		_renderer.TextureFilter = (IWorldObject o, Texture2D t) => _seasonVisuals.ForObject(o, t);
 		_glow = BuildGlow();
 		_mainMenu = new MainMenuScreen(_assets, _font) { Ui = _uiKit };
 		_cloud = new AndijonSaltanatlar.Online.CloudSession { LoginUrlFile = _opt.LoginUrlFile };
@@ -242,6 +254,12 @@ public sealed class Game1 : Game
 		if (_opt.PopTax.HasValue)
 		{
 			_state.Policy.PopulationTax = _opt.PopTax.Value;
+		}
+		if (_opt.SeasonName != null && TryParseSeason(_opt.SeasonName, out Season wanted))
+		{
+			_state.SeasonShift = ((int)wanted - (int)SeasonManager.Of(_state.Clock.Month) + 4) % 4;
+			ApplySeasonWeather(wanted);
+			_announcedSeason = wanted;
 		}
 		if (_opt.Food.HasValue)
 		{
@@ -418,10 +436,13 @@ public sealed class Game1 : Game
 		_construction = new ConstructionSystem(_map, _buildings, _units, _state, _assets);
 		_combat = new AndijonSaltanatlar.Combat.CombatSystem(_map, _units, _state) { Buildings = _buildings };
 		_citizenSocial = new AndijonSaltanatlar.NPC.CitizenSocialSystem();
+		_citizenLife = new AndijonSaltanatlar.CityLife.CitizenSocialSimulation();
 		_combat.OnCitizenWorkRequested = PerformCitizenWork;
 		_interior = new AndijonSaltanatlar.Interiors.HouseInterior(_assets, _map, _buildings, _state);
 		_birds = new BirdSystem(_assets, _map, _units);
-		_livestock = new LivestockSystem(_assets, _map, _units);
+		_livestock = new LivestockSystem(_assets, _map, _units, _buildings);
+		_taxRiot = new AndijonSaltanatlar.CityLife.TaxRiotSystem();
+		_announcedSeason = null;
 		_governor = new AIGovernorManager
 		{
 			OnMessage = (string msg) =>
@@ -1353,6 +1374,9 @@ public sealed class Game1 : Game
 		_birds?.Update(dt, _dayNight.NightAmount, _combat.Possessed);
 		_livestock?.Update(dt);
 		_citizenSocial.Update(_units, dt);
+		_citizenLife?.Update(dt, _map, _buildings, _units, _state, _combat.Possessed);
+		_taxRiot?.Update(dt, _state, _map, _buildings, _units, _combat.Possessed, _combat.RaidActive || _combat.RaidIncoming);
+		if (_opt.ScreenshotPath != null && _taxRiot != null && _taxRiot.Active) _state.ShowMessage("DBG " + _taxRiot.DebugSummary);
 		UpdateFarmControl();
 		_map.Update(dt);
 		int day = _state.Day;
@@ -1361,6 +1385,7 @@ public sealed class Game1 : Game
 		if (_state.Day != day)
 		{
 			_npcInteractions.RefreshUnits(_units, _state.Pop);
+			_citizenLife?.DayTick(_state);
 			_governor?.OnDayTick();
 			string herdNews = _livestock?.DayTick(_state);
 			if (herdNews != null)
@@ -1371,6 +1396,7 @@ public sealed class Game1 : Game
 		_time += num;
 		_dayNight.Update(_state.Clock.DayFraction);
 		_ui.PhaseName = _dayNight.PhaseName;
+		AnnounceSeason();
 		// Avtomatik saqlash: har 30 soniyada va yer ochilganda darhol (o'yin doim serverda).
 		if (CloudSignedIn)
 		{
@@ -1397,6 +1423,54 @@ public sealed class Game1 : Game
 		_perf?.EndUpdate();
 		_perf?.EndFrame();
 		base.Update(gameTime);
+	}
+
+	/// <summary>Joriy faslni yer, daraxt, qushlarga beradi (har kadr; arzon — atlas va teksturalar keshlanadi).</summary>
+	private void SyncSeason()
+	{
+		Season season = _state.Season;
+		if (_seasonVisuals != null)
+		{
+			_seasonVisuals.Current = season;
+			_map.AtlasOverride = _seasonVisuals.TileAtlas;
+		}
+		if (_birds != null) _birds.Season = season;
+	}
+
+	/// <summary>Fasl almashganda xabar (o'yin boshida emas — faqat almashuvda).</summary>
+	private void AnnounceSeason()
+	{
+		Season season = _state.Season;
+		if (_announcedSeason == season) return;
+		bool first = !_announcedSeason.HasValue;
+		_announcedSeason = season;
+		if (first) return;
+		string text = season switch
+		{
+			Season.Bahor => "BAHOR keldi! O'riklar gulladi, laylaklar qaytdi. Chorva tez ko'payadi.",
+			Season.Yoz => "YOZ keldi! Jazirama issiq, ariqlar sayozlashadi.",
+			Season.Kuz => "KUZ keldi! Hosil pishdi, barglar sarg'aydi.",
+			_ => "QISH keldi! Qor yog'di, ariqlar muzladi. Laylaklar issiq o'lkalarga uchib ketdi."
+		};
+		_state.ShowMessage(text);
+	}
+
+	private void ApplySeasonWeather(Season season)
+	{
+		_state.Weather.SetCurrent(season == Season.Qish ? Weather.Snowy : season == Season.Kuz ? Weather.Windy : Weather.Clear);
+	}
+
+	private static bool TryParseSeason(string name, out Season season)
+	{
+		switch ((name ?? "").Trim().ToLowerInvariant())
+		{
+			case "bahor": case "spring": season = Season.Bahor; return true;
+			case "yoz": case "summer": season = Season.Yoz; return true;
+			case "kuz": case "autumn": case "fall": season = Season.Kuz; return true;
+			case "qish": case "winter": season = Season.Qish; return true;
+		}
+		season = Season.Yoz;
+		return false;
 	}
 
 	private static Vector2 BuildingCenter(Building building)
@@ -1655,6 +1729,12 @@ public sealed class Game1 : Game
 		{
 			_state.CycleSpeed();
 		}
+		if (_input.KeyPressed(Keys.N))
+		{
+			// Keyingi fasl (ko'rish uchun) — saqlanmaydi, o'yin oyi bo'yicha fasl keyin o'z yo'lida davom etadi
+			_state.SeasonShift++;
+			ApplySeasonWeather(_state.Season);
+		}
 		if (_input.KeyPressed(Keys.P))
 		{
 			_ui.TogglePetition();
@@ -1809,9 +1889,11 @@ public sealed class Game1 : Game
 	{
 		GraphicsDevice.Clear(new Color(26, 30, 22));
 		Vector4 visibleWorldRect = _camera.VisibleWorldRect;
+		SyncSeason();
 		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, null, _camera.Transform);
 		_map.Draw(_sb, visibleWorldRect);
 		_birds?.DrawShadows(_sb, visibleWorldRect);
+		_taxRiot?.DrawShadows(_sb, _assets.Pixel);
 		LandExpansionRenderer.Draw(_sb, _map, _state.Land, visibleWorldRect);
 		if (_state.Mode == GameMode.Playing && !_input.MouseOverUI)
 		{
@@ -1828,6 +1910,7 @@ public sealed class Game1 : Game
 		if (_birds != null) _worldExtras.AddRange(_birds.GroundObjects);
 		if (_livestock != null) _worldExtras.AddRange(_livestock.GroundObjects);
 		_renderer.Draw(_sb, visibleWorldRect, _map, _buildings, _units, _worldExtras);
+		_taxRiot?.DrawAir(_sb, _assets.Pixel);
 		_birds?.DrawSky(_sb, visibleWorldRect);
 		_construction.Draw(_sb);
 		_sb.End();
@@ -1866,7 +1949,13 @@ public sealed class Game1 : Game
 	{
 		Viewport viewport = GraphicsDevice.Viewport;
 		_sb.Begin(SpriteSortMode.Deferred, Multiply, SamplerState.PointClamp);
-		_sb.Draw(_assets.Pixel, new Rectangle(0, 0, viewport.Width, viewport.Height), _dayNight.Ambient);
+		Color ambient = _dayNight.Ambient;
+		if (_seasonVisuals != null)
+		{
+			Color tint = _seasonVisuals.AmbientTint;
+			ambient = new Color(ambient.R * tint.R / 255, ambient.G * tint.G / 255, ambient.B * tint.B / 255, (int)ambient.A);
+		}
+		_sb.Draw(_assets.Pixel, new Rectangle(0, 0, viewport.Width, viewport.Height), ambient);
 		_sb.End();
 	}
 

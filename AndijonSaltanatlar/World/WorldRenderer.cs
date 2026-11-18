@@ -21,6 +21,12 @@ namespace AndijonSaltanatlar.World
 
         public int LastDrawnCount { get; private set; }
 
+        /// <summary>
+        /// Bino/bezak teksturasini chizishdan oldin almashtirish (masalan fasl: qor, xazon, gul).
+        /// Natija asl tekstura bilan bir xil o'lchamda bo'lishi kerak. Odamlarga qo'llanmaydi.
+        /// </summary>
+        public Func<IWorldObject, Texture2D, Texture2D> TextureFilter { get; set; }
+
         public WorldRenderer(AssetManager assets, PixelFont font)
         {
             _assets = assets;
@@ -99,7 +105,8 @@ namespace AndijonSaltanatlar.World
                     continue;
                 }
 
-                sb.Draw(o.Texture, o.DrawPosition, null, tint, 0f, Vector2.Zero, 1f,
+                Texture2D tex = TextureFilter != null ? TextureFilter(o, o.Texture) ?? o.Texture : o.Texture;
+                sb.Draw(tex, o.DrawPosition, null, tint, 0f, Vector2.Zero, 1f,
                     o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
 
                 if (o is Farm farm && farm.BuildProgress >= 1f) DrawFarmStatus(sb, o, farm);

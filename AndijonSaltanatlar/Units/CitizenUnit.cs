@@ -5,7 +5,7 @@ using Microsoft.Xna.Framework;
 
 namespace AndijonSaltanatlar.Units
 {
-    public enum CitizenActivityIcon { None, Visiting, Talking, Trading, Complaining, Revolting }
+    public enum CitizenActivityIcon { None, Visiting, Talking, Trading, Complaining, Revolting, Sitting, Eating, Sleeping }
 
     /// <summary>
     /// Shahar fuqarosi: belgilangan yo'nalish bo'ylab (A* yo'li bilan) yuradi.

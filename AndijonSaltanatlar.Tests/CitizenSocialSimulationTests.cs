@@ -10,6 +10,15 @@ namespace AndijonSaltanatlar.Tests
 {
     public sealed class CitizenSocialSimulationTests
     {
+        [Theory]
+        [InlineData(29, false)]
+        [InlineData(30, true)]
+        [InlineData(50, true)]
+        public void TaxRiotStartsAtThirtyPercentOrHigher(int tax, bool shouldRiot)
+        {
+            Assert.Equal(shouldRiot, TaxRiotSystem.TaxTooHigh(tax));
+        }
+
         [Fact]
         public void BuildingVisitsPreferTheFrontEntranceOverCloserPerimeterTiles()
         {
