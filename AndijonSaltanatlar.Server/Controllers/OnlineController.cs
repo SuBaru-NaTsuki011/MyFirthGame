@@ -77,6 +77,50 @@ namespace AndijonSaltanatlar.Server.Controllers
             return Ok(await _svc.StateAsync(k));
         }
 
+        // --- Promt 6: mehmon, sovg'a, xat ---
+
+        /// <summary>Boshqa o'yinchi shahrining ochiq ko'rinishi (maxfiy ma'lumotsiz).</summary>
+        [HttpGet("city/{kingdomId:int}")]
+        public async Task<IActionResult> City(int kingdomId)
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            CitySnapshotDto dto = await _svc.CitySnapshotAsync(k, kingdomId);
+            if (dto == null) return NotFound(new { messageUz = "Saltanat topilmadi" });
+            return Ok(dto);
+        }
+
+        /// <summary>Boshqa saltanatga sovg'a (tanga/oziq-ovqat) — kunlik limit bilan.</summary>
+        [HttpPost("gift")]
+        public async Task<IActionResult> Gift([FromBody] GiftRequest req)
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            string err = await _svc.SendGiftAsync(k, req);
+            if (err != null) return BadRequest(new { messageUz = err });
+            return Ok(new { ok = true });
+        }
+
+        /// <summary>Boshqa saltanatga xat — uzunlik, filtr va kunlik limit bilan.</summary>
+        [HttpPost("letter")]
+        public async Task<IActionResult> Letter([FromBody] LetterRequest req)
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            string err = await _svc.SendLetterAsync(k, req);
+            if (err != null) return BadRequest(new { messageUz = err });
+            return Ok(new { ok = true });
+        }
+
+        /// <summary>Kelgan xatlar qutisi.</summary>
+        [HttpGet("letters")]
+        public async Task<IActionResult> Letters()
+        {
+            Kingdom k = await MyKingdom();
+            if (k == null) return NotFound(new { messageUz = "Avval dunyoga qo'shiling" });
+            return Ok(await _svc.LettersAsync(k));
+        }
+
         [HttpGet("state")]
         public async Task<IActionResult> State()
         {

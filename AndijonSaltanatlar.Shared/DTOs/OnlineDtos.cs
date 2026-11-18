@@ -77,6 +77,61 @@ namespace AndijonSaltanatlar.Shared.DTOs
         public string Flag { get; set; } = "";
     }
 
+    // --- Promt 6: boshqa o'yinchi shahriga borish, sovg'a va xat ---
+
+    /// <summary>Boshqa o'yinchi shahrining OCHIQ ko'rinishi (maxfiy ma'lumotsiz: xazina/ombor/qo'shin yo'q).</summary>
+    public sealed class CitySnapshotDto
+    {
+        public int KingdomId { get; set; }
+        public string KingdomName { get; set; } = "";
+        public string RulerName { get; set; } = "";     // taxallus (Google ism emas)
+        public string Flag { get; set; } = "";
+        public int Population { get; set; }
+        public int Development { get; set; }            // saltanat darajasi ko'rsatkichi
+        public int RegionCount { get; set; }
+        public bool Shielded { get; set; }              // yangi o'yinchi himoyasida
+        public bool IsAi { get; set; }
+        public System.Collections.Generic.List<CityBuildingDto> Buildings { get; set; } = new System.Collections.Generic.List<CityBuildingDto>();
+    }
+
+    public sealed class CityBuildingDto
+    {
+        public string Type { get; set; } = "";
+        public int Level { get; set; }
+        public int Count { get; set; }
+    }
+
+    public sealed class GiftRequest
+    {
+        public string CommandId { get; set; } = "";
+        public int ToKingdomId { get; set; }
+        /// <summary>"coin" yoki "food".</summary>
+        public string Kind { get; set; } = "coin";
+        public int Amount { get; set; }
+    }
+
+    public sealed class LetterRequest
+    {
+        public string CommandId { get; set; } = "";
+        public int ToKingdomId { get; set; }
+        public string Text { get; set; } = "";
+    }
+
+    public sealed class LetterDto
+    {
+        public int Id { get; set; }
+        public string FromName { get; set; } = "";
+        public string Text { get; set; } = "";
+        public System.DateTime SentAt { get; set; }
+        public bool Read { get; set; }
+    }
+
+    public sealed class LettersResponse
+    {
+        public System.Collections.Generic.List<LetterDto> Letters { get; set; } = new System.Collections.Generic.List<LetterDto>();
+        public int Unread { get; set; }
+    }
+
     public sealed class RiceFieldDto
     {
         public int Id { get; set; }

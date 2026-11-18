@@ -302,6 +302,111 @@ namespace AndijonSaltanatlar.Server.Services
             return null;
         }
 
+        // --- Promt 6: boshqa o'yinchi shahrini ko'rish, sovg'a va xat ---
+
+        public const int GiftDailyLimit = 3;
+        public const int GiftMaxAmount = 1000;
+        public const int LetterMaxLength = 300;
+        public const int LetterDailyLimit = 10;
+
+        /// <summary>Yangi o'yinchi himoyasida (qalqon) — WarService bilan bir xil qoida.</summary>
+        private async Task<bool> IsShieldedAsync(Kingdom k)
+        {
+            if (k.IsAi || k.OwnerUserId == null) return false;
+            if (await _db.WarStates.Where(s => s.KingdomId == k.Id).Select(s => s.ProtectionWaived).FirstOrDefaultAsync()) return false;
+            DateTime created = await _db.Users.Where(u => u.Id == k.OwnerUserId).Select(u => u.CreatedAt).FirstOrDefaultAsync();
+            return _clock.UtcNow - created < TimeSpan.FromHours(AndijonSaltanatlar.Shared.War.WarRules.NewPlayerProtectionHours);
+        }
+
+        /// <summary>Boshqa saltanat shahrining OCHIQ ko'rinishi: xazina, ombor, qo'shin, email kabi maxfiy ma'lumot BERILMAYDI.</summary>
+        public async Task<CitySnapshotDto> CitySnapshotAsync(Kingdom viewer, int targetKingdomId)
+        {
+            Kingdom k = await _db.Kingdoms.AsNoTracking().FirstOrDefaultAsync(x => x.Id == targetKingdomId && x.WorldId == viewer.WorldId);
+            if (k == null) return null;
+            int regionCount = await _db.Regions.CountAsync(r => r.OwnerKingdomId == k.Id);
+            int population = await _db.Cities.Where(c => c.KingdomId == k.Id).Select(c => (int?)c.Population).SumAsync() ?? 0;
+            var devs = await _db.Regions.Where(r => r.OwnerKingdomId == k.Id).Select(r => r.Development).ToListAsync();
+            int development = devs.Count == 0 ? 0 : (int)devs.Average();
+            var grouped = await _db.Buildings.AsNoTracking().Where(b => b.KingdomId == k.Id && b.BuildProgress >= 1f)
+                .GroupBy(b => b.Kind)
+                .Select(g => new { Kind = g.Key, Count = g.Count(), Level = g.Max(x => x.Level) })
+                .ToListAsync();
+            var dto = new CitySnapshotDto
+            {
+                KingdomId = k.Id, KingdomName = k.Name, RulerName = k.RulerName ?? "", Flag = k.Flag ?? "",
+                Population = population, Development = development, RegionCount = regionCount,
+                IsAi = k.IsAi, Shielded = await IsShieldedAsync(k)
+            };
+            foreach (var b in grouped)
+                dto.Buildings.Add(new CityBuildingDto { Type = ((AndijonSaltanatlar.Shared.BuildingKind)b.Kind).ToString(), Level = b.Level, Count = b.Count });
+            return dto;
+        }
+
+        /// <summary>Sovg'a: tanga yoki oziq-ovqat; kunlik limit va eng ko'p miqdor serverda tekshiriladi. Natija: null — muvaffaqiyat.</summary>
+        public async Task<string> SendGiftAsync(Kingdom me, GiftRequest req)
+        {
+            if (req == null) return "So'rov bo'sh.";
+            if (req.ToKingdomId == me.Id) return "O'zingizga sovg'a yubora olmaysiz.";
+            string kind = (req.Kind ?? "coin").ToLowerInvariant();
+            if (kind != "coin" && kind != "food") return "Sovg'a turi noto'g'ri.";
+            if (req.Amount <= 0 || req.Amount > GiftMaxAmount) return "Miqdor 1 dan " + GiftMaxAmount + " gacha bo'lsin.";
+            Kingdom to = await _db.Kingdoms.FirstOrDefaultAsync(x => x.Id == req.ToKingdomId && x.WorldId == me.WorldId);
+            if (to == null) return "Saltanat topilmadi.";
+            DateTime dayStart = _clock.UtcNow.Date;
+            int todayCount = await _db.GiftLog.CountAsync(g => g.FromKingdomId == me.Id && g.SentAt >= dayStart);
+            if (todayCount >= GiftDailyLimit) return "Bugungi sovg'a limiti tugadi (" + GiftDailyLimit + " ta).";
+            KingdomResource mine = await _db.KingdomResources.FirstOrDefaultAsync(r => r.KingdomId == me.Id);
+            if (mine == null) return "Resurs topilmadi.";
+            KingdomResource their = await _db.KingdomResources.FirstOrDefaultAsync(r => r.KingdomId == to.Id);
+            if (their == null) { their = new KingdomResource { KingdomId = to.Id }; _db.KingdomResources.Add(their); }
+            if (kind == "coin")
+            {
+                if (mine.Coin < req.Amount) return "Tanga yetarli emas.";
+                mine.Coin -= req.Amount; their.Coin += req.Amount;
+            }
+            else
+            {
+                if (mine.Food < req.Amount) return "Oziq-ovqat yetarli emas.";
+                mine.Food -= req.Amount; their.Food += req.Amount;
+            }
+            _db.GiftLog.Add(new GiftLogEntity { WorldId = me.WorldId, FromKingdomId = me.Id, ToKingdomId = to.Id, Kind = kind, Amount = req.Amount, SentAt = _clock.UtcNow });
+            await _db.SaveChangesAsync();
+            return null;
+        }
+
+        /// <summary>Xat: matn uzunligi, nomaqbul so'z filtri va kunlik limit serverda tekshiriladi. Natija: null — muvaffaqiyat.</summary>
+        public async Task<string> SendLetterAsync(Kingdom me, LetterRequest req)
+        {
+            if (req == null) return "So'rov bo'sh.";
+            if (req.ToKingdomId == me.Id) return "O'zingizga xat yoza olmaysiz.";
+            string text = (req.Text ?? "").Trim();
+            if (text.Length == 0) return "Xat bo'sh.";
+            if (text.Length > LetterMaxLength) return "Xat " + LetterMaxLength + " belgidan oshmasin.";
+            if (ProfanityFilter.Contains(text)) return "Xatda nomaqbul so'zlar bor — iltimos, odob bilan yozing.";
+            Kingdom to = await _db.Kingdoms.AsNoTracking().FirstOrDefaultAsync(x => x.Id == req.ToKingdomId && x.WorldId == me.WorldId);
+            if (to == null) return "Saltanat topilmadi.";
+            DateTime dayStart = _clock.UtcNow.Date;
+            int todayCount = await _db.Letters.CountAsync(l => l.FromKingdomId == me.Id && l.SentAt >= dayStart);
+            if (todayCount >= LetterDailyLimit) return "Bugungi xat limiti tugadi (" + LetterDailyLimit + " ta).";
+            _db.Letters.Add(new PlayerLetterEntity { WorldId = me.WorldId, FromKingdomId = me.Id, ToKingdomId = to.Id, FromName = me.Name, Text = text, SentAt = _clock.UtcNow, Read = false });
+            await _db.SaveChangesAsync();
+            return null;
+        }
+
+        /// <summary>Kelgan xatlar qutisi (eng yangi 50 ta); ko'rilgach o'qilgan deb belgilanadi.</summary>
+        public async Task<LettersResponse> LettersAsync(Kingdom me)
+        {
+            var letters = await _db.Letters.AsNoTracking().Where(l => l.ToKingdomId == me.Id)
+                .OrderByDescending(l => l.SentAt).Take(50).ToListAsync();
+            var resp = new LettersResponse { Unread = letters.Count(l => !l.Read) };
+            foreach (var l in letters)
+                resp.Letters.Add(new LetterDto { Id = l.Id, FromName = l.FromName, Text = l.Text, SentAt = l.SentAt, Read = l.Read });
+            var unreadIds = letters.Where(l => !l.Read).Select(l => l.Id).ToList();
+            if (unreadIds.Count > 0)
+                await _db.Letters.Where(l => unreadIds.Contains(l.Id)).ExecuteUpdateAsync(s => s.SetProperty(x => x.Read, true));
+            return resp;
+        }
+
         private async Task EnsureResourcesAsync(int kingdomId)
         {
             if (!await _db.KingdomResources.AnyAsync(r => r.KingdomId == kingdomId))

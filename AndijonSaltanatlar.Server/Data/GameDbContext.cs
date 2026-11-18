@@ -37,6 +37,10 @@ namespace AndijonSaltanatlar.Server.Data
         public DbSet<WorldNewsEntity> WorldNews => Set<WorldNewsEntity>();
         // Google login + bulutdagi saqlash
         public DbSet<CloudSaveEntity> CloudSaves => Set<CloudSaveEntity>();
+
+        // Promt 6: o'yinchilararo xat va sovg'a.
+        public DbSet<PlayerLetterEntity> Letters => Set<PlayerLetterEntity>();
+        public DbSet<GiftLogEntity> GiftLog => Set<GiftLogEntity>();
         // PROMPT 25: urush tizimi
         public DbSet<KingdomWarStateEntity> WarStates => Set<KingdomWarStateEntity>();
         public DbSet<ArmyEntity> Armies => Set<ArmyEntity>();

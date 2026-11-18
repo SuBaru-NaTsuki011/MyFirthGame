@@ -163,5 +163,62 @@ namespace AndijonSaltanatlar.Tests
             double avg = frees.Average(MinDistToOcc);
             Assert.True(MinDistToOcc(top) >= avg - 1e-9); // tavsiya etilgan hudud band hududlardan o'rtachadan uzoq
         }
+
+        // --- Promt 6: mehmon, sovg'a, xat ---
+
+        private async Task<(Kingdom a, Kingdom b)> TwoPlayersAsync(int worldId, string tag)
+        {
+            Kingdom ka = await _svc.JoinAsync(NewPlayer(tag + "-a").Id, new JoinWorldRequest { WorldId = worldId, ChooseStart = true });
+            Kingdom kb = await _svc.JoinAsync(NewPlayer(tag + "-b").Id, new JoinWorldRequest { WorldId = worldId, ChooseStart = true });
+            await _svc.ChooseStartAsync(ka, new ChooseStartRequest { Auto = true });
+            await _svc.ChooseStartAsync(kb, new ChooseStartRequest { Auto = true });
+            return (ka, kb);
+        }
+
+        [Fact]
+        public async Task Gift_Transfers_AndEnforcesLimits()
+        {
+            var (ka, kb) = await TwoPlayersAsync(10, "gift");
+            Assert.Null(await _svc.SendGiftAsync(ka, new GiftRequest { ToKingdomId = kb.Id, Kind = "coin", Amount = 100 }));
+            using (GameDbContext db = NewDb())
+            {
+                Assert.Equal(400, db.KingdomResources.Single(r => r.KingdomId == ka.Id).Coin); // 500-100
+                Assert.Equal(600, db.KingdomResources.Single(r => r.KingdomId == kb.Id).Coin); // 500+100
+            }
+            // Kunlik limit: yana 2 ta (jami 3) — so'ng 4-si rad etiladi.
+            Assert.Null(await _svc.SendGiftAsync(ka, new GiftRequest { ToKingdomId = kb.Id, Kind = "coin", Amount = 10 }));
+            Assert.Null(await _svc.SendGiftAsync(ka, new GiftRequest { ToKingdomId = kb.Id, Kind = "coin", Amount = 10 }));
+            Assert.NotNull(await _svc.SendGiftAsync(ka, new GiftRequest { ToKingdomId = kb.Id, Kind = "coin", Amount = 10 }));
+            // Eng ko'p miqdordan oshsa — rad.
+            Assert.NotNull(await _svc.SendGiftAsync(kb, new GiftRequest { ToKingdomId = ka.Id, Kind = "coin", Amount = 2000 }));
+        }
+
+        [Fact]
+        public async Task Letter_LengthFilterAndInbox()
+        {
+            var (ka, kb) = await TwoPlayersAsync(11, "lett");
+            Assert.NotNull(await _svc.SendLetterAsync(ka, new LetterRequest { ToKingdomId = kb.Id, Text = new string('a', 301) })); // uzun
+            Assert.NotNull(await _svc.SendLetterAsync(ka, new LetterRequest { ToKingdomId = kb.Id, Text = "sen ahmoq" }));          // filtr
+            Assert.Null(await _svc.SendLetterAsync(ka, new LetterRequest { ToKingdomId = kb.Id, Text = "Salom, savdo qilaylikmi?" }));
+
+            LettersResponse inbox = await _svc.LettersAsync(kb);
+            Assert.Contains(inbox.Letters, l => l.Text.Contains("savdo"));
+            Assert.Equal(1, inbox.Unread);
+            // Ikkinchi o'qishda o'qilgan deb belgilangan.
+            LettersResponse again = await _svc.LettersAsync(kb);
+            Assert.Equal(0, again.Unread);
+        }
+
+        [Fact]
+        public async Task CitySnapshot_ReturnsPublicInfo()
+        {
+            var (ka, kb) = await TwoPlayersAsync(12, "snap");
+            CitySnapshotDto snap = await _svc.CitySnapshotAsync(ka, kb.Id);
+            Assert.NotNull(snap);
+            Assert.Equal(kb.Id, snap.KingdomId);
+            Assert.NotNull(snap.Buildings);
+            Assert.True(snap.RegionCount >= 1);
+            // DTO maxfiy maydonlarni (xazina/ombor/qo'shin/email) umuman o'z ichiga olmaydi — bu strukturaga ko'ra.
+        }
     }
 }

@@ -533,6 +533,76 @@ namespace AndijonSaltanatlar.Online
             });
         }
 
+        // --- Promt 6: mehmon, sovg'a, xat (server endpointlari bilan ishlaydi) ---
+
+        /// <summary>Boshqa o'yinchi shahrining ochiq ko'rinishini oladi.</summary>
+        public void VisitCity(int kingdomId, Action<CitySnapshotDto, string> done)
+        {
+            string url = ServerUrl, token = Token;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    HttpResponseMessage r = await Send(url, HttpMethod.Get, "api/online/city/" + kingdomId, token: token);
+                    if (!r.IsSuccessStatusCode) { string e = await ReadError(r, "SHAHARNI OCHIB BO'LMADI."); Post(() => done?.Invoke(null, e)); return; }
+                    CitySnapshotDto dto = await r.Content.ReadFromJsonAsync<CitySnapshotDto>(Json);
+                    Post(() => done?.Invoke(dto, null));
+                }
+                catch (Exception ex) { Post(() => done?.Invoke(null, "SERVERGA ULANIB BO'LMADI." + Detail(ex))); }
+            });
+        }
+
+        /// <summary>Sovg'a yuboradi. done(null) — muvaffaqiyat, aks holda xato matni.</summary>
+        public void SendGift(int toKingdomId, string kind, int amount, Action<string> done)
+        {
+            string url = ServerUrl, token = Token;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    HttpResponseMessage r = await Send(url, HttpMethod.Post, "api/online/gift",
+                        JsonContent.Create(new GiftRequest { CommandId = Guid.NewGuid().ToString("N"), ToKingdomId = toKingdomId, Kind = kind, Amount = amount }, options: Json), token);
+                    if (!r.IsSuccessStatusCode) { string e = await ReadError(r, "SOVG'A YUBORILMADI."); Post(() => done?.Invoke(e)); return; }
+                    Post(() => done?.Invoke(null));
+                }
+                catch (Exception ex) { Post(() => done?.Invoke("SERVERGA ULANIB BO'LMADI." + Detail(ex))); }
+            });
+        }
+
+        /// <summary>Xat yuboradi. done(null) — muvaffaqiyat, aks holda xato matni.</summary>
+        public void SendLetter(int toKingdomId, string text, Action<string> done)
+        {
+            string url = ServerUrl, token = Token;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    HttpResponseMessage r = await Send(url, HttpMethod.Post, "api/online/letter",
+                        JsonContent.Create(new LetterRequest { CommandId = Guid.NewGuid().ToString("N"), ToKingdomId = toKingdomId, Text = text ?? "" }, options: Json), token);
+                    if (!r.IsSuccessStatusCode) { string e = await ReadError(r, "XAT YUBORILMADI."); Post(() => done?.Invoke(e)); return; }
+                    Post(() => done?.Invoke(null));
+                }
+                catch (Exception ex) { Post(() => done?.Invoke("SERVERGA ULANIB BO'LMADI." + Detail(ex))); }
+            });
+        }
+
+        /// <summary>Kelgan xatlar qutisini oladi.</summary>
+        public void FetchLetters(Action<LettersResponse, string> done)
+        {
+            string url = ServerUrl, token = Token;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    HttpResponseMessage r = await Send(url, HttpMethod.Get, "api/online/letters", token: token);
+                    if (!r.IsSuccessStatusCode) { string e = await ReadError(r, "XATLARNI OLIB BO'LMADI."); Post(() => done?.Invoke(null, e)); return; }
+                    LettersResponse dto = await r.Content.ReadFromJsonAsync<LettersResponse>(Json);
+                    Post(() => done?.Invoke(dto, null));
+                }
+                catch (Exception ex) { Post(() => done?.Invoke(null, "SERVERGA ULANIB BO'LMADI." + Detail(ex))); }
+            });
+        }
+
         private static async Task<string> ReadError(HttpResponseMessage r, string fallback)
         {
             string msg = fallback;
