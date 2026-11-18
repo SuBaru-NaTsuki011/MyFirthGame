@@ -614,7 +614,7 @@ namespace AndijonSaltanatlar.UI
                 _font.Draw(sb, taxNames[i], new Vector2(tx, ry + 4), Cream, 2, 1);
                 Panel(sb, _taxMinus[i], PanelBg2, Border, 1);
                 _font.DrawCentered(sb, "-", _taxMinus[i].Center.ToVector2(), Cream, 2, 1);
-                // Aholi solig'i g'alayon chegarasida (35%+) — qizil: xalq saroy oldiga chiqadi
+                // Aholi solig'i g'alayon chegarasida (30% dan oshsa) — qizil: xalq saroy oldiga chiqadi
                 bool riot = i == 0 && AndijonSaltanatlar.CityLife.TaxRiotSystem.TaxTooHigh(taxVals[i]);
                 _font.DrawCentered(sb, taxVals[i] + "%", new Vector2((_taxMinus[i].Right + _taxPlus[i].X) / 2f, _taxMinus[i].Center.Y), riot ? Red : Gold, 2, 1);
                 Panel(sb, _taxPlus[i], PanelBg2, Border, 1);

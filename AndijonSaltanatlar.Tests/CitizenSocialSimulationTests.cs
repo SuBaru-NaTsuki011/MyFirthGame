@@ -12,9 +12,11 @@ namespace AndijonSaltanatlar.Tests
     {
         [Theory]
         [InlineData(29, false)]
-        [InlineData(30, true)]
+        [InlineData(30, false)]
+        [InlineData(31, true)]
+        [InlineData(35, true)]
         [InlineData(50, true)]
-        public void TaxRiotStartsAtThirtyPercentOrHigher(int tax, bool shouldRiot)
+        public void TaxRiotStartsAboveThirtyPercent(int tax, bool shouldRiot)
         {
             Assert.Equal(shouldRiot, TaxRiotSystem.TaxTooHigh(tax));
         }

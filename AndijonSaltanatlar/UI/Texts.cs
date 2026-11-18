@@ -82,7 +82,7 @@ namespace AndijonSaltanatlar.UI
             "Shohni chiqarish: saroyda shoh yonida F",
             "Bosqin chaqirish (sinov): B",
             "Keyingi fasl (ko'rish uchun): N",
-            "Aholi solig'i 35%+ bo'lsa xalq saroy oldida g'alayon qiladi"
+            "Aholi solig'i 30% dan oshsa xalq saroyga tosh otadi"
         };
     }
 }

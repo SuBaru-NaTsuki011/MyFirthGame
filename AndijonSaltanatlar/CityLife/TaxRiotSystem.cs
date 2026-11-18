@@ -11,12 +11,12 @@ using Microsoft.Xna.Framework.Graphics;
 namespace AndijonSaltanatlar.CityLife
 {
     /// <summary>
-    /// SOLIQ G'ALAYONI: aholi solig'i 35% yoki undan yuqori bo'lsa, butun xalq ko'chaga chiqadi.
+    /// SOLIQ G'ALAYONI: aholi solig'i 30% dan oshsa, butun xalq ko'chaga chiqadi.
     ///  - Har bir uydan odamlar ketma-ket chiqadi, ko'chadagi fuqarolar ham qo'shiladi
     ///    (cho'ponlar yaylovda qoladi — podani tashlab ketmaydi).
     ///  - Hammasi A* yo'l bilan SAROY OLDIGA to'planadi, shior aytadi va saroyga TOSH OTADI.
     ///  - G'alayon davom etgan har kuni barqarorlik va xalq baxti pasayadi.
-    ///  - Soliq 35% dan pastga tushirilsa — xalq tarqaladi: uylardan chiqqanlar uyiga qaytadi,
+    ///  - Soliq 30% gacha tushirilsa — xalq tarqaladi: uylardan chiqqanlar uyiga qaytadi,
     ///    ko'cha aholisi kundalik yo'liga qaytadi.
     ///  - Bosqin boshlansa g'alayon darhol to'xtaydi (xalq uylariga yashirinadi).
     /// </summary>
@@ -137,7 +137,7 @@ namespace AndijonSaltanatlar.CityLife
         }
 
         /// <summary>Shu soliqda g'alayon boshlanadimi (UI ogohlantirishi uchun).</summary>
-        public static bool TaxTooHigh(int populationTax) => populationTax >= Threshold;
+        public static bool TaxTooHigh(int populationTax) => populationTax > Threshold;   // 30% dan oshsa
 
         // ==================================================================
         // Update
@@ -206,7 +206,7 @@ namespace AndijonSaltanatlar.CityLife
                     kingdom.Stability = Math.Max(0, kingdom.Stability - 6);
                     state.Pop.AdjustHappiness(-3f);
                     string text = "Xalq saroy oldida tosh otmoqda! (" + n + " kishi)  Barqarorlik: " + kingdom.Stability
-                                + ". Aholi solig'ini " + Threshold + "% dan pastga tushiring.";
+                                + ". Aholi solig'ini " + Threshold + "% gacha tushiring.";
                     state.Life.RecordEvent("tax_riot", state.Day, text);
                     state.ShowMessage(text, isError: true);
                 }
