@@ -142,7 +142,7 @@ namespace AndijonSaltanatlar.World
                     }
                     if (cu is CitizenUnit citizen && !cu.IsDown)
                     {
-                        DrawCitizenRole(sb, o, citizen);
+                        if (citizen.Kind != Core.Graphics.CitizenArt.Citizen) DrawCitizenRole(sb, o, citizen);   // oddiy aholi boshida yozuv yo'q
                         if (!string.IsNullOrEmpty(citizen.SpeechText)) DrawCitizenSpeech(sb, o, citizen);
                     }
                     continue;
