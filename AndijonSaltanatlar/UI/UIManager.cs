@@ -67,7 +67,11 @@ namespace AndijonSaltanatlar.UI
         public bool BlocksTracker => _tab == Tab.Diag || TimePanelOpen || FarmRequestOpen || PetitionOpen || AdvisorOpen || (_governorPanel?.IsOpen ?? false);
         public bool AdvisorOpen;
         public AIGovernorPanel GovernorPanel => _governorPanel;
-        private Rectangle _upgradeBtn, _moveBtn;
+        private Rectangle _upgradeBtn, _moveBtn, _enterBtn;
+        /// <summary>"ICHKARIGA KIRISH" bosildi — Game1 boshqarilayotgan odam bilan interyerga kiradi.</summary>
+        public Building EnterRequested { get; set; }
+        /// <summary>Devorni tekshirish (ichki xonasi yo'q) so'raldi.</summary>
+        public Building InspectRequested { get; set; }
         private Rectangle _onlineBtn;
         private bool _showTitle = true, _showCity = true;
         private string _dayText = "";
@@ -93,6 +97,12 @@ namespace AndijonSaltanatlar.UI
         private readonly (string, Tab)[] _tabs;
         private readonly Rectangle[] _tabRects;
         private readonly List<(CatalogEntry entry, Rectangle rect)> _menuItems = new List<(CatalogEntry, Rectangle)>();
+
+        // Qurilish menyusi kategoriyalari — uzun ro'yxat ekrandan chiqib ketmaydi.
+        private static readonly string[] BuildCats = { "BARCHASI", "TURAR JOY", "DEHQONCHILIK", "SAVDO", "HARBIY", "ILM-FAN", "DAVLAT", "MUDOFAA" };
+        private readonly Rectangle[] _buildCatRects = new Rectangle[8];
+        private int _buildCat;
+        private Point _mouse;
 
         // DAVLAT paneli boshqaruvlari
         private readonly Rectangle[] _taxMinus = new Rectangle[3];
@@ -193,19 +203,25 @@ namespace AndijonSaltanatlar.UI
             _menuItems.Clear();
             if (_tab == Tab.Build)
             {
-                int cols = Math.Max(1, (vw - 24) / 158);
                 const int bw = 150, bh = 42, gx = 8, gy = 6;
-                int count = BuildingCatalog.Buildable.Count;
-                int rows = (count + cols - 1) / cols;
-                int panelH = rows * (bh + gy) + 12;
-                int panelW = Math.Min(vw - 24, cols * (bw + gx) - gx + 12);
+                int maxCols = Math.Max(1, (vw - 24) / 158);
+                int panelW = Math.Min(vw - 24, maxCols * (bw + gx) - gx + 12);
+                int cols = Math.Min(maxCols, Math.Max(1, (panelW - 12 + gx) / (bw + gx)));
+                var shown = new List<CatalogEntry>();
+                for (int i = 0; i < BuildingCatalog.Buildable.Count; i++)
+                    if (_buildCat == 0 || BuildCatOf(BuildingCatalog.Buildable[i]) == _buildCat) shown.Add(BuildingCatalog.Buildable[i]);
+                int rows = Math.Max(1, (shown.Count + cols - 1) / cols);
+                int tabsH = 54;
+                int panelH = rows * (bh + gy) + tabsH + 12;
                 _panelRect = new Rectangle(12, vh - BottomH - panelH - 6, panelW, panelH);
-                int sx = _panelRect.X + 6, sy = _panelRect.Y + 6;
-                for (int i = 0; i < count; i++)
+                int tabW = (panelW - 18) / 4, tabH = 22;
+                for (int i = 0; i < BuildCats.Length; i++)
+                    _buildCatRects[i] = new Rectangle(_panelRect.X + 6 + (i % 4) * tabW, _panelRect.Y + 6 + (i / 4) * (tabH + 4), tabW - 4, tabH);
+                int sx = _panelRect.X + 6, sy = _panelRect.Y + tabsH + 6;
+                for (int i = 0; i < shown.Count; i++)
                 {
                     int r = i / cols, c = i % cols;
-                    _menuItems.Add((BuildingCatalog.Buildable[i],
-                        new Rectangle(sx + c * (bw + gx), sy + r * (bh + gy), bw, bh)));
+                    _menuItems.Add((shown[i], new Rectangle(sx + c * (bw + gx), sy + r * (bh + gy), bw, bh)));
                 }
             }
             else if (_tab == Tab.Diag)
@@ -277,10 +293,14 @@ namespace AndijonSaltanatlar.UI
             _rightPanel = new Rectangle(vw - PanelW, TopH + 8, PanelW - 8, vh - BottomH - TopH - 16);
             _upgradeBtn = Rectangle.Empty;
             _moveBtn = Rectangle.Empty;
+            _enterBtn = Rectangle.Empty;
+            int stackY = _rightPanel.Bottom - 40;
             if (_rightVisible && (_state.Selected is Building || _state.Selected is LandParcel))
-                _upgradeBtn = new Rectangle(_rightPanel.X + 14, _rightPanel.Bottom - 40, _rightPanel.Width - 28, 28);
+                _upgradeBtn = new Rectangle(_rightPanel.X + 14, stackY, _rightPanel.Width - 28, 28);
             if (_rightVisible && _state.Selected is Building selB && GameStateManager.CanRelocate(selB))
-                _moveBtn = new Rectangle(_rightPanel.X + 14, _rightPanel.Bottom - 76, _rightPanel.Width - 28, 28);
+                _moveBtn = new Rectangle(_rightPanel.X + 14, stackY - 36, _rightPanel.Width - 28, 28);
+            if (_rightVisible && _state.Selected is Building enterable)
+                _enterBtn = new Rectangle(_rightPanel.X + 14, stackY - 76, _rightPanel.Width - 28, 30);
 
             LayoutTopBar(vw);
             LayoutTimePanel(vw, vh);
@@ -306,6 +326,7 @@ namespace AndijonSaltanatlar.UI
                 return;
             }
             Point m = input.MousePosition;
+            _mouse = m;
 
             bool overPanel = _tab != Tab.None && _panelRect.Contains(m);
             bool overCancel = _state.Mode != GameMode.Playing && _cancelBtn.Contains(m);
@@ -351,6 +372,21 @@ namespace AndijonSaltanatlar.UI
                 return;
             }
 
+            if (_rightVisible && _enterBtn != Rectangle.Empty && _enterBtn.Contains(m) && _state.Selected is Building eb)
+            {
+                if (eb.Type == BuildingType.Wall)
+                {
+                    InspectRequested = eb;
+                    _state.ShowMessage(eb.Name + ": daraja " + eb.Level + ", mustahkamlik " + eb.HitPoints + "/" + eb.MaxHitPoints
+                        + (eb.BuildProgress < 1f ? ", qurilish " + (int)(eb.BuildProgress * 100) + "%" : ""));
+                }
+                else if (eb.BuildProgress < 1f)
+                {
+                    _state.ShowMessage(eb.Name + " hali qurilmoqda — " + (int)(eb.BuildProgress * 100) + "% tayyor", true);
+                }
+                else EnterRequested = eb;
+                return;
+            }
             if (_rightVisible && _moveBtn != Rectangle.Empty && _moveBtn.Contains(m) && _state.Selected is Building mvb)
             {
                 _tab = Tab.None;
@@ -388,6 +424,13 @@ namespace AndijonSaltanatlar.UI
             }
             else if (_tab == Tab.Build)
             {
+                for (int i = 0; i < _buildCatRects.Length; i++)
+                    if (_buildCatRects[i] != Rectangle.Empty && _buildCatRects[i].Contains(m))
+                    {
+                        _buildCat = i;
+                        _state.CancelBuild();
+                        return;
+                    }
                 foreach (var (entry, rect) in _menuItems)
                     if (rect.Contains(m))
                     {
@@ -559,9 +602,28 @@ namespace AndijonSaltanatlar.UI
             }
         }
 
+        /// <summary>Qurilish kategoriyasi indeksi (0 — barchasi).</summary>
+        private static int BuildCatOf(CatalogEntry e) => e.Type switch
+        {
+            BuildingType.House => 1,
+            BuildingType.Garden or BuildingType.Farm => 2,
+            BuildingType.Market or BuildingType.Caravanserai => 3,
+            BuildingType.Barracks or BuildingType.GladiatorArena => 4,
+            BuildingType.Madrasa or BuildingType.Mosque => 5,
+            BuildingType.MainHall => 6,
+            BuildingType.Tower or BuildingType.Gate or BuildingType.Wall => 7,
+            _ => 0
+        };
+
         private void DrawBuildMenu(SpriteBatch sb)
         {
             Panel(sb, _panelRect, PanelBg, Border, 2);
+            for (int i = 0; i < _buildCatRects.Length; i++)
+            {
+                bool on = _buildCat == i;
+                Panel(sb, _buildCatRects[i], on ? PanelBg2 : PanelBg, on ? Gold : Border, on ? 2 : 1);
+                DrawButtonText(sb, BuildCats[i], _buildCatRects[i], on ? Gold : Muted);
+            }
             foreach (var (entry, rect) in _menuItems)
             {
                 bool unlocked = _state.IsBuildingUnlocked(entry.Type);
@@ -581,6 +643,22 @@ namespace AndijonSaltanatlar.UI
                     sb.Draw(_assets.Get(SpriteKeys.IconCoin), new Rectangle(tx, rect.Y + 24, 14, 14), Color.White);
                     _font.Draw(sb, entry.Cost.ToString(), new Vector2(tx + 18, rect.Y + 25), affordable ? Cream : Red, 2, 1);
                 }
+            }
+
+            // Uzun nomlar va tavsif — to'liq matn bilan ko'rsatiladi (qisqartirish yo'q)
+            foreach (var (entry, rect) in _menuItems)
+            {
+                if (!rect.Contains(_mouse)) continue;
+                var lines = Wrap(entry.Name + " — " + entry.Description, Math.Max(180, Math.Min(440, _panelRect.Width - 24)), 2);
+                int tw = 0;
+                foreach (string l in lines) tw = Math.Max(tw, (int)_font.Measure(l, 2).X);
+                int tht = lines.Count * 18 + 14;
+                var tr = new Rectangle(_panelRect.X + 8, Math.Max(6, _panelRect.Y - tht - 8), tw + 20, tht);
+                tr.X = Math.Clamp(tr.X, 8, Math.Max(8, _panelRect.Right - tr.Width));
+                Panel(sb, tr, new Color(22, 18, 15, 248), Gold, 1);
+                int ty2 = tr.Y + 7;
+                foreach (string l in lines) { _font.Draw(sb, l, new Vector2(tr.X + 10, ty2), Cream, 2, 1); ty2 += 18; }
+                break;
             }
         }
 
@@ -789,6 +867,7 @@ namespace AndijonSaltanatlar.UI
                     rows.Add((Texts.HitPoints + ": " + b.HitPoints + "/" + b.MaxHitPoints, Cream));
                     if (b.Cost > 0) rows.Add((Texts.Cost + ": " + b.Cost + " " + Texts.Coin, Muted));
                     if (b.PopulationCapacity > 0) rows.Add((Texts.Capacity + ": +" + b.PopulationCapacity + " " + Texts.Population, Green));
+                    rows.Add((b.BuildProgress < 1f ? "Holat: qurilmoqda (" + (int)(b.BuildProgress * 100) + "%)" : "Holat: tayyor", b.BuildProgress < 1f ? Red : Green));
                     break;
                 case Unit u:
                     title = u.Name;
@@ -834,6 +913,20 @@ namespace AndijonSaltanatlar.UI
             foreach (var (text, color) in rows)
                 foreach (string line in Wrap(text, maxW, 2)) { if (y > _rightPanel.Bottom - 96) break; _font.Draw(sb, line, new Vector2(x, y), color, 2, 1); y += 19; }
 
+            if (_enterBtn != Rectangle.Empty)
+            {
+                Panel(sb, _enterBtn, PanelBg2, Gold, 2);
+                string label = "ICHKARIGA KIRISH";
+                if (_state.Selected is Building eb)
+                {
+                    if (eb.Type == BuildingType.Wall) label = "DEVORNI TEKSHIRISH";
+                    else if (eb.BuildProgress < 1f) label = "QURILMOQDA...";
+                    else if (eb.Type == BuildingType.Garden || eb.Type == BuildingType.Farm || eb.Type == BuildingType.Barracks
+                             || eb.Type == BuildingType.GladiatorArena || eb.Type == BuildingType.Caravanserai || eb.Type == BuildingType.Gate)
+                        label = "HUDUDGA KIRISH";
+                }
+                DrawButtonText(sb, label, _enterBtn, Gold);
+            }
             if (_moveBtn != Rectangle.Empty)
             {
                 Panel(sb, _moveBtn, PanelBg2, Border, 1);

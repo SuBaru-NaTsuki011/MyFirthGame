@@ -38,10 +38,11 @@ namespace AndijonSaltanatlar.Tests
         }
 
         [Fact]
-        public void CompletedBarracksCanBeEnteredButDefensiveStructuresCannot()
+        public void CompletedBarracksAndTowerCanBeEnteredButWallsCannot()
         {
             Assert.True(HouseInterior.IsEnterable(new Barracks(new Point(4, 5))));
-            Assert.False(HouseInterior.IsEnterable(new Tower(new Point(8, 5))));
+            Assert.True(HouseInterior.IsEnterable(new Tower(new Point(8, 5)))); // minora — kuzatish maydonchasi
+            Assert.False(HouseInterior.IsEnterable(new Wall(new Point(12, 5)))); // devor faqat tekshiriladi
         }
 
         [Fact]

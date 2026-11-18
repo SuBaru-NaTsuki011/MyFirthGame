@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using AndijonSaltanatlar.Buildings;
 using AndijonSaltanatlar.Core;
 using AndijonSaltanatlar.Core.Graphics;
+using AndijonSaltanatlar.Environment;
 using AndijonSaltanatlar.Population;
 using AndijonSaltanatlar.Units;
 using AndijonSaltanatlar.World;
@@ -72,15 +73,23 @@ namespace AndijonSaltanatlar.Interiors
         private string _subtitle = "";
         private bool _palace;
         private int _doorX0, _doorX1;
+        private InteriorArt.Style _style;
+
+        // ---- Umumiy bino ichki tizimi (barcha bino turlari) ----
+        private InteriorKind _kind = InteriorKind.House;
+        private readonly List<InteriorHotspot> _hotspots = new List<InteriorHotspot>();
+        private InteriorHotspot _nearHotspot;
+        private bool _chestOpen;
+        private bool _upperPlatform;
+        private string _locationStatus = "";
 
         // ---- Uy ichidagi harakatlar: dasturxon atrofida o'tirish / ovqatlanish, to'shakda yotish ----
         public enum Pose { Stand, Sit, Eat, Lie, Bake }
 
         // ---- Non va tandir: dasturxonda non bo'lmasa — tandirda yopiladi (o'yinchi o'zi yoki oila a'zosi) ----
-        /// <summary>Har uydagi dasturxondagi nonlar soni (bino Id -> 0..MaxBread). Uyga kirmaganda ham oila o'zi yopadi.</summary>
-        private static readonly Dictionary<int, int> HouseBread = new Dictionary<int, int>();
-        private static readonly Dictionary<int, float> BakeClock = new Dictionary<int, float>();
+        /// <summary>Har uydagi dasturxondagi nonlar soni endi InteriorStore (BuildingId) da saqlanadi.</summary>
         public const int MaxBread = 4;
+        private static readonly Dictionary<int, float> BakeClock = new Dictionary<int, float>();
         public const float BakeTime = 3f;
         private readonly Vector2 _stovePos = new Vector2(7.3f, 1.55f);   // tandir oldi
         private bool _carryBread;
@@ -92,19 +101,20 @@ namespace AndijonSaltanatlar.Interiors
 
         private int Bread
         {
-            get => House != null && HouseBread.TryGetValue(House.Id, out int n) ? n : 0;
-            set { if (House != null) HouseBread[House.Id] = Math.Clamp(value, 0, MaxBread); }
+            get => House != null ? InteriorStore.For(House.Id).Bread : 0;
+            set { if (House != null) InteriorStore.For(House.Id).Bread = Math.Clamp(value, 0, MaxBread); }
         }
 
         /// <summary>Uyga kirmagan paytda oilalar o'zlari non yopadi: har uyda har ~6 o'yin soatida +1 non (3 tagacha).</summary>
         public static void TickOutside(float gameHours)
         {
             if (gameHours <= 0f) return;
-            foreach (int id in new List<int>(HouseBread.Keys))
+            foreach (InteriorState st in new List<InteriorState>(InteriorStore.All))
             {
+                int id = st.BuildingId;
                 BakeClock.TryGetValue(id, out float c);
                 c += gameHours;
-                while (c >= 6f) { c -= 6f; if (HouseBread[id] < 3) HouseBread[id]++; }
+                while (c >= 6f) { c -= 6f; if (st.Bread < 3) st.Bread++; }
                 BakeClock[id] = c;
             }
         }
@@ -137,10 +147,12 @@ namespace AndijonSaltanatlar.Interiors
             _state = state;
         }
 
+        /// <summary>
+        /// Devordan boshqa barcha qurilgan binolarga kirish mumkin: uylar, bozor, ferma, bog', saroy,
+        /// masjid, madrasa, minora va darvoza — har biriga o'z shabloni beriladi. Devor tekshiriladi (ichki xona yo'q).
+        /// </summary>
         internal static bool IsEnterable(Building b) =>
-            b != null && b.BuildProgress >= 1f
-            && b.Type != BuildingType.Garden && b.Type != BuildingType.Tower
-            && b.Type != BuildingType.Wall && b.Type != BuildingType.Gate;
+            b != null && b.BuildProgress >= 1f && b.Type != BuildingType.Wall;
 
         // ==================================================================
         // Shahardagi binoni topish
@@ -183,8 +195,13 @@ namespace AndijonSaltanatlar.Interiors
             House = building;
             _avatar = avatar;
             _palace = building.Type == BuildingType.MainHall;
+            _kind = InteriorStore.KindOf(building.Type);
             _glow ??= InteriorArt.Glow(96).ToTexture(_assets.GraphicsDevice);
             BecomeShahRequested = false;
+            _hotspots.Clear();
+            _nearHotspot = null;
+            _chestOpen = false;
+            _upperPlatform = false;
 
             if (_palace)
             {
@@ -200,6 +217,7 @@ namespace AndijonSaltanatlar.Interiors
                 _doorX0 = _doorX1 = 6;
                 int v = VariantOf(building);
                 InteriorArt.Style s = InteriorArt.For(v);
+                _style = s;
                 LoadShell(v, () => InteriorArt.Shell(s, out Vector2 o).WithOrigin(o));
                 if (building.Type == BuildingType.House)
                 {
@@ -208,8 +226,7 @@ namespace AndijonSaltanatlar.Interiors
                 }
                 else
                 {
-                    BuildPublicBuildingLayout(building, v, s);
-                    BuildPublicBuildingResidents(building);
+                    BuildLocation(building, _kind, s);
                 }
                 _pos = new Vector2(6.5f, 7.4f);
             }
@@ -217,7 +234,8 @@ namespace AndijonSaltanatlar.Interiors
             CurrentPose = Pose.Stand;
             _carryBread = false;
             _baker = null;
-            if (!HouseBread.ContainsKey(building.Id)) HouseBread[building.Id] = _brng.Next(2);
+            InteriorState st = InteriorStore.For(building.Id);
+            st.Visited = true;
             avatar.DriveIdle();
             avatar.SetFacing(new Vector2(-1, -1));
             Active = true;
@@ -237,7 +255,10 @@ namespace AndijonSaltanatlar.Interiors
                 _avatar.SetFacing(new Vector2(1, 1));
                 _avatar.DriveIdle();
             }
-            if (newAvatar == null) _state.ShowMessage(_palace ? "Saroydan chiqdingiz" : "Uydan chiqdingiz");
+            if (newAvatar == null)
+                _state.ShowMessage(_palace ? "Saroydan chiqdingiz"
+                    : _kind == InteriorKind.House ? "Uydan chiqdingiz"
+                    : House != null ? House.Name + " hududidan chiqdingiz" : "Tashqariga chiqdingiz");
             _residents.Clear();
         }
 
@@ -312,6 +333,7 @@ namespace AndijonSaltanatlar.Interiors
 
             // YOTOQXONA
             Add(Tex(k + "chest", () => InteriorArt.Chest(s)), 1, 0, 1);
+            Hot("SANDIQ", 1.5f, 0.5f, InteriorAction.OpenChest, "SANDIQNI OCHISH");
             Add(Tex(k + "bed", () => InteriorArt.Bed(s)), 0, 5, 2);
             if (v == 1 || v == 2) Add(Tex(k + "stairs", () => InteriorArt.Stairs(s)), 3, 0, 1); // bolaxonaga zinapoya
             else Add(Tex(k + "cradle", () => InteriorArt.Cradle(s)), 3, 6, 1);
@@ -324,30 +346,318 @@ namespace AndijonSaltanatlar.Interiors
             Add(Tex(k + "table", () => InteriorArt.Table(s)), 5, 4, 2);
         }
 
-        private void BuildPublicBuildingLayout(Building building, int v, InteriorArt.Style s)
-        {
-            ClearLayout();
-            string k = "public_" + v + "_";
-            if (building.Type == BuildingType.Barracks)
-            {
-                Texture2D bed = Tex(k + "bed", () => InteriorArt.Bed(s));
-                Add(bed, 0, 0, 2);
-                Add(bed, 0, 3, 2);
-                Add(bed, 5, 0, 2);
-                Add(bed, 5, 3, 2);
-                Texture2D chest = Tex(k + "chest", () => InteriorArt.Chest(s));
-                Add(chest, 1, 6, 1);
-                Add(chest, 6, 6, 1);
-                return;
-            }
+        // ------------------------------------------------------------------
+        // UMUMIY BINO ICHKI TIZIMI: har bir bino turiga o'z hududi va harakatlari
+        // ------------------------------------------------------------------
 
-            Add(Tex(k + "table", () => InteriorArt.Table(s)), 3, 3, 2);
-        }
-
-        private void BuildPublicBuildingResidents(Building building)
+        private void BuildLocation(Building building, InteriorKind kind, InteriorArt.Style s)
         {
             _residents.Clear();
+            _hotspots.Clear();
             _title = building.Name.ToUpperInvariant();
+            _subtitle = "";
+            _locationStatus = "";
+            Season season = _state.Season;
+            bool snow = season == Season.Qish;
+            switch (kind)
+            {
+                case InteriorKind.Market: BuildMarket(building, s, season); break;
+                case InteriorKind.Farm: BuildFarm(building, season); break;
+                case InteriorKind.Garden: BuildGarden(building, season, snow); break;
+                case InteriorKind.Caravanserai: BuildCaravanserai(building, season); break;
+                case InteriorKind.Barracks:
+                case InteriorKind.Arena: BuildMilitary(building, kind, season); break;
+                case InteriorKind.Madrasa: BuildMadrasa(building, s); break;
+                case InteriorKind.Mosque: BuildMosque(building, season); break;
+                case InteriorKind.Tower: BuildTower(building); break;
+                case InteriorKind.Gate: BuildGate(building, season); break;
+                default: BuildPublicFallback(building, s); break;
+            }
+        }
+
+        /// <summary>Harakatni ro'yxatga qo'shadi (ma'lumotga asoslangan interaktiv obyekt).</summary>
+        private InteriorHotspot Hot(string label, float x, float y, InteriorAction a, string al,
+            InteriorAction b = InteriorAction.None, string bl = "", float radius = 1.85f, string status = "")
+        {
+            var h = new InteriorHotspot
+            {
+                Id = _hotspots.Count.ToString(),
+                Label = label,
+                Tile = new Vector2(x, y),
+                Primary = a,
+                PrimaryLabel = al,
+                Secondary = b,
+                SecondaryLabel = bl ?? "",
+                Radius = radius,
+                Status = status
+            };
+            _hotspots.Add(h);
+            return h;
+        }
+
+        private void AddNpc(string name, string info, string line, float x, float y, Texture2D tex, float scale = 1f)
+        {
+            _residents.Add(new Resident
+            {
+                Name = name,
+                Short = name,
+                Info = info,
+                Line = line,
+                Pos = new Vector2(x, y),
+                Tex = tex,
+                Scale = scale
+            });
+        }
+
+        private Texture2D CitizenTex(int art) => _assets.Get(SpriteKeys.UnitCitizen + art + "_0");
+
+        private void LoadOpen(int key, Color ground, Color? path, bool snow)
+        {
+            LoadShell(key, () => LocationArt.OpenShell(ground, out Vector2 o, path, snow).WithOrigin(o));
+            _doorX0 = _doorX1 = 6;
+        }
+
+        private Color SeasonLeaf(Season season) => season switch
+        {
+            Season.Bahor => new Color(96, 162, 82),
+            Season.Yoz => new Color(74, 136, 62),
+            Season.Kuz => new Color(196, 148, 58),
+            _ => new Color(120, 140, 120)
+        };
+
+        private void BuildMarket(Building building, InteriorArt.Style s, Season season)
+        {
+            ClearLayout();
+            InteriorArt.Style ms = s;
+            ms.Floor = new Color(202, 178, 138);
+            ms.Accent = new Color(154, 62, 48);
+            ms.Accent2 = new Color(222, 182, 64);
+            LoadShell(300, () => InteriorArt.Shell(ms, out Vector2 o).WithOrigin(o));
+            _doorX0 = _doorX1 = 6;
+            _subtitle = "Savdo toqi — rastalar va savdogarlar";
+
+            Texture2D stallA = Tex("mstallA", () => LocationArt.Stall(new Color(150, 62, 48), 0));
+            Texture2D stallB = Tex("mstallB", () => LocationArt.Stall(new Color(42, 94, 150), 1));
+            Texture2D stallC = Tex("mstallC", () => LocationArt.Stall(new Color(64, 118, 70), 2));
+            Add(stallA, 1, 1, 2);
+            Add(stallB, 5, 1, 2);
+            Add(stallC, 1, 5, 2);
+            Add(Tex("mcrate", () => LocationArt.Crate(new Color(140, 100, 62))), 5, 5, 1);
+            Add(Tex("mcrate2", () => LocationArt.Crate(new Color(158, 118, 74))), 6, 5, 1);
+            Add(Tex("msacks", InteriorArt.Sacks), 7, 4, 1);
+
+            Hot("GURUCH RASTASI", 1.9f, 2.4f, InteriorAction.Buy, "SOTIB OLISH (10 dona)", InteriorAction.Sell, "SOTISH (10 dona)");
+            Hot("MATO RASTASI", 5.9f, 2.4f, InteriorAction.Buy, "SOTIB OLISH (10 dona)", InteriorAction.Sell, "SOTISH (10 dona)");
+            Hot("MEVA RASTASI", 1.9f, 5.6f, InteriorAction.Buy, "SOTIB OLISH (10 dona)", InteriorAction.Sell, "SOTISH (10 dona)");
+            Hot("OMBOR", 5.6f, 6.2f, InteriorAction.OpenChest, "OMBORNI OCHISH");
+
+            AddNpc("Savdogar Karim", "Guruch savdogari", "Guruchim sarxil, oling! Bugun arzon.", 3.2f, 2.6f, CitizenTex(CitizenArt.Merchant));
+            AddNpc("Savdogar Zuhra", "Mato savdogari", "Atlas va adras — to'yga kerak bo'ladi.", 5.2f, 3.6f, CitizenTex(CitizenArt.Merchant));
+            AddNpc("Xaridor Dilnoza", "Bozor xaridori", "Narxlar biroz qimmatlashibdi.", 3.0f, 5.4f, CitizenTex(CitizenArt.Buyer));
+        }
+
+        private void BuildFarm(Building building, Season season)
+        {
+            ClearLayout();
+            bool snow = season == Season.Qish;
+            LoadOpen(400, snow ? new Color(214, 220, 226) : new Color(146, 168, 104), new Color(182, 158, 112), snow);
+            _subtitle = "Dehqonchilik xo'jaligi";
+            Farm farm = building as Farm;
+            string st = farm == null ? "" : farm.CropStage == FarmCropStage.Empty ? "Dala bo'sh" : farm.CropStage == FarmCropStage.Growing ? "Ekin o'smoqda" : "Hosil pishgan";
+            _locationStatus = st;
+
+            float growth = farm?.Growth ?? 0f;
+            Texture2D crop = Tex("crop" + (int)(growth * 4), () => LocationArt.CropRow(growth, season));
+            for (int i = 0; i < 3; i++)
+            {
+                Add(crop, 5, 1 + i, 1);
+                Add(crop, 6, 1 + i, 1);
+            }
+            Add(Tex("water", LocationArt.WaterChannel), 1, 3, 2);
+            Add(Tex("fcrate", () => LocationArt.Crate(new Color(140, 100, 62))), 1, 6, 1);
+            Add(Tex("fcrate2", () => LocationArt.Crate(new Color(158, 118, 74))), 2, 6, 1);
+
+            Hot("DALA", 5.6f, 2.2f, InteriorAction.Plant, "EKIN EKISH", InteriorAction.Harvest, "HOSILNI YIG'ISH");
+            Hot("ARIQ", 1.8f, 3.6f, InteriorAction.Water, "SUG'ORISH HOLATI");
+            Hot("OMBOR", 1.9f, 5.8f, InteriorAction.OpenChest, "OMBORNI OCHISH");
+
+            AddNpc("Fermer Tohir", "Dehqon", farm != null && farm.Tended ? "Dalani o'zim parvarish qilaman." : "Urug' bo'lsa, bugun ekamiz.", 4.3f, 2.4f, CitizenTex(CitizenArt.Farmer));
+            AddNpc("Fermer Oydin", "Dehqon", "Ariq suvi yetarlimi? Hosil shunga bog'liq.", 2.6f, 4.6f, CitizenTex(CitizenArt.Farmer));
+        }
+
+        private void BuildGarden(Building building, Season season, bool snow)
+        {
+            ClearLayout();
+            LoadOpen(500, snow ? new Color(216, 222, 228) : new Color(118, 158, 88), new Color(200, 180, 144), snow);
+            _subtitle = season switch
+            {
+                Season.Bahor => "Bahor: gullar ochilgan",
+                Season.Yoz => "Yoz: soya va meva",
+                Season.Kuz => "Kuz: barglar sarg'aygan",
+                _ => "Qish: qor ostidagi chorbog'"
+            };
+            _locationStatus = _subtitle;
+
+            Texture2D tree = Tex("gtree", () => LocationArt.Tree(SeasonLeaf(season), snow));
+            Add(tree, 1, 1, 1);
+            Add(tree, 6, 1, 1);
+            Add(tree, 1, 6, 1);
+            Add(tree, 6, 6, 1);
+            Add(Tex("gflower", () => LocationArt.Flowers(season == Season.Kuz ? new Color(214, 170, 70) : new Color(214, 92, 120))), 5, 4, 1);
+            Add(Tex("gflower2", () => LocationArt.Flowers(new Color(228, 176, 72))), 2, 4, 1);
+            Add(Tex("gwell", LocationArt.Well), 4, 6, 1);
+            Texture2D bench = Tex("gbench", () => LocationArt.Bench(_style.Variant == 2 ? new Color(150, 108, 70) : new Color(126, 84, 48)));
+            Add(bench, 1, 3, 2);
+
+            Hot("CHORBOG' DARAXTI", 1.5f, 1.6f, InteriorAction.Inspect, "DARAXTNI KO'RISH");
+            Hot("GULZOR", 5.4f, 4.3f, InteriorAction.Inspect, "GULLARNI KO'RISH");
+            Hot("SUPACHА", 1.9f, 3.8f, InteriorAction.Sit, "O'TIRISH", InteriorAction.Stand, "TURISH");
+            Hot("QUDUQ", 4.4f, 6.3f, InteriorAction.Water, "SUG'ORISH HOLATI");
+
+            AddNpc("Bog'bon Sodiq", "Bog'bon", "Bog'imiz har fasl o'z go'zalligida.", 3.2f, 2.2f, CitizenTex(CitizenArt.Farmer));
+        }
+
+        private void BuildCaravanserai(Building building, Season season)
+        {
+            ClearLayout();
+            LoadOpen(600, season == Season.Qish ? new Color(212, 216, 220) : new Color(196, 176, 140), new Color(176, 152, 116), season == Season.Qish);
+            _subtitle = "Karvonsaroy — savdo karvonlari qo'nog'i";
+            Add(Tex("karch", LocationArt.GateArch), 1, 0, 2);
+            Add(Tex("kcargo", () => LocationArt.CaravanCargo(new Color(150, 62, 48))), 5, 2, 2);
+            Add(Tex("kcrate", () => LocationArt.Crate(new Color(148, 108, 68))), 1, 5, 1);
+            Add(Tex("kcrate2", () => LocationArt.Crate(new Color(160, 120, 78))), 2, 5, 1);
+            Add(Tex("kstall", () => LocationArt.Stall(new Color(42, 94, 150), 1)), 5, 5, 2);
+
+            Hot("KARVON YUKI", 5.8f, 3.2f, InteriorAction.Caravan, "KARVONLARNI KO'RISH");
+            Hot("SAVDO IDORASI", 5.8f, 6.2f, InteriorAction.Caravan, "SAVDO YO'LLARI");
+            Hot("OMBOR", 1.8f, 5.6f, InteriorAction.OpenChest, "OMBORNI OCHISH");
+
+            AddNpc("Karvonboshi Anvar", "Karvon rahbari", "Samarqanddan karvon yo'lda. Yuk og'ir.", 3.2f, 3.2f, CitizenTex(CitizenArt.Merchant));
+            AddNpc("Savdogar Bekzod", "Savdogar", "Yo'llar ochiq bo'lsa, savdo jonlanadi.", 4.6f, 4.4f, CitizenTex(CitizenArt.Merchant));
+        }
+
+        private void BuildMilitary(Building building, InteriorKind kind, Season season)
+        {
+            ClearLayout();
+            LoadOpen(700, season == Season.Qish ? new Color(214, 214, 214) : new Color(184, 160, 120), new Color(158, 136, 104), season == Season.Qish);
+            _title = kind == InteriorKind.Arena ? "JANG MAYDONI" : "QO'SHINXONA";
+            _subtitle = kind == InteriorKind.Arena ? "Gladiatorlar mashq maydoni" : "Navkarlar mashq qo'rg'oni";
+            Add(Tex("marker", () => LocationArt.TrainingMarker(new Color(158, 46, 40))), 3, 1, 1);
+            Add(Tex("dummy", LocationArt.PracticeDummy), 1, 2, 1);
+            Add(Tex("dummy2", LocationArt.PracticeDummy), 6, 2, 1);
+            Add(Tex("dummy3", LocationArt.PracticeDummy), 1, 5, 1);
+            Add(Tex("mbench", () => LocationArt.Bench(new Color(126, 84, 48))), 5, 5, 2);
+            Add(Tex("mchest", () => InteriorArt.Chest(_style)), 6, 6, 1);
+
+            Hot("MASHG'ULOT NUQTASI", 3.5f, 1.6f, InteriorAction.Train, "MASHG'ULOTNI BOSHLASH");
+            Hot("DAM OLISH JOYI", 5.9f, 5.8f, InteriorAction.Sit, "O'TIRISH", InteriorAction.Stand, "TURISH");
+            Hot("QUROL SANDIG'I", 6.4f, 6.4f, InteriorAction.OpenChest, "SANDIQNI OCHISH");
+
+            _residents.Clear();
+            AddNpc("Sarkarda Rustam", "Qo'shin sarkardasi", "Jangchilar mashqqa tayyor.", 3.0f, 3.2f, _assets.Get(SpriteKeys.UnitSpearman + "_0"));
+            AddNpc("Mashqchi Navkar", "Jangchi", "Har kuni mashq — g'alaba kaliti.", 4.6f, 2.8f, _assets.Get(SpriteKeys.UnitSwordsman + "_0"));
+        }
+
+        private void BuildMadrasa(Building building, InteriorArt.Style s)
+        {
+            ClearLayout();
+            InteriorArt.Style ms = s;
+            ms.Floor = new Color(190, 166, 128);
+            ms.Accent = new Color(34, 120, 128);
+            ms.Accent2 = new Color(222, 182, 64);
+            LoadShell(800, () => InteriorArt.Shell(ms, out Vector2 o).WithOrigin(o));
+            _doorX0 = _doorX1 = 6;
+            _subtitle = "Ilm maskani — darsxona va kutubxona";
+            Add(Tex("books", () => LocationArt.Bookshelf(new Color(122, 80, 46))), 1, 0, 1);
+            Add(Tex("books2", () => LocationArt.Bookshelf(new Color(138, 92, 52))), 2, 0, 1);
+            Add(Tex("desk", () => LocationArt.LowDesk(new Color(126, 84, 46))), 4, 2, 2);
+            Add(Tex("desk2", () => LocationArt.LowDesk(new Color(140, 96, 54))), 4, 5, 2);
+            Add(Tex("rug", () => LocationArt.PrayerRug(new Color(42, 94, 150))), 6, 2, 2);
+
+            Hot("USTOZ", 3.1f, 3.3f, InteriorAction.Talk, "O'QITUVCHI BILAN GAPLASHISH");
+            Hot("KUTUBXONA", 1.6f, 1.4f, InteriorAction.Library, "KUTUBXONANI KO'RISH");
+            Hot("DARSXONA", 4.9f, 3.2f, InteriorAction.Lessons, "DARSLARNI KO'RISH", InteriorAction.Research, "ILM-FAN");
+
+            AddNpc("Ustoz Komil", "Mudarris", "Ilm — eng yaxshi boylik. Savollaringiz bormi?", 3.0f, 3.0f, CitizenTex(CitizenArt.Craftsman));
+            AddNpc("Talaba Islom", "Shogird", "Bugun hisob va nahv darslari bor.", 5.4f, 4.2f, CitizenTex(CitizenArt.Citizen));
+            AddNpc("Talaba Maryam", "Shogird", "Kutubxonada qo'lyozmalar ko'p.", 2.2f, 5.2f, CitizenTex(CitizenArt.Citizen));
+        }
+
+        private void BuildMosque(Building building, Season season)
+        {
+            ClearLayout();
+            InteriorArt.Style ms = _style;
+            ms.Floor = new Color(180, 176, 158);
+            ms.Accent = new Color(30, 110, 118);
+            ms.Accent2 = new Color(222, 182, 64);
+            LoadShell(900, () => InteriorArt.Shell(ms, out Vector2 o).WithOrigin(o));
+            _doorX0 = _doorX1 = 6;
+            _subtitle = "Jome masjidi — xotirjam ibodat maskani";
+            Add(Tex("mcol", InteriorArt.Column), 1, 2, 1);
+            Add(Tex("mcol2", InteriorArt.Column), 6, 2, 1);
+            Add(Tex("mcol3", InteriorArt.Column), 2, 6, 1);
+            Add(Tex("mcol4", InteriorArt.Column), 5, 6, 1);
+            Add(Tex("mrug", () => LocationArt.PrayerRug(new Color(30, 110, 118))), 2, 1, 2);
+            Add(Tex("mrug2", () => LocationArt.PrayerRug(new Color(38, 84, 140))), 5, 1, 2);
+            Add(Tex("mrug3", () => LocationArt.PrayerRug(new Color(46, 120, 82))), 2, 4, 2);
+            Add(Tex("mrug4", () => LocationArt.PrayerRug(new Color(120, 48, 44))), 5, 4, 2);
+
+            Hot("IBODAT JOYI", 2.8f, 2.0f, InteriorAction.Pray, "XOTIRJAM O'TIRISH");
+            Hot("MASJID HOVLISI", 4.4f, 5.6f, InteriorAction.Inspect, "MASJID HAQIDA");
+
+            AddNpc("Imom Abdulahad", "Masjid imomi", "Assalomu alaykum. Masjid eshigi doim ochiq.", 3.4f, 3.4f, CitizenTex(CitizenArt.Craftsman));
+            AddNpc("Musofir Bobo", "Mahalla oqsoqoli", "Tinchlik va totuvlik bo'lsin.", 4.6f, 4.6f, CitizenTex(CitizenArt.Citizen));
+        }
+
+        private void BuildTower(Building building)
+        {
+            ClearLayout();
+            InteriorArt.Style ts = _style;
+            ts.Floor = new Color(150, 146, 136);
+            ts.Wall = new Color(176, 166, 148);
+            ts.Accent = new Color(110, 82, 50);
+            ts.Accent2 = new Color(180, 180, 170);
+            LoadShell(1000, () => InteriorArt.Shell(ts, out Vector2 o).WithOrigin(o));
+            _doorX0 = _doorX1 = 6;
+            _subtitle = "Minora — qo'riqlash posti";
+            Add(Tex("tstairs", () => InteriorArt.Stairs(ts)), 1, 1, 1);
+            Add(Tex("tchest", () => InteriorArt.Chest(ts)), 6, 1, 1);
+            Add(Tex("tbrazier", InteriorArt.Brazier), 1, 6, 1);
+
+            if (!_upperPlatform)
+            {
+                Hot("ZINAPOYA", 1.6f, 1.6f, InteriorAction.Climb, "YUQORIGA CHIQISH");
+                Hot("QO'RIQCHI SANDIG'I", 6.4f, 1.6f, InteriorAction.OpenChest, "SANDIQNI OCHISH");
+                AddNpc("Qo'riqchi", "Minora qo'riqchisi", "Yuqoridan butun vodiy ko'rinadi.", 4.4f, 3.4f, _assets.Get(SpriteKeys.UnitSpearman + "_0"));
+            }
+            else
+            {
+                Hot("KUZATISH MAYDOCHASI", 4.0f, 3.6f, InteriorAction.Inspect, "ATROFNI KUZATISH");
+                Hot("ZINAPOYA", 1.6f, 1.6f, InteriorAction.Descend, "PASTGA TUSHISH");
+            }
+        }
+
+        private void BuildGate(Building building, Season season)
+        {
+            ClearLayout();
+            LoadOpen(1100, season == Season.Qish ? new Color(208, 212, 216) : new Color(188, 170, 138), new Color(168, 146, 112), season == Season.Qish);
+            _title = "DARVOZA";
+            _subtitle = "Shahar darvozasi va qo'riqxona";
+            Add(Tex("garch", LocationArt.GateArch), 1, 0, 2);
+            Add(Tex("gcrate", () => LocationArt.Crate(new Color(148, 108, 68))), 5, 1, 1);
+            Add(Tex("gbench", () => LocationArt.Bench(new Color(126, 84, 48))), 5, 4, 2);
+
+            Hot("DARVOZA YO'LI", 2.0f, 1.8f, InteriorAction.PassGate, "DARVOZADAN O'TISH");
+            Hot("QO'RIQCHI", 4.6f, 3.0f, InteriorAction.Talk, "QO'RIQCHI BILAN GAPLASHISH", InteriorAction.Inspect, "DARVOZA HOLATI");
+
+            AddNpc("Darvoza qo'riqchisi", "Shahar qo'riqchisi", "Darvoza ochiq, yo'lovchilar tinch.", 4.4f, 3.0f, _assets.Get(SpriteKeys.UnitSpearman + "_0"));
+        }
+
+        private void BuildPublicFallback(Building building, InteriorArt.Style s)
+        {
+            ClearLayout();
+            Add(Tex("pftable", () => InteriorArt.Table(s)), 3, 3, 2);
+            Hot("BINO ICHI", 4.0f, 4.6f, InteriorAction.Inspect, "KO'RISH");
             _subtitle = "Bino ichki qismi";
         }
 
@@ -526,11 +836,21 @@ namespace AndijonSaltanatlar.Interiors
                 Resident near = NearestResident(1.9f);
                 if (near != null && near.IsShah) { BecomeShahRequested = true; return; }
             }
+            if (_chestOpen)
+            {
+                UpdateChestPanel(input);
+                _avatar.DriveIdle();
+                return;
+            }
             if (input.KeyPressed(Keys.Escape) || input.KeyPressed(Keys.Enter) || input.KeyPressed(Keys.F))
             {
                 Exit();
                 return;
             }
+
+            UpdateNearHotspot();
+            if (HandleHotspotKeys(input)) { _avatar.DriveIdle(); return; }
+            if (_upperPlatform) { _avatar.DriveIdle(); return; }
 
             if (UpdatePose(dt, input)) return;
 
@@ -559,6 +879,256 @@ namespace AndijonSaltanatlar.Interiors
             bool inDoorTile = tile.Y == N - 1 && tile.X >= _doorX0 && tile.X <= _doorX1;
             if (!inDoorTile) _leftDoor = true;
             else if (_leftDoor && _pos.Y > N - 0.45f) Exit();
+        }
+
+        // ==================================================================
+        // INTERAKTIV OBYEKTLAR (ma'lumotga asoslangan harakatlar)
+        // ==================================================================
+
+        private void UpdateNearHotspot()
+        {
+            _nearHotspot = null;
+            if (House == null || _hotspots.Count == 0) return;
+            float best = float.MaxValue;
+            foreach (InteriorHotspot h in _hotspots)
+            {
+                Vector2 center = h.Tile + new Vector2(h.Size * 0.5f);
+                float d = Vector2.Distance(center, _pos);
+                if (d <= h.Radius && d < best) { best = d; _nearHotspot = h; }
+            }
+        }
+
+        /// <summary>E — asosiy, Q — ikkinchi harakat. Uy/saroyning o'z harakatlari (dasturxon, to'shak) ustun turadi.</summary>
+        private bool HandleHotspotKeys(InputManager input)
+        {
+            if (_nearHotspot == null) return false;
+            bool houseStyle = _kind == InteriorKind.House || _palace;
+            if (input.KeyPressed(Keys.E) && (!houseStyle || _nearHotspot.Primary == InteriorAction.OpenChest || _nearHotspot.Primary == InteriorAction.Climb || _nearHotspot.Primary == InteriorAction.Descend))
+            {
+                Execute(_nearHotspot.Primary);
+                return true;
+            }
+            if (input.KeyPressed(Keys.Q) && _nearHotspot.Secondary != InteriorAction.None)
+            {
+                Execute(_nearHotspot.Secondary);
+                return true;
+            }
+            return false;
+        }
+
+        private void Execute(InteriorAction action)
+        {
+            if (House == null) return;
+            InteriorState st = InteriorStore.For(House.Id);
+            switch (action)
+            {
+                case InteriorAction.Sit:
+                    _standPos = _pos;
+                    if (_nearHotspot != null) _pos = _nearHotspot.Tile + new Vector2(0.5f);
+                    CurrentPose = Pose.Sit;
+                    _poseTime = 0f;
+                    _avatar.DriveIdle();
+                    _state.ShowMessage("O'tirdingiz. W/Q — turish");
+                    break;
+                case InteriorAction.Stand: StandUp(); break;
+                case InteriorAction.Eat: Eat(); break;
+                case InteriorAction.Lie: LieDown(); break;
+                case InteriorAction.OpenChest:
+                    _chestOpen = true;
+                    _state.ShowMessage("Sandiq ochildi: 1-2 oziq-ovqat, 3-4 urug', 5 mahsulot. ESC — yopish");
+                    break;
+                case InteriorAction.Buy: MarketBuy(); break;
+                case InteriorAction.Sell: MarketSell(); break;
+                case InteriorAction.Talk: TalkToNpc(); break;
+                case InteriorAction.Plant: FarmPlant(); break;
+                case InteriorAction.Water: ShowWaterStatus(); break;
+                case InteriorAction.Harvest: FarmHarvest(); break;
+                case InteriorAction.Train:
+                    _state.StartTrainingSession(_buildings);
+                    break;
+                case InteriorAction.Lessons:
+                    _state.ShowMessage("Darslar: " + _state.Pop.Count + " aholi, o'rtacha ma'lumot " + MathF.Round(_state.Pop.AvgEducation) + "%. " + _state.Civ.Player.Researched.Count + " texnologiya o'rganilgan");
+                    break;
+                case InteriorAction.Research:
+                    _state.ShowMessage(string.IsNullOrEmpty(_state.Civ.Player.CurrentResearch)
+                        ? "Hozir tadqiqot yo'q. TARAQQIYOT bo'limidan yangi ilm tanlang."
+                        : "Tadqiqot davom etmoqda: " + _state.Civ.Player.CurrentResearch);
+                    break;
+                case InteriorAction.Library:
+                    _state.ShowMessage("Kutubxona: " + _state.Civ.Player.Researched.Count + " asosiy asar. Aholi ma'lumoti " + MathF.Round(_state.Pop.AvgEducation) + "%");
+                    break;
+                case InteriorAction.Pray:
+                    _state.ShowMessage("Masjidda xotirjam o'tirdingiz. Qalbingiz taskin topdi.");
+                    break;
+                case InteriorAction.Climb:
+                    _upperPlatform = true;
+                    BuildTower(House);
+                    _pos = new Vector2(4.0f, 5.2f);
+                    _state.ShowMessage("Minora tepasiga chiqdingiz — atrofni kuzatishingiz mumkin");
+                    break;
+                case InteriorAction.Descend:
+                    _upperPlatform = false;
+                    BuildTower(House);
+                    _pos = new Vector2(2.4f, 2.4f);
+                    _state.ShowMessage("Pastga tushdingiz");
+                    break;
+                case InteriorAction.PassGate: Exit(); break;
+                case InteriorAction.Inspect: Inspect(); break;
+                case InteriorAction.Caravan: ShowCaravanStatus(); break;
+                case InteriorAction.WallInfo: ShowWallStatus(); break;
+            }
+        }
+
+        private void MarketBuy()
+        {
+            InteriorState st = InteriorStore.For(House.Id);
+            const int amount = 10, cost = 30;
+            if (st.MarketStock < amount) { _state.ShowMessage("Rastada mahsulot qolmadi. Keyinroq keling.", true); return; }
+            if (!_state.CanAfford(cost)) { _state.ShowMessage("Tanga yetarli emas: " + cost + " kerak", true); return; }
+            _state.Coins -= cost;
+            _state.Food += amount;
+            st.MarketStock -= amount;
+            st.MarketPurchases++;
+            _state.ShowMessage("Sotib olindi: +" + amount + " oziq-ovqat (-" + cost + " tanga). Rastada: " + st.MarketStock);
+        }
+
+        private void MarketSell()
+        {
+            InteriorState st = InteriorStore.For(House.Id);
+            const int amount = 10, gain = 18;
+            if (_state.Food < amount) { _state.ShowMessage("Sotish uchun omborda " + amount + " dona mahsulot kerak", true); return; }
+            _state.Food -= amount;
+            _state.Coins += gain;
+            st.MarketStock += amount;
+            st.MarketSales++;
+            _state.ShowMessage("Sotildi: -" + amount + " oziq-ovqat (+ " + gain + " tanga). Savdo: " + st.MarketSales + " ta");
+        }
+
+        private void FarmPlant()
+        {
+            if (!(House is Farm farm)) return;
+            if (farm.CropStage != FarmCropStage.Empty) { _state.ShowMessage("Dalada ekin bor — avval hosilni yig'ing", true); return; }
+            if (_state.Farming.Seeds <= 0) { _state.ShowMessage("Urug' tugagan! FERMERLIK bo'limida urug' sotib oling — bepul berilmaydi", true); return; }
+            _state.Farming.Seeds--;
+            farm.PlantCrop();
+            InteriorStore.For(House.Id).GardenCare++;
+            _state.ShowMessage("Ekin ekildi. Omborda " + _state.Farming.Seeds + " qop urug' qoldi");
+            RebuildLocation();
+        }
+
+        private void FarmHarvest()
+        {
+            if (!(House is Farm farm)) return;
+            if (farm.CropStage != FarmCropStage.Mature) { _state.ShowMessage("Hosil hali pishmagan — " + (int)(farm.Growth * 100) + "% tayyor", true); return; }
+            int yield = farm.HarvestCrop();
+            int stored = farm.SellStoredProduce();
+            _state.Food += stored;
+            _state.ShowMessage("Hosil yig'ildi: +" + stored + " oziq-ovqat" + (yield > 0 ? " (" + yield + " dona)" : ""));
+            RebuildLocation();
+        }
+
+        private void ShowWaterStatus()
+        {
+            string water = _state.Farming.Irrigation ? "Ariqlar toza, suv yetarli" : "Ariq quruq — Yoz faslida tozalash kerak";
+            string grow = House is Farm f ? " Ekin holati: " + (int)(f.Growth * 100) + "%" : "";
+            _state.ShowMessage(water + "." + grow);
+        }
+
+        private void TalkToNpc()
+        {
+            Resident r = NearestResident(3.2f);
+            _state.ShowMessage(r == null ? "Yaqin atrofda hech kim yo'q." : r.Name + ": " + r.Line);
+        }
+
+        private void Inspect()
+        {
+            InteriorState st = InteriorStore.For(House.Id);
+            switch (_kind)
+            {
+                case InteriorKind.Garden:
+                    _state.ShowMessage(_subtitle + ". Bog' parvarishi: " + st.GardenCare + " marta ishlov berilgan.");
+                    break;
+                case InteriorKind.Tower:
+                    _state.ShowMessage("Atrof kuzatilmoqda: " + _buildings.Buildings.Count + " bino, " + _state.Population + " aholi, mudofaa " + AndijonSaltanatlar.Defense.CityDefenseManager.Compute(_buildings, _state.Military.TotalStrength));
+                    break;
+                case InteriorKind.Mosque:
+                    _state.ShowMessage("Jome masjidi: mahalla ahli uchun xotirjam ibodat maskani.");
+                    break;
+                case InteriorKind.Gate:
+                    ShowWallStatus();
+                    break;
+                default:
+                    _state.ShowMessage(_title + ". " + _subtitle);
+                    break;
+            }
+        }
+
+        private void ShowCaravanStatus()
+        {
+            int saroy = _buildings.Count(BuildingType.Caravanserai);
+            _state.ShowMessage("Faol karvonsaroylar: " + saroy + ". Tanga: " + _state.Coins + ", oziq-ovqat: " + _state.Food);
+        }
+
+        private void ShowWallStatus()
+        {
+            Building b = House;
+            _state.ShowMessage(b.Name + ": daraja " + b.Level + ", mustahkamlik " + b.HitPoints + "/" + b.MaxHitPoints);
+        }
+
+        private void RebuildLocation()
+        {
+            if (House == null) return;
+            if (_kind == InteriorKind.House || _palace) return;
+            BuildLocation(House, _kind, _style);
+            UpdateNearHotspot();
+        }
+
+        // ---- Sandiq paneli: BuildingId bo'yicha saqlanadigan real zaxira ----
+        private readonly Rectangle[] _chestRects = new Rectangle[5];
+        private Rectangle _chestClose;
+
+        private void UpdateChestPanel(InputManager input)
+        {
+            InteriorState st = InteriorStore.For(House.Id);
+            if (input.KeyPressed(Keys.Escape) || input.KeyPressed(Keys.E)) { _chestOpen = false; return; }
+            int clicked = -1;
+            if (input.LeftPressed)
+            {
+                if (_chestClose != Rectangle.Empty && _chestClose.Contains(input.MousePosition)) { _chestOpen = false; return; }
+                for (int i = 0; i < _chestRects.Length; i++)
+                    if (_chestRects[i] != Rectangle.Empty && _chestRects[i].Contains(input.MousePosition)) clicked = i;
+            }
+            int food = _state.Food;
+            if (input.KeyPressed(Keys.D1) || clicked == 0) MoveToChest(ref food, ref st.ChestFood, 5);
+            else if (input.KeyPressed(Keys.D2) || clicked == 1) MoveToChest(ref st.ChestFood, ref food, 5);
+            else if (input.KeyPressed(Keys.D3) || clicked == 2) MoveSeedsToChest(st, 5);
+            else if (input.KeyPressed(Keys.D4) || clicked == 3) MoveSeedsFromChest(st, 5);
+            else if (input.KeyPressed(Keys.D5) || clicked == 4) MoveToChest(ref st.ChestProduce, ref food, 5);
+            _state.Food = food;
+        }
+
+        private void MoveToChest(ref int from, ref int to, int amount)
+        {
+            int n = Math.Min(amount, from);
+            if (n <= 0) { _state.ShowMessage("Bu yerda hech narsa yo'q", true); return; }
+            from -= n;
+            to += n;
+        }
+
+        private void MoveSeedsToChest(InteriorState st, int amount)
+        {
+            int n = Math.Min(amount, _state.Farming.Seeds);
+            if (n <= 0) { _state.ShowMessage("Urug' yo'q", true); return; }
+            _state.Farming.Seeds -= n;
+            st.ChestSeeds += n;
+        }
+
+        private void MoveSeedsFromChest(InteriorState st, int amount)
+        {
+            int n = Math.Min(amount, st.ChestSeeds);
+            if (n <= 0) { _state.ShowMessage("Sandiqda urug' yo'q", true); return; }
+            st.ChestSeeds -= n;
+            _state.Farming.Seeds += n;
         }
 
         // ------------------------------------------------------------------ harakatlar
@@ -614,12 +1184,20 @@ namespace AndijonSaltanatlar.Interiors
             a1 = a2 = "";
             switch (CurrentPose)
             {
-                case Pose.Sit: a1 = "[E] OVQATLANISH"; a2 = "[Q] TURISH"; break;
+                case Pose.Sit:
+                    if (IsHouse) { a1 = "[E] OVQATLANISH"; a2 = "[Q] TURISH"; }
+                    else a1 = "[Q] TURISH";
+                    break;
                 case Pose.Eat: a1 = "OVQATLANMOQDA..."; break;
                 case Pose.Lie: a1 = "DAM OLMOQDA..."; a2 = "[Q] TURISH"; break;
                 case Pose.Bake: a1 = "NON YOPILMOQDA..."; break;
                 default:
-                    if (_carryBread && NearTable) a1 = "[E] NONNI DASTURXONGA QO'YISH";
+                    if (!IsHouse && !_palace && _nearHotspot != null)
+                    {
+                        a1 = "[E] " + _nearHotspot.PrimaryLabel;
+                        if (_nearHotspot.Secondary != InteriorAction.None) a2 = "[Q] " + _nearHotspot.SecondaryLabel;
+                    }
+                    else if (_carryBread && NearTable) a1 = "[E] NONNI DASTURXONGA QO'YISH";
                     else if (NearTable && !_carryBread) a1 = "[E] DASTURXONGA O'TIRISH";
                     else if (NearStove && !_carryBread) a1 = "[E] TANDIRDA NON YOPISH";
                     else if (NearBed) a1 = "[E] YOTISH";
@@ -729,8 +1307,18 @@ namespace AndijonSaltanatlar.Interiors
             ActionLabels(out _act1Label, out _act2Label);
             bool click1 = input.LeftPressed && _act1 != Rectangle.Empty && _act1.Contains(input.MousePosition);
             bool click2 = input.LeftPressed && _act2 != Rectangle.Empty && _act2.Contains(input.MousePosition);
-            if (input.KeyPressed(Keys.E) || click1) DoPrimary();
-            else if (input.KeyPressed(Keys.Q) || click2) StandUp();
+            if (click1)
+            {
+                if (!IsHouse && !_palace && _nearHotspot != null) Execute(_nearHotspot.Primary);
+                else DoPrimary();
+            }
+            else if (click2)
+            {
+                if (!IsHouse && !_palace && _nearHotspot != null && _nearHotspot.Secondary != InteriorAction.None) Execute(_nearHotspot.Secondary);
+                else StandUp();
+            }
+            else if (input.KeyPressed(Keys.E)) DoPrimary();
+            else if (input.KeyPressed(Keys.Q)) StandUp();
 
             if (CurrentPose == Pose.Stand) return false;
             _poseTime += dt;
@@ -905,10 +1493,27 @@ namespace AndijonSaltanatlar.Interiors
             {
                 Label(sb, px, font, ToScreen(new Vector2(0.6f, 7.6f), -12), "TAXT ZALI", roomLabel, roomBg);
             }
-            else
+            else if (IsHouse)
             {
                 Label(sb, px, font, ToScreen(new Vector2(2.0f, 7.4f), -6), "YOTOQXONA", roomLabel, roomBg);
                 Label(sb, px, font, ToScreen(new Vector2(7.7f, 6.6f), -14), "OSHXONA", roomLabel, roomBg);
+            }
+            else
+            {
+                Label(sb, px, font, ToScreen(new Vector2(2.0f, 7.4f), -6), _title, roomLabel, roomBg);
+            }
+
+            // Interaktiv obyektlar belgilari (yaqinlashganda nomi ko'rinadi)
+            if (!IsHouse && !_palace)
+            {
+                foreach (InteriorHotspot h in _hotspots)
+                {
+                    Vector2 hp = ToScreen(h.Tile + new Vector2(h.Size * 0.5f), 8);
+                    bool nearH = h == _nearHotspot;
+                    Color dot = nearH ? new Color(255, 214, 90) : new Color(230, 200, 140) * 0.75f;
+                    sb.Draw(px, new Rectangle((int)hp.X - 3, (int)hp.Y - 3, 6, 6), dot);
+                    if (nearH) Label(sb, px, font, hp + new Vector2(0, -16), h.Label, new Color(255, 226, 150), new Color(0, 0, 0, 140));
+                }
             }
             Label(sb, px, font, ToScreen(new Vector2((_doorX0 + _doorX1 + 1) / 2f, N + 0.5f), -10), "CHIQISH", new Color(255, 226, 150), new Color(0, 0, 0, 130));
 
@@ -985,7 +1590,51 @@ namespace AndijonSaltanatlar.Interiors
                 font.DrawCentered(sb, _act2Label, _act2.Center.ToVector2(), new Color(234, 224, 202), 2);
             }
 
-            string hint = "WASD yurish | SHIFT yugurish | ENTER / ESC yoki eshik - tashqariga chiqish";
+            // ---- Sandiq paneli ----
+            if (_chestOpen)
+            {
+                InteriorState st = InteriorStore.For(House.Id);
+                int pw = Math.Min(420, vw - 24), ph = 210;
+                var pr = new Rectangle(vw / 2 - pw / 2, vh / 2 - ph / 2, pw, ph);
+                sb.Draw(px, new Rectangle(pr.X - 3, pr.Y - 3, pr.Width + 6, pr.Height + 6), new Color(216, 167, 83, 240));
+                sb.Draw(px, pr, new Color(28, 22, 18, 248));
+                font.DrawCentered(sb, "SANDIQ — " + _title, new Vector2(pr.Center.X, pr.Y + 18), new Color(255, 214, 90), 3);
+                int ly = pr.Y + 46;
+                font.Draw(sb, "Oziq-ovqat: ombor " + _state.Food + " / sandiq " + st.ChestFood, new Vector2(pr.X + 16, ly), new Color(236, 224, 200), 2); ly += 22;
+                font.Draw(sb, "Urug': ombor " + _state.Farming.Seeds + " / sandiq " + st.ChestSeeds, new Vector2(pr.X + 16, ly), new Color(236, 224, 200), 2); ly += 22;
+                font.Draw(sb, "Mahsulot: sandiqda " + st.ChestProduce, new Vector2(pr.X + 16, ly), new Color(236, 224, 200), 2); ly += 30;
+                string[] acts = { "1  Oziq-ovqat qo'yish", "2  Oziq-ovqat olish", "3  Urug' qo'yish", "4  Urug' olish", "5  Mahsulotni olish" };
+                int bw = (pw - 44) / 2, bh = 26;
+                for (int i = 0; i < acts.Length; i++)
+                {
+                    int col = i % 2, row = i / 2;
+                    _chestRects[i] = new Rectangle(pr.X + 16 + col * (bw + 12), ly + row * (bh + 6), bw, bh);
+                    sb.Draw(px, _chestRects[i], new Color(56, 42, 26));
+                    sb.Draw(px, new Rectangle(_chestRects[i].X, _chestRects[i].Y, _chestRects[i].Width, 1), new Color(150, 116, 66));
+                    font.Draw(sb, acts[i], new Vector2(_chestRects[i].X + 6, _chestRects[i].Y + 6), new Color(234, 224, 202), 2);
+                }
+                _chestClose = new Rectangle(pr.Right - 96, pr.Bottom - 32, 80, 24);
+                sb.Draw(px, _chestClose, new Color(60, 44, 30));
+                font.DrawCentered(sb, "YOPISH", _chestClose.Center.ToVector2(), new Color(236, 220, 184), 2);
+            }
+
+            // ---- Minora kuzatish maydoni ----
+            if (_upperPlatform)
+            {
+                int pw = Math.Min(430, vw - 24), ph = 150;
+                var pr = new Rectangle(vw / 2 - pw / 2, 96, pw, ph);
+                sb.Draw(px, new Rectangle(pr.X - 3, pr.Y - 3, pr.Width + 6, pr.Height + 6), new Color(216, 167, 83, 230));
+                sb.Draw(px, pr, new Color(22, 26, 34, 242));
+                font.DrawCentered(sb, "KUZATISH MAYDOCHASI", new Vector2(pr.Center.X, pr.Y + 18), new Color(255, 214, 90), 3);
+                int ly = pr.Y + 48;
+                font.Draw(sb, "Shahar binolari: " + _buildings.Buildings.Count, new Vector2(pr.X + 18, ly), new Color(226, 222, 210), 2); ly += 22;
+                font.Draw(sb, "Aholi: " + _state.Population + "   Qo'shin: " + _state.Military.TotalUnits, new Vector2(pr.X + 18, ly), new Color(226, 222, 210), 2); ly += 22;
+                font.Draw(sb, "Mudofaa kuchi: " + AndijonSaltanatlar.Defense.CityDefenseManager.Compute(_buildings, _state.Military.TotalStrength), new Vector2(pr.X + 18, ly), new Color(226, 222, 210), 2);
+            }
+
+            string hint = _kind == InteriorKind.House || _palace
+                ? "WASD yurish | SHIFT yugurish | ENTER / ESC yoki eshik - tashqariga chiqish"
+                : "WASD yurish | E harakat | Q ikkinchi harakat | ESC - tashqariga chiqish";
             Vector2 hs = font.Measure(hint, 2);
             var hr = new Rectangle(vw / 2 - (int)hs.X / 2 - 16, vh - 40, (int)hs.X + 32, 28);
             sb.Draw(px, hr, new Color(20, 16, 14, 210));
@@ -1052,10 +1701,13 @@ namespace AndijonSaltanatlar.Interiors
             Building h = NearbyHouse;
             Vector2 top = cam.WorldToScreen(IsoMath.TileToWorld(new Vector2(h.Position.X + h.Size.X, h.Position.Y + h.Size.Y)) + new Vector2(0, -h.Texture.Height - 6));
             bool denied = !MayEnter(h, _nearbyWho);
+            bool openAir = h.Type == BuildingType.Garden || h.Type == BuildingType.Farm
+                || h.Type == BuildingType.Barracks || h.Type == BuildingType.GladiatorArena
+                || h.Type == BuildingType.Caravanserai || h.Type == BuildingType.Gate;
             string t = denied ? "SAROYGA FAQAT SOQCHILAR KIRADI"
                 : h.Type == BuildingType.MainHall ? "[ENTER] SAROYGA KIRISH"
-                : h.Type == BuildingType.GladiatorArena ? "[ENTER] JANG MAYDONIGA KIRISH"
-                : "[ENTER] " + h.Name.ToUpperInvariant() + "GA KIRISH";
+                : openAir ? "[ENTER] " + h.Name.ToUpperInvariant() + " — HUDUDGA KIRISH"
+                : "[ENTER] " + h.Name.ToUpperInvariant() + " — ICHKARIGA KIRISH";
             Vector2 s = font.Measure(t, 2);
             var r = new Rectangle((int)(top.X - s.X / 2 - 8), (int)(top.Y - s.Y - 8), (int)s.X + 16, (int)s.Y + 10);
             r.X = Math.Clamp(r.X, 8, vw - r.Width - 8);

@@ -59,6 +59,8 @@ namespace AndijonSaltanatlar.SaveSystem
         public int ProdTax { get; set; } = 10;
 
         public List<SavedBuilding> PlayerBuildings { get; set; } = new List<SavedBuilding>();
+        /// <summary>Har bir bino (BuildingId) uchun ichki holat: sandiq, non, savdo, parvarish.</summary>
+        public List<AndijonSaltanatlar.Interiors.SavedInterior> Interiors { get; set; } = new List<AndijonSaltanatlar.Interiors.SavedInterior>();
         public List<SavedRoad> Roads { get; set; } = new List<SavedRoad>();
         public List<CitizenSnapshot> Citizens { get; set; } = new List<CitizenSnapshot>();
         public List<int> CitizenBindings { get; set; } = new List<int>();
