@@ -80,7 +80,8 @@ namespace AndijonSaltanatlar.World
                     tint *= cu.FadeAlpha;
                     SpriteEffects fx = o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
                     Vector2 feet = IsoMath.TileToWorld(cu.Position);
-                    var origin = new Vector2(o.Texture.Width / 2f, o.Texture.Height - Core.Graphics.UnitArt.FootOffset);
+                    var origin = new Vector2(o.Texture.Width / 2f, o.Texture.Height - AssetManager.FootOf(o.Texture));
+                    float k = AssetManager.ScaleOf(o.Texture);
                     if (cu.IsDown)
                     {
                         // Yiqilish: tezlashib qulaydi, yerga tushib biroz sakraydi, keyin xira yotadi
@@ -88,9 +89,9 @@ namespace AndijonSaltanatlar.World
                         Color down = Color.Lerp(tint, new Color(150, 140, 135) * cu.FadeAlpha, lie);
                         float ang = cu.FallAngle * (o.Flipped ? -1f : 1f);
                         Vector2 at = new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)) + cu.HitDirWorld * 4f * lie;
-                        sb.Draw(o.Texture, at, null, down, ang, origin, 1f, fx, 0f);
+                        sb.Draw(o.Texture, at, null, down, ang, origin, k, fx, 0f);
                         if (cu.FlashTimer > 0f && _assets.FlashOf(o.Texture) is Texture2D wf)
-                            sb.Draw(wf, at, null, Color.White * (cu.FlashTimer / Unit.FlashTime) * cu.FadeAlpha, ang, origin, 1f, fx, 0f);
+                            sb.Draw(wf, at, null, Color.White * (cu.FlashTimer / Unit.FlashTime) * cu.FadeAlpha, ang, origin, k, fx, 0f);
                     }
                     else
                     {
@@ -99,10 +100,10 @@ namespace AndijonSaltanatlar.World
                         cu.GetHitPose(out Vector2 hoff, out float hrot);
                         if (spin) fx = fx == SpriteEffects.None ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
                         Vector2 at = new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)) + off + hoff;
-                        sb.Draw(o.Texture, at, null, tint, rot + hrot, origin, new Vector2(1f, sy), fx, 0f);
+                        sb.Draw(o.Texture, at, null, tint, rot + hrot, origin, new Vector2(k, sy * k), fx, 0f);
                         // Zarba tekkan lahza: oq chaqnash
                         if (cu.FlashTimer > 0f && _assets.FlashOf(o.Texture) is Texture2D wf)
-                            sb.Draw(wf, at, null, Color.White * (cu.FlashTimer / Unit.FlashTime) * cu.FadeAlpha, rot + hrot, origin, new Vector2(1f, sy), fx, 0f);
+                            sb.Draw(wf, at, null, Color.White * (cu.FlashTimer / Unit.FlashTime) * cu.FadeAlpha, rot + hrot, origin, new Vector2(k, sy * k), fx, 0f);
                     }
                     if (cu is CitizenUnit citizen && !cu.IsDown)
                     {
@@ -117,7 +118,9 @@ namespace AndijonSaltanatlar.World
                 Vector2 pos = o.DrawPosition;
                 if (bb != null && bb.Level >= 2 && bb.BuildProgress >= 1f)
                 {
-                    Texture2D lt = _assets.TryGet(AssetManager.LevelKey(bb.SpriteKey, System.Math.Min(bb.Level, AssetManager.MaxArtLevel)));
+                    string lk = AssetManager.LevelKey(bb.SpriteKey, System.Math.Min(bb.Level, AssetManager.MaxArtLevel));
+                    int st = AssetManager.StyleOf(bb.Position);
+                    Texture2D lt = (st > 0 ? _assets.TryGet(lk + "_s" + st) : null) ?? _assets.TryGet(lk);
                     if (lt != null) { tex = lt; pos = WorldObjectExtensions.AnchorBottomCenter(lt, bb.Position, bb.Size.X); }
                 }
 
@@ -166,7 +169,7 @@ namespace AndijonSaltanatlar.World
             Vector2 size = _font.Measure(citizen.RoleLabel, 1, 0);
             int width = (int)size.X + 6;
             int height = (int)size.Y + 4;
-            int x = (int)MathF.Round(unit.DrawPosition.X + unit.Texture.Width / 2f - width / 2f);
+            int x = (int)MathF.Round(unit.DrawPosition.X + unit.Texture.Width * AssetManager.ScaleOf(unit.Texture) / 2f - width / 2f);
             int y = (int)MathF.Round(unit.DrawPosition.Y - height - 2);
             sb.Draw(_assets.Pixel, new Rectangle(x, y, width, height), new Color(12, 35, 22, 220));
             _font.Draw(sb, citizen.RoleLabel, new Vector2(x + 3, y + 2), new Color(130, 245, 145), 1, 0);
@@ -177,7 +180,7 @@ namespace AndijonSaltanatlar.World
             Vector2 size = _font.Measure(citizen.SpeechText, 1, 0);
             int width = (int)size.X + 8;
             int height = (int)size.Y + 6;
-            int x = (int)MathF.Round(unit.DrawPosition.X + unit.Texture.Width / 2f - width / 2f);
+            int x = (int)MathF.Round(unit.DrawPosition.X + unit.Texture.Width * AssetManager.ScaleOf(unit.Texture) / 2f - width / 2f);
             int y = (int)MathF.Round(unit.DrawPosition.Y - height - _font.Measure(citizen.RoleLabel, 1, 0).Y - 6);
             var box = new Rectangle(x, y, width, height);
             sb.Draw(_assets.Pixel, box, new Color(246, 230, 184));

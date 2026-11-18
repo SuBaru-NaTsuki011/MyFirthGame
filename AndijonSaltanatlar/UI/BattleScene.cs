@@ -194,8 +194,8 @@ namespace AndijonSaltanatlar.UI
         {
             switch (line)
             {
-                case UnitLine.Otliq: return SpriteKeys.UnitPatrol;
-                case UnitLine.Masofaviy: return SpriteKeys.UnitSwordsman;
+                case UnitLine.Otliq: return SpriteKeys.UnitCavalry;
+                case UnitLine.Masofaviy: return SpriteKeys.UnitPatrol;   // kamonchi
                 case UnitLine.Aravasi:
                 case UnitLine.Lager: return SpriteKeys.UnitCitizen + "2";
                 default: return level >= 3 ? SpriteKeys.UnitShield : level == 2 ? SpriteKeys.UnitSwordsman : SpriteKeys.UnitSpearman;
@@ -232,7 +232,7 @@ namespace AndijonSaltanatlar.UI
                         Tint = TintFor(g.Line, g.Level, kingdom),
                         Phase = (float)rng.NextDouble() * MathHelper.TwoPi,
                         Speed = 1.6f + (float)rng.NextDouble() * 1.4f,
-                        Scale = (g.Line == UnitLine.Otliq ? 1.25f : 1.1f) * s,
+                        Scale = (g.Line == UnitLine.Otliq ? 0.95f : 1.1f) * s,
                         Support = g.Line == UnitLine.Aravasi || g.Line == UnitLine.Lager,
                         Ranged = g.Line == UnitLine.Masofaviy,
                         Col = col, Index = i
@@ -374,7 +374,7 @@ namespace AndijonSaltanatlar.UI
                     tex = _assets.TryGet(g.Sprite + "_" + frame) ?? _assets.TryGet(g.Sprite + "_0");
                 }
                 if (tex == null) continue;
-                var origin = new Vector2(tex.Width / 2f, tex.Height - 2);
+                var origin = new Vector2(tex.Width / 2f, tex.Height - 2 / AssetManager.ScaleOf(tex));
                 Color col = g.Tint * alpha;
                 if (hit && acting && u > 0.3f && u < 0.75f)
                 {
@@ -382,7 +382,7 @@ namespace AndijonSaltanatlar.UI
                     col = Color.Lerp(col, new Color(255, 196, 186) * alpha, 0.55f * flash);
                 }
                 sb.Draw(_assets.Pixel, new Rectangle((int)(pos.X - 9 * s), (int)(pos.Y - 2 * s), (int)(18 * s), (int)(5 * s)), new Color(0, 0, 0, 60) * alpha); // soya
-                sb.Draw(tex, pos, null, col, rot, origin, g.Scale, left ? SpriteEffects.None : SpriteEffects.FlipHorizontally, 0f);
+                sb.Draw(tex, pos, null, col, rot, origin, g.Scale * AssetManager.ScaleOf(tex), left ? SpriteEffects.None : SpriteEffects.FlipHorizontally, 0f);
             }
         }
 
@@ -475,9 +475,9 @@ namespace AndijonSaltanatlar.UI
             if (outcome > 0) pos.Y -= MathF.Max(0f, MathF.Sin(t * 4f)) * 5 * s;
             Texture2D tex = _assets.TryGet(SpriteKeys.UnitShield + "_" + ((int)(t * 1.5f) % 3)) ?? _assets.TryGet(SpriteKeys.UnitShield + "_0");
             if (tex == null) return;
-            var origin = new Vector2(tex.Width / 2f, tex.Height - 2);
+            var origin = new Vector2(tex.Width / 2f, tex.Height - 2 / AssetManager.ScaleOf(tex));
             sb.Draw(_assets.Pixel, new Rectangle((int)(pos.X - 12 * s), (int)(pos.Y - 2 * s), (int)(24 * s), (int)(6 * s)), new Color(0, 0, 0, 70));
-            sb.Draw(tex, pos, null, Color.Lerp(Color.White, kingdom, 0.25f), 0f, origin, 1.6f * s, left ? SpriteEffects.None : SpriteEffects.FlipHorizontally, 0f);
+            sb.Draw(tex, pos, null, Color.Lerp(Color.White, kingdom, 0.25f), 0f, origin, 1.6f * s * AssetManager.ScaleOf(tex), left ? SpriteEffects.None : SpriteEffects.FlipHorizontally, 0f);
             // Sarkarda tug'i (CommandGesture paytida ko'tariladi)
             float poleX = pos.X + (left ? -14 : 14) * s, top = pos.Y - (58 + gesture * 8) * s;
             sb.Draw(_assets.Pixel, new Rectangle((int)poleX, (int)top, Math.Max(1, (int)(2 * s)), (int)(44 * s)), new Color(70, 52, 32));

@@ -52,7 +52,8 @@ namespace AndijonSaltanatlar.Core
         public const string UnitRaider = "unit_raider";           // bosqinchi
         public const string UnitRaiderChief = "unit_raider_chief"; // bosqinchilar sardori
         public const string UnitShah = "unit_shah";                // shoh (tojli)
-        public const string UnitElite = "unit_elite";              // xos navkar (VIP)
+        public const string UnitElite = "unit_elite";
+        public const string UnitCavalry = "unit_cavalry";          // otliq (Bobur bobo modellaridan)              // xos navkar (VIP)
         public const string UnitCitizen = "unit_citizen"; // + <0..5> + _0.._2 (fuqaro turi + kadr)
         public const int CitizenKinds = CitizenArt.Kinds;
         public const int UnitFrames = 3;
@@ -161,6 +162,20 @@ namespace AndijonSaltanatlar.Core
             RegisterUnit(SpriteKeys.UnitSpearman, UnitArt.Spearman);
             RegisterUnit(SpriteKeys.UnitShield, UnitArt.Shield);
             RegisterUnit(SpriteKeys.UnitPatrol, UnitArt.Patrol);
+            // Otliq: Content/Sprites/unit_cavalry_*.png (3D modeldan); bo'lmasa patrul rasmi
+            for (int f = 0; f < SpriteKeys.UnitFrames; f++)
+            {
+                int frame = f;
+                Register(SpriteKeys.UnitCavalry + "_" + f, () => UnitArt.Frame(UnitArt.Patrol, frame));
+                Register(SpriteKeys.UnitCavalry + "_b" + f, () => UnitArt.Frame(UnitArt.Patrol, frame));
+            }
+            for (int a = 0; a < UnitArt.AttackKinds; a++)
+                for (int ph = 0; ph < UnitArt.AttackPhases; ph++)
+                {
+                    int aa = a, pp = ph;
+                    Register(AttackKey(SpriteKeys.UnitCavalry, aa, pp), () => UnitArt.AttackFrame(UnitArt.Patrol, aa, pp));
+                }
+            RegisterWalk(SpriteKeys.UnitCavalry, fr => UnitArt.Frame(UnitArt.Patrol, fr));
             RegisterUnit(SpriteKeys.UnitRaider, UnitArt.Raider);
             RegisterUnit(SpriteKeys.UnitRaiderChief, UnitArt.RaiderChief);
             RegisterUnit(SpriteKeys.UnitShah, UnitArt.Shah);
@@ -172,6 +187,10 @@ namespace AndijonSaltanatlar.Core
                 {
                     int kk = k, ff = f;
                     Register(SpriteKeys.UnitCitizen + kk + "_" + ff, () => CitizenArt.Frame(kk, ff));
+                    if (ff == 0) RegisterWalk(SpriteKeys.UnitCitizen + kk, fr => CitizenArt.Frame(kk, fr));
+                    string bk = SpriteKeys.UnitCitizen + kk + "_b" + ff;
+                    if (File.Exists(Path.Combine(_spriteDir, bk + ".png")) || Bundled.Contains(bk))
+                        Register(bk, () => CitizenArt.Frame(kk, ff));
                 }
 
             Register(SpriteKeys.IconCoin, DecorArt.IconCoin);
@@ -181,12 +200,28 @@ namespace AndijonSaltanatlar.Core
 
         private void RegisterUnit(string key, int kind)
         {
+            RegisterWalk(key, fr => UnitArt.Frame(kind, fr));
             for (int f = 0; f < SpriteKeys.UnitFrames; f++)
             {
                 int frame = f;
                 Register(key + "_" + f, () => UnitArt.Frame(kind, frame));
+                // Orqa ko'rinish: Content/Sprites/key_b{f}.png (3D modeldan); bo'lmasa — old rasm
+                if (File.Exists(Path.Combine(_spriteDir, key + "_b" + f + ".png")) || Bundled.Contains(key + "_b" + f))
+                    Register(key + "_b" + f, () => UnitArt.Frame(kind, frame));
             }
-            if (kind == UnitArt.Shah) return;
+            if (kind == UnitArt.Shah)
+            {
+                // Shoh (Bobur) ham qilich bilan jang qiladi — 3D modeldan zarba kadrlari bo'lsa
+                for (int a = 0; a < UnitArt.AttackKinds; a++)
+                    for (int ph = 0; ph < UnitArt.AttackPhases; ph++)
+                    {
+                        int aa = a, pp = ph;
+                        string k2 = AttackKey(key, aa, pp);
+                        if (File.Exists(Path.Combine(_spriteDir, k2 + ".png")) || Bundled.Contains(k2))
+                            Register(k2, () => UnitArt.AttackFrame(UnitArt.Swordsman, aa, pp));
+                    }
+                return;
+            }
             // Zarba kadrlari: key_a{tur}_{bosqich}
             for (int a = 0; a < UnitArt.AttackKinds; a++)
                 for (int ph = 0; ph < UnitArt.AttackPhases; ph++)
@@ -198,6 +233,11 @@ namespace AndijonSaltanatlar.Core
 
         /// <summary>Bino ko'rinishi uchun eng yuqori daraja.</summary>
         public const int MaxArtLevel = 5;
+        /// <summary>Yuqori darajadagi bezak uslublari soni (bir xil binolar har xil ko'rinadi).</summary>
+        public const int Styles = 4;
+
+        /// <summary>Bino joyiga qarab doimiy uslub (0..Styles-1).</summary>
+        public static int StyleOf(Point pos) => ((pos.X * 7 + pos.Y * 13) % Styles + Styles) % Styles;
 
         /// <summary>
         /// key_l2..key_l5: bespokeMax gacha — binoning o'z rasmi (baseOf(daraja)), undan yuqori — o'sha rasm
@@ -208,7 +248,13 @@ namespace AndijonSaltanatlar.Core
             for (int lv = 2; lv <= MaxArtLevel; lv++)
             {
                 int l = lv;
-                Register(LevelKey(key, l), () => l <= bespokeMax ? baseOf(l) : LevelArt.Compose(baseOf(bespokeMax), size, l));
+                Register(LevelKey(key, l), () => l <= bespokeMax ? baseOf(l) : LevelArt.Compose(baseOf(bespokeMax), size, l, 0));
+                if (l > bespokeMax)
+                    for (int st = 1; st < Styles; st++)
+                    {
+                        int s = st;
+                        Register(LevelKey(key, l) + "_s" + s, () => LevelArt.Compose(baseOf(bespokeMax), size, l, s));
+                    }
             }
         }
 
@@ -224,6 +270,16 @@ namespace AndijonSaltanatlar.Core
         /// Sprite'ning oq silueti (zarba tekkan lahzadagi chaqnash uchun). Alfa niqobidan bir marta yasaladi —
         /// GetData kerak emas (telefonda ham ishlaydi).
         /// </summary>
+        /// <summary>Yuqori aniqlikdagi rasmlar ko'paytmasi (o'yin pikseliga nisbatan).</summary>
+        public const int HR = 3;
+        private static readonly HashSet<Texture2D> HiRes = new HashSet<Texture2D>();
+
+        /// <summary>Rasmni chizish masshtabi: oddiy — 1, 3D modeldan olingan aniq rasm — 1/HR.</summary>
+        public static float ScaleOf(Texture2D t) => t != null && HiRes.Contains(t) ? 1f / HR : 1f;
+
+        /// <summary>Oyoq nuqtasi rasm pastidan necha piksel yuqorida (rasm o'z piksellarida).</summary>
+        public static float FootOf(Texture2D t) => UnitArt.FootOffset / ScaleOf(t);
+
         public Texture2D FlashOf(Texture2D tex)
         {
             if (tex == null) return null;
@@ -233,12 +289,49 @@ namespace AndijonSaltanatlar.Core
             for (int i = 0; i < mask.Length; i++) { byte a = mask[i]; data[i] = new Color(a, a, a, a); }
             w = new Texture2D(_gd, tex.Width, tex.Height, false, SurfaceFormat.Color);
             w.SetData(data);
+            if (HiRes.Contains(tex)) HiRes.Add(w);
             _flash[tex] = w;
             return w;
         }
 
         /// <summary>Sprite bo'lsa qaytaradi, bo'lmasa null (istisno tashlamaydi).</summary>
         public Texture2D TryGet(string key) => key != null && _textures.TryGetValue(key, out var tex) ? tex : null;
+
+        private HashSet<string> _bundled;
+        /// <summary>APK ichidagi spraytlar ro'yxati (Content/Sprites/sprites.txt); kompyuterda fayldan o'qiladi.</summary>
+        private HashSet<string> Bundled
+        {
+            get
+            {
+                if (_bundled != null) return _bundled;
+                _bundled = new HashSet<string>();
+                if (File.Exists(Path.Combine(_spriteDir, "sprites.txt"))) return _bundled; // kompyuter: to'g'ridan-to'g'ri fayl
+                try
+                {
+                    using var s = Microsoft.Xna.Framework.TitleContainer.OpenStream("Content/Sprites/sprites.txt");
+                    using var r = new StreamReader(s);
+                    string line;
+                    while ((line = r.ReadLine()) != null) if (line.Trim().Length > 0) _bundled.Add(line.Trim());
+                }
+                catch (Exception) { }
+                return _bundled;
+            }
+        }
+
+        /// <summary>key_w0..w7 va key_bw0..bw7 (3D modeldan yurish sikli) — fayl bor bo'lsagina.</summary>
+        private void RegisterWalk(string key, Func<int, Canvas> fallback)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                int ii = i;
+                foreach (string p in new[] { "_w", "_bw" })
+                {
+                    string k = key + p + i;
+                    if (File.Exists(Path.Combine(_spriteDir, k + ".png")) || Bundled.Contains(k))
+                        Register(k, () => fallback(1 + ii % 2));
+                }
+            }
+        }
 
         private void Register(string key, Func<Canvas> placeholder)
         {
@@ -249,13 +342,29 @@ namespace AndijonSaltanatlar.Core
                 try { canvas = Canvas.FromPng(_gd, path); }
                 catch (Exception) { canvas = null; } // buzuq fayl — placeholderga qaytamiz
             }
+            else if (Bundled.Contains(key))
+            {
+                // Telefon: PNG APK ichida (TitleContainer); o'qib bo'lmasa — chizilgan rasm
+                try
+                {
+                    using var s = Microsoft.Xna.Framework.TitleContainer.OpenStream("Content/Sprites/" + key + ".png");
+                    using var btex = Texture2D.FromStream(_gd, s);
+                    var c = new Canvas(btex.Width, btex.Height);
+                    btex.GetData(c.Pixels);
+                    canvas = c;
+                }
+                catch (Exception) { canvas = null; }
+            }
             if (canvas == null)
             {
                 canvas = placeholder();
                 if (_exportDir != null) canvas.SavePng(_gd, Path.Combine(_exportDir, key + ".png"));
             }
 
-            Texture2D tex = canvas.ToTexture(_gd);
+            // 3D modeldan olingan yuqori aniqlikdagi odam rasmi (HR marta katta) — mipmapli, chizishda 1/HR masshtab
+            bool hiRes = key.StartsWith("unit_") && canvas.Height >= 120;
+            Texture2D tex = hiRes ? canvas.ToTextureMipmapped(_gd) : canvas.ToTexture(_gd);
+            if (hiRes) HiRes.Add(tex);
             tex.Name = key;
             _textures[key] = tex;
 

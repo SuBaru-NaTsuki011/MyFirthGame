@@ -189,6 +189,43 @@ namespace AndijonSaltanatlar.Core.Graphics
 
         // ---------- Texture bilan ishlash ----------
 
+        /// <summary>
+        /// Mipmapli premultiplied tekstura: katta (yuqori aniqlikdagi) rasm kichik chizilganda ham silliq — piksel
+        /// bo'lib ko'rinmaydi (PointClamp mip darajasini tanlaydi). Android'da mipmapsiz (GLES cheklovlari).
+        /// </summary>
+        public Texture2D ToTextureMipmapped(GraphicsDevice gd)
+        {
+#if ANDROID
+            return ToTexture(gd);
+#else
+            int w = Width, h = Height;
+            var tex = new Texture2D(gd, w, h, true, SurfaceFormat.Color);
+            var lvl = new Vector4[w * h];
+            for (int i = 0; i < lvl.Length; i++)
+            {
+                Color p = Pixels[i];
+                float a = p.A / 255f;
+                lvl[i] = new Vector4(p.R / 255f * a, p.G / 255f * a, p.B / 255f * a, a);
+            }
+            for (int level = 0; level < tex.LevelCount; level++)
+            {
+                var data = new Color[w * h];
+                for (int i = 0; i < data.Length; i++) data[i] = new Color(lvl[i]);
+                tex.SetData(level, null, data, 0, data.Length);
+                int nw = Math.Max(1, w / 2), nh = Math.Max(1, h / 2);
+                var next = new Vector4[nw * nh];
+                for (int y = 0; y < nh; y++)
+                    for (int x = 0; x < nw; x++)
+                    {
+                        int x0 = Math.Min(w - 1, x * 2), x1 = Math.Min(w - 1, x * 2 + 1), y0 = Math.Min(h - 1, y * 2), y1 = Math.Min(h - 1, y * 2 + 1);
+                        next[y * nw + x] = (lvl[y0 * w + x0] + lvl[y0 * w + x1] + lvl[y1 * w + x0] + lvl[y1 * w + x1]) * 0.25f;
+                    }
+                lvl = next; w = nw; h = nh;
+            }
+            return tex;
+#endif
+        }
+
         /// <summary>Premultiplied-alpha Texture2D yaratadi (SpriteBatch AlphaBlend uchun).</summary>
         public Texture2D ToTexture(GraphicsDevice gd)
         {

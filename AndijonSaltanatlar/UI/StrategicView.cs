@@ -372,7 +372,7 @@ namespace AndijonSaltanatlar.UI
                 for (int i = 0; i < 3; i++)
                 {
                     Vector2 off = new Vector2((i - 1) * 12, (i == 1 ? -6 : 2));
-                    sb.Draw(tex, pos + off, null, Color.White, 0f, new Vector2(tex.Width / 2f, tex.Height - 8), 0.8f,
+                    sb.Draw(tex, pos + off, null, Color.White, 0f, new Vector2(tex.Width / 2f, tex.Height - 8 / AssetManager.ScaleOf(tex)), 0.8f * AssetManager.ScaleOf(tex),
                         left ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
                 }
             Fill(sb, new Rectangle((int)pos.X + 16, (int)pos.Y - 44, 2, 34), new Color(110, 80, 50));

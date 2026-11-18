@@ -701,7 +701,8 @@ namespace AndijonSaltanatlar.Interiors
                 Texture2D tex = _avatar.Texture;
                 if (tex == null) return;
                 Vector2 feet = IsoMath.TileToWorld(_pos);
-                var origin = new Vector2(tex.Width / 2f, tex.Height - UnitArt.FootOffset);
+                var origin = new Vector2(tex.Width / 2f, tex.Height - AssetManager.FootOf(tex));
+                float k = AssetManager.ScaleOf(tex);
                 SpriteEffects fx = _avatar.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
                 switch (CurrentPose)
                 {
@@ -709,15 +710,15 @@ namespace AndijonSaltanatlar.Interiors
                     case Pose.Eat:
                         // O'tirgan: gavda pastroq (bukilgan), ovqatlanayotganda qo'l/bosh biroz qimirlaydi
                         float bob = CurrentPose == Pose.Eat ? MathF.Abs(MathF.Sin(_poseTime * 7f)) * 1.5f : 0f;
-                        sb.Draw(tex, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y + 3 + bob)), null, Color.White, 0f, origin, new Vector2(1f, 0.78f), fx, 0f);
+                        sb.Draw(tex, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y + 3 + bob)), null, Color.White, 0f, origin, new Vector2(k, 0.78f * k), fx, 0f);
                         break;
                     case Pose.Lie:
                         // Yotgan: to'shak ustida, yonboshlab
                         Vector2 bed = IsoMath.TileToWorld(_bedPos) + new Vector2(0, -10);
-                        sb.Draw(tex, new Vector2(MathF.Round(bed.X), MathF.Round(bed.Y)), null, Color.White, -MathHelper.PiOver2 * 0.92f, origin, 0.95f, SpriteEffects.None, 0f);
+                        sb.Draw(tex, new Vector2(MathF.Round(bed.X), MathF.Round(bed.Y)), null, Color.White, -MathHelper.PiOver2 * 0.92f, origin, 0.95f * k, SpriteEffects.None, 0f);
                         break;
                     default:
-                        sb.Draw(tex, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)), null, Color.White, 0f, origin, 1f, fx, 0f);
+                        sb.Draw(tex, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)), null, Color.White, 0f, origin, k, fx, 0f);
                         break;
                 }
             }));
@@ -859,7 +860,7 @@ namespace AndijonSaltanatlar.Interiors
         {
             Vector2 feet = IsoMath.TileToWorld(tile) + new Vector2(0, -lift);
             sb.Draw(tex, new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)), null, Color.White, 0f,
-                new Vector2(tex.Width / 2f, tex.Height - UnitArt.FootOffset), scale,
+                new Vector2(tex.Width / 2f, tex.Height - AssetManager.FootOf(tex)), scale * AssetManager.ScaleOf(tex),
                 flip ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
         }
 

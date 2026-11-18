@@ -14,7 +14,7 @@ namespace AndijonSaltanatlar.Units
         public ShahUnit(Vector2 position) : base(position)
         {
             Name = "Shoh " + ShahName;
-            Description = "Saltanat hukmdori. Zarbof to'n kiygan, boshida qimmatbaho toshli oltin toj.";
+            Description = "Saltanat hukmdori Bobur. Zarbof to'n kiygan, boshida oq salla, qo'lida kitob.";
             SpriteKey = SpriteKeys.UnitShah;
             Team = UnitTeam.Player;
             ExternallyControlled = true;

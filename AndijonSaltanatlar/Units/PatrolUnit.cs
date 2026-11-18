@@ -83,4 +83,18 @@ namespace AndijonSaltanatlar.Units
             SetHitPoints(120);
         }
     }
+
+    /// <summary>Otliq soqchi — bosh ko'chalarda ot minib yuradi (Bobur bobo 3D modelidan).</summary>
+    public class CavalryUnit : PatrolUnit
+    {
+        public CavalryUnit(IEnumerable<Vector2> patrolPoints, float speed = 1.6f) : base(patrolPoints, speed)
+        {
+            Name = "Otliq soqchi";
+            Description = "Nayzali otliq navkar. Bosh ko'chalarni ot minib qo'riqlaydi.";
+            SpriteKey = SpriteKeys.UnitCavalry;
+            WalkCycleTiles = 1.7f;
+            Attack = 18;
+            SetHitPoints(220);
+        }
+    }
 }

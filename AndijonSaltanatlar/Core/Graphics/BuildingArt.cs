@@ -26,6 +26,13 @@ namespace AndijonSaltanatlar.Core.Graphics
             Color wall = v switch { 0 => Pal.Mud, 1 => Pal.BrickPale, 2 => Pal.Plaster, _ => Pal.MudDark };
             Color roof = Canvas.Shade(wall, 0.92f);
             float mh = v == 1 ? 32 : (v == 3 ? 26 : 29);
+            // Har bir uy turi o'z ranglari va shakliga ega — yuqori darajada ham bir xil bo'lib qolmaydi
+            Color band = v switch { 0 => Pal.Turquoise, 1 => Pal.Blue, 2 => new Color(70, 150, 96), _ => Pal.Red };
+            Color dome = v switch { 0 => Pal.Turquoise, 1 => Pal.Blue, 2 => new Color(70, 150, 96), _ => Pal.Gold };
+            Color flagC = v switch { 0 => Pal.Red, 1 => Pal.Gold, 2 => Pal.Blue, _ => new Color(70, 150, 96) };
+            bool rightLoft = v % 2 == 1;                       // bolaxona o'ngda (toq turlar) yoki chapda
+            float lx0 = rightLoft ? 1.0f : 0.2f, lx1 = rightLoft ? 1.8f : 1.0f, lc = (lx0 + lx1) / 2f;
+            float domeX = rightLoft ? 0.6f : 1.4f;
 
             // hovli
             ic.Top(0.08f, 0.08f, 1.92f, 1.92f, 0, new Color(204, 176, 130));
@@ -45,30 +52,30 @@ namespace AndijonSaltanatlar.Core.Graphics
             if (level >= 2)
             {
                 // feruza koshin belbog' va oltin hoshiya
-                ic.QuadSW(0.2f, 1.8f, 1.0f, mh - 5, mh - 2, Pal.Turquoise);
-                ic.QuadSE(1.8f, 0.2f, 1.0f, mh - 5, mh - 2, Canvas.Shade(Pal.Turquoise, 0.74f));
+                ic.QuadSW(0.2f, 1.8f, 1.0f, mh - 5, mh - 2, band);
+                ic.QuadSE(1.8f, 0.2f, 1.0f, mh - 5, mh - 2, Canvas.Shade(band, 0.74f));
                 ic.QuadSW(0.2f, 1.8f, 1.0f, mh - 2, mh - 1, Pal.Gold);
             }
 
             if (v == 1 || v == 2 || level >= 3)
             {
                 // bolaxona (ikkinchi qavat)
-                ic.Box(0.2f, 0.2f, 1.0f, 0.9f, mh, mh + 15, wall, 7, roof);
-                ic.Parapet(0.2f, 0.2f, 1.0f, 0.9f, mh + 15, roof, 0.07f);
+                ic.Box(lx0, 0.2f, lx1, 0.9f, mh, mh + 15, wall, 7, roof);
+                ic.Parapet(lx0, 0.2f, lx1, 0.9f, mh + 15, roof, 0.07f);
                 if (level >= 3)
                 {
-                    ic.FramedArch(true, 0.6f, 0.9f, 0.13f, mh + 2, mh + 13, Pal.Blue, Pal.Door);
-                    ic.QuadSW(0.2f, 1.0f, 0.9f, mh + 13, mh + 15, Pal.Gold);
-                    ic.Pole(0.45f, 0.5f, mh + 15, mh + 29, Pal.Wood, 1);
-                    ic.Flag(0.45f, 0.5f, mh + 29, Pal.Red, 10, 7);
+                    ic.FramedArch(true, lc, 0.9f, 0.13f, mh + 2, mh + 13, band, Pal.Door);
+                    ic.QuadSW(lx0, lx1, 0.9f, mh + 13, mh + 15, Pal.Gold);
+                    ic.Pole(lx0 + 0.25f, 0.5f, mh + 15, mh + 29, Pal.Wood, 1);
+                    ic.Flag(lx0 + 0.25f, 0.5f, mh + 29, flagC, 10, 7);
                 }
-                else ic.Arch(true, 0.6f, 0.9f, 0.1f, mh + 3, mh + 12, Pal.Door);
+                else ic.Arch(true, lc, 0.9f, 0.1f, mh + 3, mh + 12, Pal.Door);
             }
             if (level >= 3)
             {
                 // feruza qirrali gumbaz (oltin uchli)
-                ic.Cylinder(1.4f, 0.6f, mh, mh + 4, 10, Pal.Plaster);
-                ic.Dome(1.4f, 0.6f, mh + 4, 10, 12, Pal.Turquoise, 6, true);
+                ic.Cylinder(domeX, 0.6f, mh, mh + 4, 10, Pal.Plaster);
+                ic.Dome(domeX, 0.6f, mh + 4, 10, v == 2 ? 15 : 12, dome, v == 3 ? 0 : 6, true);
             }
             else if (v == 3)
             {
@@ -84,7 +91,7 @@ namespace AndijonSaltanatlar.Core.Graphics
             ic.QuadSE(0.95f, 1.25f, 1.5f, 8, 15, Canvas.Shade(Pal.Door, 0.9f));
 
             // ayvon: yog'och ustunlar va tom (yuqori darajada — o'ymakor, ko'k bo'yalgan, oltin hoshiyali)
-            Color post = level >= 2 ? Pal.Blue : Pal.Wood;
+            Color post = level >= 2 ? (v switch { 0 => Pal.Blue, 1 => Pal.Turquoise, 2 => Pal.Red, _ => Pal.Gold }) : Pal.Wood;
             ic.Pole(1.1f, 1.38f, 0, 19, post);
             ic.Pole(1.72f, 1.38f, 0, 19, post);
             ic.Box(1.0f, 1.0f, 1.8f, 1.42f, 19, 22, Pal.Wood, 0, Canvas.Shade(roof, 0.95f));
@@ -113,7 +120,7 @@ namespace AndijonSaltanatlar.Core.Graphics
                 ic.Box(1.24f, 1.8f, 1.31f, 1.92f, 0, 15, Pal.Plaster, 0, Pal.Turquoise);
                 ic.Box(1.54f, 1.8f, 1.61f, 1.92f, 0, 15, Pal.Plaster, 0, Pal.Turquoise);
                 ic.Box(1.24f, 1.8f, 1.61f, 1.92f, 12, 16, Pal.Plaster, 0, Pal.Turquoise);
-                ic.QuadSW(1.27f, 1.58f, 1.92f, 13, 15, Pal.Blue);
+                ic.QuadSW(1.27f, 1.58f, 1.92f, 13, 15, band);
             }
 
             ic.C.Outline(Outline);

@@ -37,7 +37,7 @@ namespace AndijonSaltanatlar.Military
         public static readonly List<UnitDef> All = new List<UnitDef>
         {
             new UnitDef { Type = UnitType.Piyoda,    NameUz = "Piyoda",    Role = UnitRole.Piyoda, Health = 60,  Attack = 10, Defense = 6,  Speed = 5, TrainingCost = 50,  TrainingDays = 1, Upkeep = 1,
-                          Hint = "Arzon, tez tayyorlanadi", IconKey = "unit_patrol" },
+                          Hint = "Arzon, tez tayyorlanadi", IconKey = "unit_spearman" },
             new UnitDef { Type = UnitType.Qilichboz, NameUz = "Qilichboz", Role = UnitRole.Piyoda, Health = 80,  Attack = 16, Defense = 8,  Speed = 5, TrainingCost = 90,  TrainingDays = 2, Upkeep = 2,
                           Hint = "Yaqin jangda kuchli", IconKey = "unit_swordsman" },
             new UnitDef { Type = UnitType.Qalqonchi, NameUz = "Qalqonchi", Role = UnitRole.Piyoda, Health = 120, Attack = 8,  Defense = 18, Speed = 4, TrainingCost = 110, TrainingDays = 2, Upkeep = 2,
@@ -47,11 +47,11 @@ namespace AndijonSaltanatlar.Military
             new UnitDef { Type = UnitType.Kamonchi,  NameUz = "Kamonchi",  Role = UnitRole.Masofaviy, Health = 70, Attack = 18, Defense = 6, Speed = 5, TrainingCost = 140, TrainingDays = 3, Upkeep = 3,
                           RequiredBuilding = BuildingType.Barracks, Hint = "Uzoqdan o'q uzadi", IconKey = "unit_patrol" },
             new UnitDef { Type = UnitType.Otliq,     NameUz = "Otliq",     Role = UnitRole.Otliq,  Health = 140, Attack = 22, Defense = 12, Speed = 9, TrainingCost = 250, TrainingDays = 5, Upkeep = 5,
-                          RequiredBuilding = BuildingType.Barracks, Hint = "Tez zarba beradi", IconKey = "unit_raider_chief" },
+                          RequiredBuilding = BuildingType.Barracks, Hint = "Tez zarba beradi", IconKey = "unit_cavalry" },
             new UnitDef { Type = UnitType.SaroyQoriqchisi, NameUz = "Saroy qo'riqchisi", Role = UnitRole.Piyoda, Health = 160, Attack = 20, Defense = 22, Speed = 5, TrainingCost = 320, TrainingDays = 4, Upkeep = 6,
                           RequiredBuilding = BuildingType.MainHall, RequiredLevel = 2, Hint = "Saroyni himoya qiladi", IconKey = "unit_elite" },
             new UnitDef { Type = UnitType.ElitaOtliq, NameUz = "Elita otliq", Role = UnitRole.Otliq, Health = 200, Attack = 32, Defense = 18, Speed = 10, TrainingCost = 480, TrainingDays = 6, Upkeep = 8,
-                          RequiredBuilding = BuildingType.GladiatorArena, Hint = "Eng kuchli otliqlar", IconKey = "unit_elite" },
+                          RequiredBuilding = BuildingType.GladiatorArena, Hint = "Eng kuchli otliqlar", IconKey = "unit_cavalry" },
             new UnitDef { Type = UnitType.HarbiyXabarchi, NameUz = "Harbiy xabarchi", Role = UnitRole.Yordamchi, Health = 50, Attack = 6, Defense = 4, Speed = 12, TrainingCost = 70, TrainingDays = 1, Upkeep = 1,
                           RequiredBuilding = BuildingType.Tower, Hint = "Ruhni ko'taradi, xabar yetkazadi", IconKey = "unit_patrol" },
             new UnitDef { Type = UnitType.TaminotBirligi, NameUz = "Ta'minot birligi", Role = UnitRole.Yordamchi, Health = 90, Attack = 2, Defense = 8, Speed = 4, TrainingCost = 100, TrainingDays = 2, Upkeep = 1,

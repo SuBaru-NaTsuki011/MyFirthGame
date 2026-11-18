@@ -38,6 +38,14 @@ namespace AndijonSaltanatlar.Units
         private readonly float[] _walkPhaseTicks = new float[4]; // 4 ta yo'nalish uchun phase offset (placeholder)
         private int _walkPhaseIndex;
         private float _animTimer;
+        private float _walkDist;
+        private Vector2 _animLastPos = new Vector2(float.NaN, float.NaN);
+
+        /// <summary>
+        /// To'liq yurish sikli (ikki qadam) necha tile masofada — kadrlar bosib o'tilgan yo'lga bog'langan,
+        /// shuning uchun oyoq yerda sirpanmaydi va qadam tezligi yurish tezligiga mos keladi.
+        /// </summary>
+        public float WalkCycleTiles { get; set; } = 0.85f;
         private float _moveNoise;
         private bool _facingDirVested;
 
@@ -279,7 +287,8 @@ namespace AndijonSaltanatlar.Units
             get
             {
                 Vector2 w = IsoMath.TileToWorld(Position);
-                return new Vector2(MathF.Round(w.X - Texture.Width / 2f), MathF.Round(w.Y - Texture.Height + UnitArt.FootOffset));
+                float k = AssetManager.ScaleOf(Texture);
+                return new Vector2(MathF.Round(w.X - Texture.Width * k / 2f), MathF.Round(w.Y - Texture.Height * k + UnitArt.FootOffset));
             }
         }
 
@@ -313,6 +322,15 @@ namespace AndijonSaltanatlar.Units
             if (HitPoints <= 0) HitPoints = MaxHitPoints;
             IsElite = true;
         }
+
+        /// <summary>Orqa tomon kadrlari (yuqoriga — shimol/g'arbga yurganda ko'rinadi). null — old kadrlar ishlatiladi.</summary>
+        public Texture2D[] BackFrames { get; set; }
+
+        /// <summary>Unit kameradan uzoqqa (ekranda yuqoriga) qarab turibdi.</summary>
+        public bool FacingAway => Direction == Direction.North || Direction == Direction.West;
+
+        /// <summary>Joriy yo'nalishga mos kadrlar to'plami.</summary>
+        private Texture2D[] Dir => FacingAway && BackFrames != null && BackFrames.Length == Frames.Length ? BackFrames : Frames;
 
         public void SetFrames(Texture2D[] frames)
         {
@@ -419,13 +437,22 @@ namespace AndijonSaltanatlar.Units
                 return;
             }
 
-            Texture = Frames[0]; // default
+            Texture2D[] fr = Dir;
+            Texture = fr[0]; // default
 
-            // Tashqi boshqaruv: kadr tezligi haqiqiy harakat tezligiga to'g'ri proporsional
-            if (ExternallyControlled && State == UnitState.Walking && Frames.Length > 1)
+            // Bosib o'tilgan masofa (teleport yoki qayta tug'ilish sakrashlari hisobga olinmaydi)
+            float moved = float.IsNaN(_animLastPos.X) ? 0f : Vector2.Distance(Position, _animLastPos);
+            _animLastPos = Position;
+            if (moved < 1f) _walkDist += moved;
+
+            // Yurish: kadr = sikl ichidagi joy (masofa / sikl uzunligi). 3D modeldan 8 kadrli silliq sikl,
+            // eski rasmlarda 2 kadr. 
+            if (State == UnitState.Walking && Frames.Length > 1)
             {
-                _animTimer += dt * MathF.Max(1f, _driveSpeed) * 3.4f;
-                Texture = Frames[1 + (int)_animTimer % (Frames.Length - 1)];
+                int walkFrames = Frames.Length - 1;
+                float phase = _walkDist / MathF.Max(0.1f, WalkCycleTiles) + (PerEntityPhaseOffset / (MathF.PI * 2f));
+                int idx = 1 + (int)(phase * walkFrames) % walkFrames;
+                Texture = fr[idx];
                 return;
             }
 
@@ -447,18 +474,18 @@ namespace AndijonSaltanatlar.Units
                 int walkFrames = Frames.Length - 1;
                 float t = _animTimer * MaxFrameDeltaFactor;
                 int idx = Frames.Length > 1 ? 1 + (int)(t % walkFrames) : 0;
-                Texture = Frames[idx];
+                Texture = fr[idx];
             }
             else
             {
                 _animTimer = 0f;
-                Texture = Frames[0];
+                Texture = fr[0];
 
                 // Idle animatsiyasi fasl bilan bog'liq: placeholder cheklovlariga ko'ra
                 if (State == UnitState.Idle && Frames.Length > 1 && dt > 0.016f)
                 {
                     // Hozircha faqat 1-frame idle, lekin placeholder animatsiya vorislik qilishi mumkin
-                    Texture = Frames[0];
+                    Texture = fr[0];
                 }
             }
         }

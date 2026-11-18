@@ -431,6 +431,10 @@ public sealed class Game1 : Game
 		_state = new GameStateManager();
 		CityGenerator.Generate(_map, _buildings, _units, seed);
 		CitizenSpawner.Spawn(_map, _units);
+		// Otliq soqchilar bosh ko'chalarda (3D modeldan olingan otliq rasmi)
+		float co = GameConfig.CityOffset;
+		_units.Add(new CavalryUnit(new[] { new Vector2(16.5f + co, 31.5f + co), new Vector2(48.5f + co, 31.5f + co) }));
+		_units.Add(new CavalryUnit(new[] { new Vector2(31.5f + co, 15.5f + co), new Vector2(31.5f + co, 49.5f + co) }, 1.4f));
 		PatrolController.RouteAll(_map, _units);
 		_state.IsStoryMode = _pendingStoryMode;
 		_state.PendingCampaignState = _pendingStory;

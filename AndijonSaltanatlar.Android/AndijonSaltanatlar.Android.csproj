@@ -38,6 +38,7 @@
   <!-- Shriftlar APK ichiga asset sifatida (TitleContainer orqali o'qiladi). -->
   <ItemGroup>
     <AndroidAsset Include="..\AndijonSaltanatlar\Content\Fonts\*.ttf" Link="Assets\Content\Fonts\%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\AndijonSaltanatlar\Content\Sprites\*" Link="Assets\Content\Sprites\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

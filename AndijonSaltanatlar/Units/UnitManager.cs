@@ -23,10 +23,9 @@ namespace AndijonSaltanatlar.Units
         public T Add<T>(T unit) where T : Unit
         {
             unit.Id = _nextId++;
-            var frames = new Texture2D[SpriteKeys.UnitFrames];
-            for (int i = 0; i < frames.Length; i++)
-                frames[i] = _assets.Get(unit.SpriteKey + "_" + i);
+            LoadFrames(unit.SpriteKey, out var frames, out var back);
             unit.SetFrames(frames);
+            unit.BackFrames = back;
             var attack = new Texture2D[UnitArt.AttackKinds * UnitArt.AttackPhases];
             bool any = false;
             for (int i = 0; i < attack.Length; i++)
@@ -43,12 +42,52 @@ namespace AndijonSaltanatlar.Units
         public void MakeElite(Unit unit)
         {
             if (unit == null || unit.IsElite) return;
-            var frames = new Texture2D[SpriteKeys.UnitFrames];
-            for (int i = 0; i < frames.Length; i++) frames[i] = _assets.TryGet(SpriteKeys.UnitElite + "_" + i);
+            LoadFrames(SpriteKeys.UnitElite, out var frames, out var eliteBack);
             var attack = new Texture2D[UnitArt.AttackKinds * UnitArt.AttackPhases];
             for (int i = 0; i < attack.Length; i++)
                 attack[i] = _assets.TryGet(AssetManager.AttackKey(SpriteKeys.UnitElite, i / UnitArt.AttackPhases, i % UnitArt.AttackPhases));
             unit.MakeElite(frames, attack);
+            unit.BackFrames = eliteBack;
+        }
+
+        public const int WalkFrames = 8;
+
+        /// <summary>
+        /// Kadrlar: [turish, yurish...]. 3D modeldan 8 kadrli yurish sikli (key_w0..w7, orqa: key_bw0..bw7) bo'lsa — shu,
+        /// aks holda eski 3 kadr. Orqa kadrlar old kadrlar bilan bir xil sonda bo'lmasa null.
+        /// </summary>
+        public void LoadFrames(string key, out Texture2D[] frames, out Texture2D[] back)
+        {
+            if (_assets.TryGet(key + "_w0") != null && _assets.TryGet(key + "_w" + (WalkFrames - 1)) != null)
+            {
+                frames = new Texture2D[1 + WalkFrames];
+                frames[0] = _assets.Get(key + "_0");
+                for (int i = 0; i < WalkFrames; i++) frames[1 + i] = _assets.TryGet(key + "_w" + i) ?? frames[0];
+                back = null;
+                Texture2D b0 = _assets.TryGet(key + "_b0");
+                if (b0 != null && _assets.TryGet(key + "_bw0") != null)
+                {
+                    back = new Texture2D[1 + WalkFrames];
+                    back[0] = b0;
+                    for (int i = 0; i < WalkFrames; i++) back[1 + i] = _assets.TryGet(key + "_bw" + i) ?? b0;
+                }
+                return;
+            }
+            frames = new Texture2D[SpriteKeys.UnitFrames];
+            for (int i = 0; i < frames.Length; i++) frames[i] = _assets.Get(key + "_" + i);
+            back = LoadBack(key);
+        }
+
+        /// <summary>Orqa tomon kadrlari (key_b0..b2) — hammasi bo'lsa qaytadi, aks holda null.</summary>
+        private Texture2D[] LoadBack(string key)
+        {
+            var back = new Texture2D[SpriteKeys.UnitFrames];
+            for (int i = 0; i < back.Length; i++)
+            {
+                back[i] = _assets.TryGet(key + "_b" + i);
+                if (back[i] == null) return null;
+            }
+            return back;
         }
 
         /// <summary>Unitni dunyodan olib tashlaydi (faqat vaqtinchalik unitlar — masalan bosqinchilar — uchun).</summary>
