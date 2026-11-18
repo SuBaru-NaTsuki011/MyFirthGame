@@ -104,6 +104,7 @@ public sealed class Game1 : Game
 	private ArenaController _arena;
 	private bool _arenaFromMap;
 	private readonly FarmWorkController _farmWork = new FarmWorkController();
+	private readonly SwimController _swim = new SwimController();
 
 	private bool _strategicMode;
 
@@ -1676,6 +1677,16 @@ public sealed class Game1 : Game
 		}
 		_units.Update(dt * (_combat?.TimeScale ?? 1f));
 		_farmWork.Update(dt, _map, _buildings, _units, _state);
+		_swim.Force = _opt.Swim;
+		if (_opt.FarmDemo.HasValue && _opt.ScreenshotPath != null && _farmWork.FirstCarrier is Unit carrier) _camera.Jump(IsoMath.TileToWorld(carrier.Position) + new Vector2(0, 60), 2.8f);
+		if (_opt.Swim && _opt.ScreenshotPath != null)
+		{
+			if (_swim.FirstInWater is Unit swimmer) _camera.Jump(IsoMath.TileToWorld(swimmer.Position) + new Vector2(0, 60), 2.6f);
+			_state.ShowMessage(_swim.Debug);
+		}
+		_swim.Update(dt, _map, _units, _state, _combat.Possessed, u => _farmWork.IsWorker(u));
+		// Uyga kirmagan paytda oilalar o'zlari non yopadi
+		if (!_state.Paused) AndijonSaltanatlar.Interiors.HouseInterior.TickOutside(dt * _state.Speed / Math.Max(1f, _state.Clock.SecondsPerDay) * 24f);
 		_renderer.Tick(dt);
 		_birds?.Update(dt, _dayNight.NightAmount, _combat.Possessed);
 		_livestock?.Update(dt);

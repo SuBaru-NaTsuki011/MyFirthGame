@@ -19,7 +19,7 @@ namespace AndijonSaltanatlar.World
         /// <summary>start dan goal gacha tile yo'li (ikkalasi ham kiritiladi) yoki null.</summary>
         public static List<Point> FindPath(MapManager map, Point start, Point goal, int maxExpansions = 20000)
         {
-            if (!map.IsWalkable(start.X, start.Y) || !map.IsWalkable(goal.X, goal.Y)) return null;
+            if (!map.IsPassable(start.X, start.Y) || !map.IsPassable(goal.X, goal.Y)) return null;
             if (start == goal) return new List<Point> { start };
 
             var open = new PriorityQueue<Point, int>();
@@ -40,9 +40,10 @@ namespace AndijonSaltanatlar.World
                 foreach (Point dir in Dirs)
                 {
                     var next = new Point(current.X + dir.X, current.Y + dir.Y);
-                    if (!map.IsWalkable(next.X, next.Y) || closed.Contains(next)) continue;
+                    if (!map.IsPassable(next.X, next.Y) || closed.Contains(next)) continue;
 
-                    int tentative = cg + 1;
+                    // Suvdan o'tish mumkin (kechib yoki suzib), lekin sekinroq — yo'l faqat ancha qisqarsa suvdan o'tadi
+                    int tentative = cg + (map.IsWater(next.X, next.Y) ? 4 : 1);
                     if (!gScore.TryGetValue(next, out int known) || tentative < known)
                     {
                         gScore[next] = tentative;

@@ -13,6 +13,19 @@ namespace AndijonSaltanatlar.Core.Graphics
         /// Ekin (bug'doy) o'sish bosqichi, 3x aniqlikda (o'yinda 1/3 masshtabda chiziladi):
         /// 0 — urug' (tuproqda), 1 — nihol, 2 — yosh, 3 — yashil poya, 4 — pishgan oltin boshoq.
         /// </summary>
+        /// <summary>Hosil qopi (yelkada), 3x aniqlik.</summary>
+        public static Canvas Sack()
+        {
+            var c = new Canvas(42, 48);
+            c.FillBlob(21, 28, 16, 17, new Color(196, 168, 112), 0.04f);
+            c.FillBlob(17, 24, 9, 9, new Color(214, 188, 132), 0.03f);
+            c.FillEllipse(21, 11, 6, 4, new Color(170, 140, 88));
+            c.Line(new Vector2(14, 13), new Vector2(28, 13), new Color(120, 86, 48), 3);
+            c.Line(new Vector2(10, 34), new Vector2(32, 34), new Color(176, 146, 92), 2);
+            c.Outline(new Color(70, 50, 30), 0.5f);
+            return c;
+        }
+
         public static Canvas Crop(int stage)
         {
             const int W = 30, H = 66;

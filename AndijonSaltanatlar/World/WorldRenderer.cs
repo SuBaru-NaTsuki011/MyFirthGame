@@ -100,7 +100,42 @@ namespace AndijonSaltanatlar.World
                         cu.GetHitPose(out Vector2 hoff, out float hrot);
                         if (spin) fx = fx == SpriteEffects.None ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
                         Vector2 at = new Vector2(MathF.Round(feet.X), MathF.Round(feet.Y)) + off + hoff;
+                        int depth = map.WaterDepth((int)MathF.Floor(cu.Position.X), (int)MathF.Floor(cu.Position.Y));
+                        float sinkNow = 0f;
+                        if (depth > 0)
+                        {
+                            // Suvda: sayozda kechib (tizzagacha), chuqurda suzib (yelkagacha); tana suv sathida kesiladi
+                            float bodyPx = (o.Texture.Height - AssetManager.FootOf(o.Texture)) * k;
+                            float sink = bodyPx * (depth == 2 ? 0.62f : 0.3f) + (depth == 2 ? MathF.Sin(_time * 2.6f + cu.PerEntityPhaseOffset) * 1.2f : 0f);
+                            sinkNow = sink;
+                            int keepRows = (int)MathF.Max(1f, (o.Texture.Height - AssetManager.FootOf(o.Texture)) - sink / k);
+                            var src = new Rectangle(0, 0, o.Texture.Width, keepRows);
+                            var org = new Vector2(origin.X, keepRows);
+                            Vector2 wat = at + new Vector2(0, -0f);
+                            sb.Draw(o.Texture, wat + new Vector2(0, 0), src, tint, 0f, org, k, fx, 0f);
+                            // to'lqin halqalari
+                            float rip = (_time * 0.8f + cu.PerEntityPhaseOffset) % 1f;
+                            DrawRing(sb, at, 9f + rip * 9f, new Color(220, 240, 255) * (0.55f * (1f - rip)));
+                            DrawRing(sb, at, 7f, new Color(200, 230, 255) * 0.45f);
+                        }
+                        else
                         sb.Draw(o.Texture, at, null, tint, rot + hrot, origin, new Vector2(k, sy * k), fx, 0f);
+                        // Yelkadagi narsa (hosil qopi)
+                        if (cu.CarryKey != null && _assets.TryGet(cu.CarryKey) is Texture2D carry)
+                        {
+                            float ck = AssetManager.ScaleOf(carry);
+                            float side = o.Flipped ? 5f : -5f;
+                            sb.Draw(carry, at + new Vector2(side, -30f + sinkNow), null, Color.White, 0f, new Vector2(carry.Width / 2f, carry.Height), ck, fx, 0f);
+                        }
+                        // Sug'orish: ekin ustiga suv tomchilari
+                        if (cu.Watering)
+                            for (int dI = 0; dI < 6; dI++)
+                            {
+                                float u2 = (_time * 1.6f + dI / 6f) % 1f;
+                                float dxw = (o.Flipped ? -1f : 1f) * (8f + dI * 1.6f);
+                                Vector2 dp = at + new Vector2(dxw + u2 * 2f, -14f + u2 * 16f);
+                                sb.Draw(_assets.Pixel, new Rectangle((int)dp.X, (int)dp.Y, 1, 2), new Color(150, 200, 255) * (1f - u2 * 0.6f));
+                            }
                         // Zarba tekkan lahza: oq chaqnash
                         if (cu.FlashTimer > 0f && _assets.FlashOf(o.Texture) is Texture2D wf)
                             sb.Draw(wf, at, null, Color.White * (cu.FlashTimer / Unit.FlashTime) * cu.FadeAlpha, rot + hrot, origin, new Vector2(k, sy * k), fx, 0f);
@@ -217,6 +252,16 @@ namespace AndijonSaltanatlar.World
                     float sway = stage >= 2 ? 0.04f * MathF.Sin(_time * 1.7f + col * 0.7f + row) : 0f;
                     sb.Draw(tex, new Vector2(MathF.Round(w.X), MathF.Round(w.Y)), null, Color.White, sway, origin, k * grow, (col + row) % 2 == 0 ? SpriteEffects.None : SpriteEffects.FlipHorizontally, 0f);
                 }
+        }
+
+        private void DrawRing(SpriteBatch sb, Vector2 c, float r, Color col)
+        {
+            for (int i = 0; i < 20; i++)
+            {
+                float a = i / 20f * MathF.PI * 2f;
+                var p = c + new Vector2(MathF.Cos(a) * r, MathF.Sin(a) * r * 0.45f);
+                sb.Draw(_assets.Pixel, new Rectangle((int)p.X, (int)p.Y, 2, 1), col);
+            }
         }
 
         private float _time;

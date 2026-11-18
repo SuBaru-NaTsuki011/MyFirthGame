@@ -40,7 +40,31 @@ namespace AndijonSaltanatlar.CityLife
             public float Delay;
             public float ThrowTimer;
             public float ShoutTimer;
+            /// <summary>Askar yetib kelib to'xtatgan — endi tosh otmaydi.</summary>
+            public bool Restrained;
         }
+
+        // ---- Askarlar g'alayonchilarni to'xtatadi: har askar bitta odamga boradi; askar yetmagan odamlar otishda davom etadi ----
+        private sealed class GuardJob
+        {
+            public Unit U;
+            public Rioter R;
+            public List<Point> Path;
+            public int Idx;
+            public bool Arrived;
+            public bool Returning;
+            public Vector2 Home;
+            public float Talk;
+        }
+        private readonly List<GuardJob> _guards = new List<GuardJob>();
+        private float _assignTimer;
+        /// <summary>Askarlar g'alayonchilarning qancha qismini to'xtata oladi (qolganlari tosh otaveradi).</summary>
+        private const float GuardShare = 0.6f;
+        private static readonly string[] GuardLines = { "To'xta! Tosh otma!", "Tarqalinglar!", "Shohning amri — tinch turing!", "Qo'lingni tushir!" };
+        private static readonly string[] CalmLines = { "Xo'p, xo'p... to'xtadim", "Mayli, otmayman", "Bizni eshitishsin, xolos" };
+
+        /// <summary>Hozir g'alayonchini to'xtatib turgan askarlar soni.</summary>
+        public int GuardsHolding { get { int n = 0; foreach (GuardJob g in _guards) if (g.Arrived && !g.Returning) n++; return n; } }
 
         private sealed class Stone
         {
@@ -80,7 +104,7 @@ namespace AndijonSaltanatlar.CityLife
             get
             {
                 int n = 0;
-                foreach (Rioter r in _rioters) if (r.Mode == Mode.Protesting) n++;
+                foreach (Rioter r in _rioters) if (r.Mode == Mode.Protesting && !r.Restrained) n++;
                 return n;
             }
         }
@@ -93,7 +117,7 @@ namespace AndijonSaltanatlar.CityLife
                 foreach (Rioter r in _rioters) m[(int)r.Mode]++;
                 int noPath = 0;
                 foreach (Rioter r in _rioters) if (r.Mode == Mode.Marching && r.Path == null) noPath++;
-                return "W" + m[0] + " M" + m[1] + " P" + m[2] + " R" + m[3] + " nopath" + noPath + " stones" + _stones.Count + " spots" + _spots.Count;
+                return "W" + m[0] + " M" + m[1] + " P" + m[2] + " R" + m[3] + " nopath" + noPath + " stones" + _stones.Count + " spots" + _spots.Count + " guards" + _guards.Count + " hold" + GuardsHolding;
             }
         }
 
@@ -139,6 +163,8 @@ namespace AndijonSaltanatlar.CityLife
 
             for (int i = _rioters.Count - 1; i >= 0; i--)
                 if (UpdateRioter(_rioters[i], dt, map, units)) _rioters.RemoveAt(i);
+
+            UpdateGuards(dt, map, units, possessed);
 
             UpdateProjectiles(dt);
 
@@ -235,6 +261,7 @@ namespace AndijonSaltanatlar.CityLife
         private void End(GameStateManager state, MapManager map)
         {
             Active = false;
+            SendGuardsHome(map);
             foreach (Rioter r in _rioters) BeginReturn(r, map);
             var kingdom = state.World.PlayerKingdom;
             kingdom.Stability = Math.Min(100, kingdom.Stability + 3);
@@ -247,12 +274,170 @@ namespace AndijonSaltanatlar.CityLife
         private void Abort(UnitManager units)
         {
             Active = false;
+            foreach (GuardJob g in _guards) ReleaseGuard(g);
+            _guards.Clear();
             foreach (Rioter r in _rioters)
             {
                 if (r.Spawned) units.Remove(r.Unit);
                 else Release(r.Unit);
             }
             _rioters.Clear();
+        }
+
+        // ==================================================================
+        // Askarlar
+        // ==================================================================
+
+        private static bool IsSoldier(Unit u) =>
+            (u is GuardUnit) || (u is PatrolUnit && !(u is CitizenUnit) && !(u is GladiatorUnit));
+
+        private void UpdateGuards(float dt, MapManager map, UnitManager units, Unit possessed)
+        {
+            // Yaroqsiz topshiriqlar
+            for (int i = _guards.Count - 1; i >= 0; i--)
+            {
+                GuardJob g = _guards[i];
+                bool lost = !units.Units.Contains(g.U) || g.U.IsDown || g.U == possessed;
+                bool targetGone = !g.Returning && (!_rioters.Contains(g.R) || g.R.Mode == Mode.Returning);
+                if (lost) { ReleaseGuard(g); _guards.RemoveAt(i); continue; }
+                if (targetGone) StartGuardReturn(g, map);
+            }
+
+            // Yangi askarlarni yuborish (g'alayon davom etayotgan bo'lsa)
+            _assignTimer -= dt;
+            if (Active && _assignTimer <= 0f)
+            {
+                _assignTimer = 1.5f;
+                int active = 0;
+                foreach (Rioter r in _rioters) if (r.Mode == Mode.Protesting || r.Mode == Mode.Marching) active++;
+                int busy = 0;
+                foreach (GuardJob g in _guards) if (!g.Returning) busy++;
+                int want = (int)Math.Ceiling(active * GuardShare);
+                Vector2 pc = PalaceCenter();
+                var free = new List<Unit>();
+                foreach (Unit u in units.Units)
+                {
+                    if (!IsSoldier(u) || u == possessed || u.IsDown || u.ExternallyControlled) continue;
+                    if (Vector2.Distance(u.Position, pc) > 40f) continue;
+                    bool taken = false;
+                    foreach (GuardJob g in _guards) if (g.U == u) { taken = true; break; }
+                    if (!taken) free.Add(u);
+                }
+                free.Sort((a, b) => Vector2.DistanceSquared(a.Position, pc).CompareTo(Vector2.DistanceSquared(b.Position, pc)));
+                foreach (Unit u in free)
+                {
+                    if (busy >= want) break;
+                    Rioter target = null; float best = float.MaxValue;
+                    foreach (Rioter r in _rioters)
+                    {
+                        if (r.Restrained || (r.Mode != Mode.Protesting && r.Mode != Mode.Marching)) continue;
+                        bool covered = false;
+                        foreach (GuardJob g in _guards) if (g.R == r && !g.Returning) { covered = true; break; }
+                        if (covered) continue;
+                        float d = Vector2.DistanceSquared(r.Unit.Position, u.Position);
+                        if (d < best) { best = d; target = r; }
+                    }
+                    if (target == null) break;
+                    var job = new GuardJob { U = u, R = target, Home = u.Position, Talk = (float)_rng.NextDouble() * 2f };
+                    job.Path = PathTo(map, u.Position, target.Unit.Position);
+                    job.Idx = job.Path != null && job.Path.Count > 1 ? 1 : 0;
+                    u.ExternallyControlled = true;
+                    _guards.Add(job);
+                    busy++;
+                }
+            }
+
+            // Harakat
+            for (int i = _guards.Count - 1; i >= 0; i--)
+            {
+                GuardJob g = _guards[i];
+                Unit u = g.U;
+                if (g.Returning)
+                {
+                    if (FollowPath(u, g, dt, 1.2f) && StepToUnit(u, g.Home, dt, 1.2f)) { ReleaseGuard(g); _guards.RemoveAt(i); }
+                    continue;
+                }
+                Vector2 rp = g.R.Unit.Position;
+                if (!g.Arrived)
+                {
+                    float d = Vector2.Distance(u.Position, rp);
+                    if (d < 0.75f)
+                    {
+                        g.Arrived = true;
+                        g.R.Restrained = true;
+                        g.R.ShoutTimer = 1.5f;
+                        u.DriveIdle();
+                        u.SetFacing(rp - u.Position);
+                       
+                        g.R.Unit.SetFacing(u.Position - rp);
+                        continue;
+                    }
+                    // Yo'l bo'ylab, oxirida to'g'ridan-to'g'ri g'alayonchi yoniga
+                    if (FollowPath(u, g, dt, 1.7f))
+                    {
+                        Vector2 dir = rp - u.Position;
+                        Vector2 stop = rp - (dir.LengthSquared() > 0.0001f ? Vector2.Normalize(dir) * 0.6f : Vector2.Zero);
+                        StepToUnit(u, stop, dt, 1.6f);
+                        if (Vector2.Distance(u.Position, stop) < 0.08f) { g.Arrived = false; u.Position = stop; g.R.Restrained = true; g.Arrived = true; u.DriveIdle(); u.SetFacing(rp - u.Position); }
+                    }
+                }
+                else
+                {
+                    u.DriveIdle();
+                    u.SetFacing(rp - u.Position);
+                    g.Talk -= dt;
+                    if (g.Talk <= 0f) { g.Talk = 12f + (float)_rng.NextDouble() * 10f; }
+                }
+            }
+        }
+
+        private void StartGuardReturn(GuardJob g, MapManager map)
+        {
+            if (g.R != null) g.R.Restrained = false;
+            g.Returning = true;
+            g.Arrived = false;
+            g.Path = PathTo(map, g.U.Position, g.Home);
+            g.Idx = g.Path != null && g.Path.Count > 1 ? 1 : 0;
+        }
+
+        private void SendGuardsHome(MapManager map)
+        {
+            foreach (GuardJob g in _guards) if (!g.Returning) StartGuardReturn(g, map);
+        }
+
+        private static void ReleaseGuard(GuardJob g)
+        {
+            g.U.ExternallyControlled = false;
+            g.U.DriveIdle();
+        }
+
+        /// <returns>true — yo'l tugadi.</returns>
+        private static bool FollowPath(Unit u, GuardJob g, float dt, float speed)
+        {
+            if (g.Path == null) return true;
+            float step = speed * dt;
+            while (g.Idx < g.Path.Count)
+            {
+                Point tile = g.Path[g.Idx];
+                Vector2 target = new Vector2(tile.X + 0.5f, tile.Y + 0.5f);
+                Vector2 delta = target - u.Position;
+                float distance = delta.Length();
+                if (distance <= MathF.Max(0.03f, step)) { u.Position = target; step -= distance; g.Idx++; continue; }
+                u.DriveMove(delta, speed);
+                u.Position += delta / distance * step;
+                return false;
+            }
+            return true;
+        }
+
+        private static bool StepToUnit(Unit u, Vector2 to, float dt, float speed)
+        {
+            Vector2 d = to - u.Position;
+            float dist = d.Length();
+            if (dist < 0.05f) { u.DriveIdle(); return true; }
+            u.DriveMove(d, speed);
+            u.Position += d / dist * MathF.Min(dist, speed * dt);
+            return false;
         }
 
         private bool IsRioter(CitizenUnit c)
@@ -358,6 +543,13 @@ namespace AndijonSaltanatlar.CityLife
 
                 case Mode.Protesting:
                     u.DriveIdle();
+                    if (r.Restrained)
+                    {
+                        // Askar to'xtatgan: tosh otmaydi, faqat ba'zan noliydi
+                        r.ShoutTimer -= dt;
+                        if (r.ShoutTimer <= 0f) { r.ShoutTimer = 10f + (float)_rng.NextDouble() * 10f; u.Say(CalmLines[_rng.Next(CalmLines.Length)], 2.5f); }
+                        return false;
+                    }
                     Vector2 center = PalaceCenter();
                     u.SetFacing(center - u.Position);
                     r.ThrowTimer -= dt;

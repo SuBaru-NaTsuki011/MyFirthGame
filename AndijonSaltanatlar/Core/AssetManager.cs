@@ -193,6 +193,7 @@ namespace AndijonSaltanatlar.Core
                         Register(bk, () => CitizenArt.Frame(kk, ff));
                 }
 
+            Register("carry_sack", DecorArt.Sack);
             // Ekin bosqichlari (dehqon parvarishida o'sadi)
             for (int st = 0; st < 5; st++)
             {
@@ -391,7 +392,7 @@ namespace AndijonSaltanatlar.Core
             }
 
             // 3D modeldan olingan yuqori aniqlikdagi odam rasmi (HR marta katta) — mipmapli, chizishda 1/HR masshtab
-            bool hiRes = (key.StartsWith("unit_") && canvas.Height >= 120) || key.StartsWith("crop_");
+            bool hiRes = (key.StartsWith("unit_") && canvas.Height >= 120) || key.StartsWith("crop_") || key.StartsWith("carry_");
             Texture2D tex = hiRes ? canvas.ToTextureMipmapped(_gd) : canvas.ToTexture(_gd);
             if (hiRes) HiRes.Add(tex);
             tex.Name = key;

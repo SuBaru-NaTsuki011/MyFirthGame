@@ -74,7 +74,40 @@ namespace AndijonSaltanatlar.Interiors
         private int _doorX0, _doorX1;
 
         // ---- Uy ichidagi harakatlar: dasturxon atrofida o'tirish / ovqatlanish, to'shakda yotish ----
-        public enum Pose { Stand, Sit, Eat, Lie }
+        public enum Pose { Stand, Sit, Eat, Lie, Bake }
+
+        // ---- Non va tandir: dasturxonda non bo'lmasa — tandirda yopiladi (o'yinchi o'zi yoki oila a'zosi) ----
+        /// <summary>Har uydagi dasturxondagi nonlar soni (bino Id -> 0..MaxBread). Uyga kirmaganda ham oila o'zi yopadi.</summary>
+        private static readonly Dictionary<int, int> HouseBread = new Dictionary<int, int>();
+        private static readonly Dictionary<int, float> BakeClock = new Dictionary<int, float>();
+        public const int MaxBread = 4;
+        public const float BakeTime = 3f;
+        private readonly Vector2 _stovePos = new Vector2(7.3f, 1.55f);   // tandir oldi
+        private bool _carryBread;
+        private Resident _baker;
+        private int _bakerStage;
+        private float _bakerTime;
+        private Vector2 _bakerHome;
+        private readonly Random _brng = new Random();
+
+        private int Bread
+        {
+            get => House != null && HouseBread.TryGetValue(House.Id, out int n) ? n : 0;
+            set { if (House != null) HouseBread[House.Id] = Math.Clamp(value, 0, MaxBread); }
+        }
+
+        /// <summary>Uyga kirmagan paytda oilalar o'zlari non yopadi: har uyda har ~6 o'yin soatida +1 non (3 tagacha).</summary>
+        public static void TickOutside(float gameHours)
+        {
+            if (gameHours <= 0f) return;
+            foreach (int id in new List<int>(HouseBread.Keys))
+            {
+                BakeClock.TryGetValue(id, out float c);
+                c += gameHours;
+                while (c >= 6f) { c -= 6f; if (HouseBread[id] < 3) HouseBread[id]++; }
+                BakeClock[id] = c;
+            }
+        }
         public Pose CurrentPose { get; private set; } = Pose.Stand;
         public const int MealFood = 5;
         public const float EatTime = 3f;
@@ -182,6 +215,9 @@ namespace AndijonSaltanatlar.Interiors
             }
             _leftDoor = false;
             CurrentPose = Pose.Stand;
+            _carryBread = false;
+            _baker = null;
+            if (!HouseBread.ContainsKey(building.Id)) HouseBread[building.Id] = _brng.Next(2);
             avatar.DriveIdle();
             avatar.SetFacing(new Vector2(-1, -1));
             Active = true;
@@ -481,6 +517,7 @@ namespace AndijonSaltanatlar.Interiors
         {
             if (!Active || _avatar == null) return;
             _time += dt;
+            UpdateFamilyBaker(dt);
             if (input == null) { _avatar.DriveIdle(); return; }
 
             // Saroyda shoh yonida F — shohga aylanib shaharga chiqish
@@ -527,6 +564,48 @@ namespace AndijonSaltanatlar.Interiors
         // ------------------------------------------------------------------ harakatlar
         private bool IsHouse => House != null && House.Type == BuildingType.House && !_palace;
         private bool NearTable => IsHouse && Vector2.Distance(_pos, _tableCenter) < 1.9f;
+        private bool NearStove => IsHouse && Vector2.Distance(_pos, _stovePos) < 1.5f;
+
+        /// <summary>
+        /// Oila a'zosi: dasturxonda non qolmasa (va o'yinchi o'zi yopmayotgan bo'lsa) — tandirga borib non yopadi,
+        /// dasturxonga qo'yadi va joyiga qaytadi.
+        /// </summary>
+        private void UpdateFamilyBaker(float dt)
+        {
+            if (!IsHouse) return;
+            if (_baker == null)
+            {
+                if (Bread > 0 || _carryBread || CurrentPose == Pose.Bake) return;
+                foreach (Resident r in _residents)
+                    if (!r.IsShah && r.Scale >= 1f) { _baker = r; break; }
+                if (_baker == null) return;
+                _bakerHome = _baker.Pos;
+                _bakerStage = 0;
+                _bakerTime = 0f;
+                _baker.Line = "Non tugabdi — tandirda non yopay";
+            }
+            Resident b = _baker;
+            Vector2 tableSpot = new Vector2(7.45f, 5.0f);
+            switch (_bakerStage)
+            {
+                case 0: if (WalkResident(b, _stovePos, dt)) { _bakerStage = 1; _bakerTime = 0f; b.Line = "Tandirda non yopyapman..."; } break;
+                case 1:
+                    _bakerTime += dt;
+                    if (_bakerTime >= BakeTime) { _bakerStage = 2; b.Line = "Issiq non tayyor!"; }
+                    break;
+                case 2: if (WalkResident(b, tableSpot, dt)) { Bread += 2; _bakerStage = 3; b.Line = "Dasturxonga non qo'ydim, marhamat!"; } break;
+                case 3: if (WalkResident(b, _bakerHome, dt)) { _baker = null; } break;
+            }
+        }
+
+        private static bool WalkResident(Resident r, Vector2 to, float dt)
+        {
+            Vector2 d = to - r.Pos;
+            float dist = d.Length();
+            if (dist < 0.05f) return true;
+            r.Pos += d / dist * MathF.Min(dist, 1.3f * dt);
+            return false;
+        }
         private bool NearBed => IsHouse && Vector2.Distance(_pos, _bedPos) < 1.8f;
 
         /// <summary>Hozir bajarsa bo'ladigan harakatlar (ekrandagi tugmalar va klaviatura ko'rsatmasi).</summary>
@@ -538,8 +617,11 @@ namespace AndijonSaltanatlar.Interiors
                 case Pose.Sit: a1 = "[E] OVQATLANISH"; a2 = "[Q] TURISH"; break;
                 case Pose.Eat: a1 = "OVQATLANMOQDA..."; break;
                 case Pose.Lie: a1 = "DAM OLMOQDA..."; a2 = "[Q] TURISH"; break;
+                case Pose.Bake: a1 = "NON YOPILMOQDA..."; break;
                 default:
-                    if (NearTable) a1 = "[E] DASTURXONGA O'TIRISH";
+                    if (_carryBread && NearTable) a1 = "[E] NONNI DASTURXONGA QO'YISH";
+                    else if (NearTable && !_carryBread) a1 = "[E] DASTURXONGA O'TIRISH";
+                    else if (NearStove && !_carryBread) a1 = "[E] TANDIRDA NON YOPISH";
                     else if (NearBed) a1 = "[E] YOTISH";
                     break;
             }
@@ -555,6 +637,8 @@ namespace AndijonSaltanatlar.Interiors
                 case "eat": _pos = new Vector2(6.4f, 6.6f); SitDown(); _state.Food = Math.Max(_state.Food, MealFood); Eat(); _poseTime = 0.5f; break;
                 case "lie": _pos = new Vector2(2.4f, 6.2f); LieDown(); _poseTime = 0.4f; break;
                 case "table": _pos = new Vector2(6.4f, 6.8f); break;
+                case "nobread": Bread = 0; break;
+                case "stove": Bread = 1; _pos = new Vector2(7.2f, 2.3f); CurrentPose = Pose.Bake; _poseTime = 1f; break;
             }
         }
 
@@ -564,7 +648,22 @@ namespace AndijonSaltanatlar.Interiors
             switch (CurrentPose)
             {
                 case Pose.Stand:
-                    if (NearTable) SitDown();
+                    if (_carryBread && NearTable)
+                    {
+                        _carryBread = false;
+                        Bread += 2;
+                        _state.ShowMessage("Issiq nonni dasturxonga qo'ydingiz (" + Bread + " ta non)");
+                    }
+                    else if (NearTable && !_carryBread) SitDown();
+                    else if (NearStove && !_carryBread)
+                    {
+                        if (_baker != null) { _state.ShowMessage("Oila a'zosi allaqachon non yopyapti"); break; }
+                        CurrentPose = Pose.Bake;
+                        _poseTime = 0f;
+                        _avatar.DriveIdle();
+                        _avatar.SetFacing(_stovePos - _pos + new Vector2(0, -1));
+                        _state.ShowMessage("Tandirga xamir yopishtiryapsiz...");
+                    }
                     else if (NearBed) LieDown();
                     break;
                 case Pose.Sit:
@@ -576,7 +675,7 @@ namespace AndijonSaltanatlar.Interiors
         /// <summary>O'rnidan turish (Q yoki 2-tugma).</summary>
         public void StandUp()
         {
-            if (CurrentPose == Pose.Stand || CurrentPose == Pose.Eat) return;
+            if (CurrentPose == Pose.Stand || CurrentPose == Pose.Eat || CurrentPose == Pose.Bake) return;
             CurrentPose = Pose.Stand;
             _pos = _standPos;
             _avatar.DriveIdle();
@@ -597,12 +696,18 @@ namespace AndijonSaltanatlar.Interiors
 
         private void Eat()
         {
+            if (IsHouse && Bread <= 0)
+            {
+                _state.ShowMessage("Dasturxonda non yo'q — tandirda non yoping (yoki oila a'zosi yopadi)", true);
+                return;
+            }
             if (_state.Food < MealFood)
             {
                 _state.ShowMessage("Uyda ovqat yo'q — omborda oziq-ovqat tugagan", true);
                 return;
             }
             _state.Food -= MealFood;
+            if (IsHouse) Bread -= 1;
             CurrentPose = Pose.Eat;
             _poseTime = 0f;
             _state.ShowMessage("Bismillah! Osh tortildi (-" + MealFood + " oziq-ovqat)");
@@ -637,12 +742,18 @@ namespace AndijonSaltanatlar.Interiors
                 _avatar.HitPoints = Math.Min(_avatar.MaxHitPoints, _avatar.HitPoints + 40);
                 _state.ShowMessage("Osh juda mazali bo'ldi! Kuch qaytdi.");
             }
+            if (CurrentPose == Pose.Bake && _poseTime >= BakeTime)
+            {
+                CurrentPose = Pose.Stand;
+                _carryBread = true;
+                _state.ShowMessage("Non pishdi! Endi dasturxonga qo'ying (E)");
+            }
             if (CurrentPose == Pose.Lie && _avatar.HitPoints < _avatar.MaxHitPoints && (int)(_poseTime * 2f) != (int)((_poseTime - dt) * 2f))
                 _avatar.HitPoints = Math.Min(_avatar.MaxHitPoints, _avatar.HitPoints + 2);
             // Yurish tugmasi bosilsa — o'rnidan turadi (ovqat tugamaguncha emas)
             bool moveKey = input.KeyDown(Keys.W) || input.KeyDown(Keys.A) || input.KeyDown(Keys.S) || input.KeyDown(Keys.D) ||
                            input.KeyDown(Keys.Up) || input.KeyDown(Keys.Down) || input.KeyDown(Keys.Left) || input.KeyDown(Keys.Right);
-            if (moveKey && CurrentPose != Pose.Eat) { StandUp(); return false; }
+            if (moveKey && CurrentPose != Pose.Eat && CurrentPose != Pose.Bake) { StandUp(); return false; }
             return true;
         }
 
@@ -677,6 +788,7 @@ namespace AndijonSaltanatlar.Interiors
         public void Draw(SpriteBatch sb, Texture2D px, PixelFont font, int vw, int vh, float night)
         {
             if (!Active) return;
+            _pxCache = px;
             Matrix m = Transform(vw, vh);
 
             // --- Xona ---
@@ -689,6 +801,18 @@ namespace AndijonSaltanatlar.Interiors
                 Prop pp = p;
                 items.Add((pp.Depth, 0, () => sb.Draw(pp.Tex, pp.DrawPos, Color.White)));
             }
+            if (IsHouse)
+            {
+                int nb = Bread;
+                items.Add((_tableCenter.X + _tableCenter.Y + 0.9f, 0, () =>
+                {
+                    for (int i = 0; i < nb; i++)
+                    {
+                        Vector2 w = IsoMath.TileToWorld(new Vector2(5.55f + (i % 2) * 0.55f, 4.55f + (i / 2) * 0.5f)) + new Vector2(0, -13);
+                        DrawNon(sb, _pxCache, w);
+                    }
+                }));
+            }
             foreach (Resident r in _residents)
             {
                 Resident rr = r;
@@ -696,6 +820,22 @@ namespace AndijonSaltanatlar.Interiors
                 items.Add((rr.Pos.X + rr.Pos.Y, 1, () => DrawPerson(sb, rr.Tex, rr.Pos, left, rr.Scale, rr.Lift)));
             }
             float avatarDepth = CurrentPose == Pose.Lie ? _bedPos.X + _bedPos.Y + 1.2f : _pos.X + _pos.Y;
+            if (_carryBread)
+                items.Add((avatarDepth + 0.01f, 2, () => DrawNon(sb, px, IsoMath.TileToWorld(_pos) + new Vector2(_avatar.Flipped ? -7 : 7, -24))));
+            if (CurrentPose == Pose.Bake)
+            {
+                // tandir ichida non pishmoqda — olov uchqunlari
+                float bt = _poseTime;
+                items.Add((_stovePos.X + _stovePos.Y + 0.5f, 2, () =>
+                {
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float u = (bt * 1.3f + i / 5f) % 1f;
+                        Vector2 p = IsoMath.TileToWorld(new Vector2(7.5f, 0.8f)) + new Vector2((i - 2) * 3f, -12f - u * 18f);
+                        sb.Draw(px, new Rectangle((int)p.X, (int)p.Y, 2, 2), new Color(255, 170, 60) * (1f - u));
+                    }
+                }));
+            }
             items.Add((avatarDepth, 1, () =>
             {
                 Texture2D tex = _avatar.Texture;
@@ -790,6 +930,12 @@ namespace AndijonSaltanatlar.Interiors
                 }
             }
 
+            // Non yopayotgan oila a'zosi — nima qilayotgani doim ko'rinadi
+            if (_baker != null && !string.IsNullOrEmpty(_baker.Line))
+                Bubble(sb, px, font, ToScreen(_baker.Pos, (_baker.Scale < 1f ? 40 : 54) + _baker.Lift) + new Vector2(0, -26), _baker.Line);
+            if (IsHouse)
+                Label(sb, px, font, ToScreen(new Vector2(6.0f, 4.0f), 44), "DASTURXON: " + Bread + " NON", Bread > 0 ? new Color(255, 226, 150) : new Color(255, 140, 120), new Color(0, 0, 0, 140));
+
             // Sarlavha
             Vector2 tsize = font.Measure(_title, 3);
             Vector2 ssize = font.Measure(_subtitle, 2);
@@ -848,6 +994,23 @@ namespace AndijonSaltanatlar.Interiors
             if (_state.MessageTimer > 0f && !string.IsNullOrEmpty(_state.Message))
                 Label(sb, px, font, new Vector2(vw / 2f, 90), _state.Message, _state.MessageIsError ? new Color(255, 140, 120) : new Color(150, 230, 150), new Color(0, 0, 0, 170));
             sb.End();
+        }
+
+        private Texture2D _pxCache;
+
+        /// <summary>Dumaloq non (tandir noni): oltin-jigarrang, o'rtasi naqshli.</summary>
+        private static void DrawNon(SpriteBatch sb, Texture2D px, Vector2 c)
+        {
+            if (px == null) return;
+            Color crust = new Color(196, 132, 62), mid = new Color(226, 172, 96), dot = new Color(150, 96, 50);
+            for (int y = -3; y <= 3; y++)
+            {
+                int hw = (int)MathF.Round(7f * MathF.Sqrt(1f - (y * y) / 12.5f));
+                sb.Draw(px, new Rectangle((int)c.X - hw, (int)c.Y + y, hw * 2, 1), Math.Abs(y) >= 2 ? crust : mid);
+            }
+            sb.Draw(px, new Rectangle((int)c.X - 2, (int)c.Y - 1, 1, 1), dot);
+            sb.Draw(px, new Rectangle((int)c.X + 1, (int)c.Y, 1, 1), dot);
+            sb.Draw(px, new Rectangle((int)c.X - 1, (int)c.Y + 1, 1, 1), dot);
         }
 
         private static bool FacesLeft(Vector2 who, Vector2 target)

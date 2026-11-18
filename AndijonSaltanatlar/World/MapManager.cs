@@ -90,6 +90,41 @@ namespace AndijonSaltanatlar.World
         public void Reserve(int x, int y) { if (InBounds(x, y)) _reserved[x, y] = true; }
         public bool IsReserved(int x, int y) => InBounds(x, y) && _reserved[x, y];
 
+        public bool IsWater(int x, int y) => InBounds(x, y) && _tiles[x, y] == TileType.Water;
+
+        /// <summary>Suv chuqurligi: 0 — quruq, 1 — sayoz (ariq: kechib o'tiladi), 2 — chuqur (hovuz/daryo: suziladi).</summary>
+        public int WaterDepth(int x, int y)
+        {
+            if (!IsWater(x, y)) return 0;
+            int n = 0;
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                    if (IsWater(x + dx, y + dy)) n++;
+            return n >= 8 ? 2 : 1;
+        }
+
+        /// <summary>Odam shu tile'dan o'ta oladimi: quruqlik yoki suv (kechib/suzib). Yo'l topishda suv qimmatroq.</summary>
+        public bool IsPassable(int x, int y)
+        {
+            if (!InBounds(x, y)) return false;
+            if (_tiles[x, y] == TileType.Water)
+            {
+                object w = _occupant[x, y];
+                return w == null || (w is Decoration wd && !wd.BlocksMovement);
+            }
+            return IsWalkable(x, y);
+        }
+
+        /// <summary>Barcha suv kataklari (cho'milish joyini tanlash uchun).</summary>
+        public List<Point> WaterTiles()
+        {
+            var list = new List<Point>();
+            for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
+                    if (_tiles[x, y] == TileType.Water) list.Add(new Point(x, y));
+            return list;
+        }
+
         /// <summary>Unit shu tile ustidan yura oladimi (keyingi bosqichda yo'l topish uchun).</summary>
         public bool IsWalkable(int x, int y)
         {

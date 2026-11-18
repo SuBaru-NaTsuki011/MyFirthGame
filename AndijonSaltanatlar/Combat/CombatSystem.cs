@@ -996,7 +996,7 @@ namespace AndijonSaltanatlar.Combat
         // HARAKAT VA YO'L TOPISH
         // ==================================================================
 
-        private bool Walk(Vector2 p) => _map.IsWalkable((int)MathF.Floor(p.X), (int)MathF.Floor(p.Y));
+        private bool Walk(Vector2 p) => _map.IsPassable((int)MathF.Floor(p.X), (int)MathF.Floor(p.Y));
 
         /// <summary>To'siqqa tegsa devor bo'ylab sirpanadi. Unit to'siq ichida qolib ketgan bo'lsa — chiqib ketishiga ruxsat.</summary>
         private bool MoveWithCollision(Unit u, Vector2 delta)

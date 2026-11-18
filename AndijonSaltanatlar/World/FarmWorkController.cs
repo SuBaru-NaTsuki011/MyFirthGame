@@ -29,6 +29,9 @@ namespace AndijonSaltanatlar.World
             public float Timer, TalkTimer;
             public int Carry;
             public Building Market;
+            public bool WaterMode;      // hozir sug'oryapti (aks holda ketmon bilan chopyapti)
+            public float ModeTimer;
+            public float Wet;           // sug'orilganlik (0..1) — ekin tezroq o'sadi
         }
 
         private readonly Dictionary<int, Job> _jobs = new Dictionary<int, Job>();
@@ -38,6 +41,15 @@ namespace AndijonSaltanatlar.World
         private readonly Random _rng = new Random();
 
         public int WorkerCount => _jobs.Count;
+        /// <summary>Qop ko'tarib ketayotgan birinchi dehqon (sinov kamerasi uchun).</summary>
+        public Unit FirstCarrier { get { foreach (Job j in _jobs.Values) if (j.Worker.CarryKey != null) return j.Worker; return null; } }
+
+        /// <summary>Bu odam dala dehqonimi (boshqa tizimlar — cho'milish va h.k. — uni olib ketmasin).</summary>
+        public bool IsWorker(Unit u)
+        {
+            foreach (Job j in _jobs.Values) if (j.Worker == u) return true;
+            return false;
+        }
 
         public void Update(float dt, MapManager map, BuildingManager buildings, UnitManager units, GameStateManager state)
         {
@@ -125,8 +137,10 @@ namespace AndijonSaltanatlar.World
             Farm f = j.Farm;
             CitizenUnit w = j.Worker;
             // Ekin dehqon parvarishida o'sadi (dehqon dalada bo'lsa tezroq — chopiq va sug'orish)
+            // Sug'orilgan dala 1.5 barobar tez o'sadi; namlik asta quriydi
+            j.Wet = Math.Max(0f, j.Wet - hours / 3f);
             if (f.CropStage == FarmCropStage.Growing)
-                f.AdvanceGrowth(hours / Farm.TendedGrowHours * (j.Phase == Phase.Work ? 1.25f : 0.8f));
+                f.AdvanceGrowth(hours / Farm.TendedGrowHours * (j.Phase == Phase.Work ? 1.25f : 0.8f) * (j.Wet > 0f ? 1.5f : 1f));
 
             switch (j.Phase)
             {
@@ -144,7 +158,22 @@ namespace AndijonSaltanatlar.World
                     break;
 
                 case Phase.Work:
-                    w.Working = true;
+                    // Chopiq va sug'orish navbatma-navbat (ekin o'sayotganda)
+                    if (f.CropStage == FarmCropStage.Growing)
+                    {
+                        j.ModeTimer += gameDt;
+                        if (j.ModeTimer > 10f)
+                        {
+                            j.ModeTimer = 0f;
+                            j.WaterMode = !j.WaterMode;
+                            if (j.WaterMode) { j.Wet = 1f; w.Say("Ekinni sug'oryapman", 2.5f); }
+                            else w.Say("Chopiq qilyapman", 2.2f);
+                        }
+                    }
+                    else j.WaterMode = false;
+                    bool still = w.State != UnitState.Walking;
+                    w.Working = !j.WaterMode;
+                    w.Watering = j.WaterMode && still;
                     j.Timer += gameDt;
                     if (f.CropStage == FarmCropStage.Empty && j.Timer > 4f)
                     {
@@ -165,7 +194,8 @@ namespace AndijonSaltanatlar.World
                             f.SellStoredProduce();   // dalada saqlanmaydi — dehqon o'zi olib ketadi
                             j.Carry = total;
                             j.Market = NearestMarket(f, buildings);
-                            w.Say(total + " qop hosil — bozorga!", 3f);
+                            w.CarryKey = "carry_sack";   // hosil qopga solindi — yelkada
+                            w.Say("Hosilni qopga soldim (" + total + ") — bozorga!", 3f);
                             Vector2 dest = j.Market != null ? EntranceOf(j.Market) : FieldFront(f);
                             GoTo(j, Phase.ToMarket, dest);
                         }
@@ -205,11 +235,12 @@ namespace AndijonSaltanatlar.World
                             }
                             j.Carry = 0;
                         }
+                        w.CarryKey = null;
                         GoTo(j, Phase.ToField, FieldFront(f));
                     }
                     break;
             }
-            if (j.Phase != Phase.Work) w.Working = false;
+            if (j.Phase != Phase.Work) { w.Working = false; w.Watering = false; }
             else if (w.State == UnitState.Walking) w.Working = false;
 
             // Ishlayotganda vaqti-vaqti bilan gapiradi

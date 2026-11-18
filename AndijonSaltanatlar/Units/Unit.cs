@@ -52,6 +52,11 @@ namespace AndijonSaltanatlar.Units
         public Texture2D[] BackWorkFrames { get; set; }
         /// <summary>Unit joyida ishlayapti (dehqon yer chopyapti) — ish kadrlari aylanadi.</summary>
         public bool Working { get; set; }
+        /// <summary>Yelkada ko'tarib yurgan narsa rasmi kaliti (masalan "carry_sack" — hosil qopi). null — hech narsa.</summary>
+        public string CarryKey { get; set; }
+        /// <summary>Sug'oryapti — ekin ustiga suv tomchilari tushadi.</summary>
+        public bool Watering { get; set; }
+
         /// <summary>Bir ish harakati (ketmonni ko'tarib urish) davomiyligi, soniya.</summary>
         public float WorkCycle { get; set; } = 0.95f;
         private float _workTime;
