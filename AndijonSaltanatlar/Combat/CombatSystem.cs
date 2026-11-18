@@ -71,6 +71,19 @@ namespace AndijonSaltanatlar.Combat
         // ==================================================================
 
         private ShahUnit _shah;
+        /// <summary>Soliq g'alayoni davom etyapti — shohga ko'proq qo'riqchi hamroh bo'ladi.</summary>
+        public bool UnrestHigh { get; set; }
+
+        /// <summary>Hozir shohga hamroh bo'lib yurgan qo'riqchilar soni.</summary>
+        public int EscortCount
+        {
+            get
+            {
+                int n = 0;
+                foreach (var kv in _agents) if (kv.Value.Mode == AgentMode.Escort && !kv.Key.IsDown) n++;
+                return n;
+            }
+        }
 
         /// <summary>Shoh hozir shaharda (saroydan tashqarida) yuribdimi.</summary>
         public bool ShahInWorld => _shah != null;
@@ -89,14 +102,22 @@ namespace AndijonSaltanatlar.Combat
                 // Eng yaqin ikki soqchi (avval nayzalilar) — hamrohlar
                 var guards = new List<Unit>();
                 foreach (Unit u in _units.Units)
-                    if (IsSoldier(u) && !u.IsDown && u != Possessed && Vector2.Distance(u.Position, palaceDoor) < 16f) guards.Add(u);
+                    if (IsSoldier(u) && !u.IsDown && u != Possessed && Vector2.Distance(u.Position, palaceDoor) < 30f) guards.Add(u);
                 guards.Sort((a, b) =>
                 {
                     int pa = a is SpearmanUnit ? 0 : 1, pb = b is SpearmanUnit ? 0 : 1;
                     return pa != pb ? pa.CompareTo(pb) : Vector2.Distance(a.Position, palaceDoor).CompareTo(Vector2.Distance(b.Position, palaceDoor));
                 });
-                Vector2[] offsets = { new Vector2(-0.9f, 0.5f), new Vector2(0.5f, -0.9f) };
-                for (int i = 0; i < guards.Count && i < 2; i++)
+                // Qo'riqchilar shoh atrofida halqa bo'lib yuradi: odatda 4 ta, g'alayonda 8 ta
+                int escorts = UnrestHigh ? 8 : 4;
+                var offsets = new Vector2[escorts];
+                for (int k = 0; k < escorts; k++)
+                {
+                    float ang = k / (float)escorts * MathF.PI * 2f + 0.4f;
+                    float rad = k % 2 == 0 ? 1.0f : 1.35f;
+                    offsets[k] = new Vector2(MathF.Cos(ang) * rad, MathF.Sin(ang) * rad);
+                }
+                for (int i = 0; i < guards.Count && i < escorts; i++)
                 {
                     Unit g = guards[i];
                     if (!_agents.TryGetValue(g, out Agent ga))

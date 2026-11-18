@@ -1677,6 +1677,8 @@ public sealed class Game1 : Game
 		}
 		_units.Update(dt * (_combat?.TimeScale ?? 1f));
 		_farmWork.Update(dt, _map, _buildings, _units, _state);
+		_units.ApplyPhysics(_map, _combat.Possessed, dt);
+		_combat.UnrestHigh = _taxRiot != null && _taxRiot.Active;
 		_swim.Force = _opt.Swim;
 		if (_opt.FarmDemo.HasValue && _opt.ScreenshotPath != null && _farmWork.FirstCarrier is Unit carrier) _camera.Jump(IsoMath.TileToWorld(carrier.Position) + new Vector2(0, 60), 2.8f);
 		if (_opt.Swim && _opt.ScreenshotPath != null)
@@ -1692,7 +1694,9 @@ public sealed class Game1 : Game
 		_livestock?.Update(dt);
 		_citizenSocial.Update(_units, dt);
 		_citizenLife?.Update(dt, _map, _buildings, _units, _state, _combat.Possessed);
+		_taxRiot?.SetEscortShield(_combat.EscortCount);
 		_taxRiot?.Update(dt, _state, _map, _buildings, _units, _combat.Possessed, _combat.RaidActive || _combat.RaidIncoming);
+		if (_taxRiot?.PalaceAlert != null) { _state.ShowMessage(_taxRiot.PalaceAlert, true); _taxRiot.PalaceAlert = null; }
 		if (_opt.ScreenshotPath != null && _taxRiot != null && _taxRiot.Active) _state.ShowMessage("DBG " + _taxRiot.DebugSummary);
 		UpdateFarmControl();
 		_map.Update(dt);

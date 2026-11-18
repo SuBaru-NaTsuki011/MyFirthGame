@@ -168,8 +168,15 @@ namespace AndijonSaltanatlar.World
                         sb.Draw(sil, pos + d, null, rim, 0f, Vector2.Zero, 1f, fxb, 0f);
                 }
 
+                if (bb != null && bb.Type == BuildingType.MainHall && bb.MaxHitPoints > 0 && bb.HitPoints < bb.MaxHitPoints)
+                {
+                    float dmg = 1f - bb.HitPoints / (float)bb.MaxHitPoints;
+                    tint = Color.Lerp(tint, new Color(96, 82, 72), dmg * 0.9f);   // qoraygan, chang bosgan
+                }
                 sb.Draw(tex, pos, null, tint, 0f, Vector2.Zero, 1f,
                     o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
+                if (bb != null && bb.Type == BuildingType.MainHall && bb.HitPoints < bb.MaxHitPoints * 0.66f)
+                    DrawSmoke(sb, pos + new Vector2(tex.Width / 2f, tex.Height * 0.25f), 1f - bb.HitPoints / (float)bb.MaxHitPoints, tex.Width);
                 // Qish: tomlar va devorlar qor bilan oqaradi
                 float bsnow = AndijonSaltanatlar.Environment.SeasonVisuals.Snow;
                 if (bb != null && bsnow > 0f && _assets.FlashOf(tex) is Texture2D bsil)
@@ -251,6 +258,31 @@ namespace AndijonSaltanatlar.World
                     Vector2 w = IsoMath.TileToWorld(new Vector2(farm.Position.X + x, farm.Position.Y + y)) + new Vector2(0, -7 - podium);
                     float sway = stage >= 2 ? 0.04f * MathF.Sin(_time * 1.7f + col * 0.7f + row) : 0f;
                     sb.Draw(tex, new Vector2(MathF.Round(w.X), MathF.Round(w.Y)), null, Color.White, sway, origin, k * grow, (col + row) % 2 == 0 ? SpriteEffects.None : SpriteEffects.FlipHorizontally, 0f);
+                }
+        }
+
+        /// <summary>Shikastlangan saroydan tutun ko'tariladi (shikast qancha ko'p — shuncha quyuq).</summary>
+        private void DrawSmoke(SpriteBatch sb, Vector2 top, float dmg, int width)
+        {
+            int n = 10 + (int)(dmg * 22);
+            for (int i = 0; i < n; i++)
+            {
+                float u = (_time * 0.22f + i / (float)n) % 1f;
+                float x = top.X + ((i * 37) % width - width / 2f) * 0.6f + MathF.Sin(_time * 0.8f + i) * 10f * u;
+                float y = top.Y - u * 110f;
+                int s = (int)(8 + u * 26 * (0.6f + dmg));
+                float a = (1f - u) * (0.55f + dmg * 0.45f);
+                sb.Draw(_assets.Pixel, new Rectangle((int)x - s / 2, (int)y - s / 2, s, s), new Color(52, 48, 46) * (a * 0.85f));
+            }
+            // Kuchli shikast — alanga tillari
+            if (dmg > 0.66f)
+                for (int i = 0; i < 8; i++)
+                {
+                    float u = (_time * 1.4f + i / 8f) % 1f;
+                    float x = top.X + ((i * 53) % width - width / 2f) * 0.5f;
+                    float y = top.Y + 20f - u * 26f;
+                    int s = (int)(6 * (1f - u) + 2);
+                    sb.Draw(_assets.Pixel, new Rectangle((int)x - s / 2, (int)y - s, s, s * 2), Color.Lerp(new Color(255, 210, 90), new Color(230, 70, 30), u) * (1f - u));
                 }
         }
 

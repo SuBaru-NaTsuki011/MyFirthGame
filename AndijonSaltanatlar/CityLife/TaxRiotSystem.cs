@@ -42,6 +42,8 @@ namespace AndijonSaltanatlar.CityLife
             public float ShoutTimer;
             /// <summary>Askar yetib kelib to'xtatgan — endi tosh otmaydi.</summary>
             public bool Restrained;
+            /// <summary>Askar uni saroydan shu joygacha uzoqlashtiradi.</summary>
+            public Vector2 PushSpot;
         }
 
         // ---- Askarlar g'alayonchilarni to'xtatadi: har askar bitta odamga boradi; askar yetmagan odamlar otishda davom etadi ----
@@ -68,6 +70,7 @@ namespace AndijonSaltanatlar.CityLife
 
         private sealed class Stone
         {
+            public Unit Victim;           // shohga otilgan bo'lsa
             public Vector2 From, To;      // tile koordinatalari
             public float H0, H1;          // boshlang'ich / nishondagi balandlik (world piksel)
             public float T, Duration, Arc;
@@ -91,12 +94,24 @@ namespace AndijonSaltanatlar.CityLife
         private readonly List<Stone> _stones = new List<Stone>();
         private readonly List<Dust> _dust = new List<Dust>();
         private Building _palace;
+        private Unit _shahTarget;
+        private int _damageStage;
+        private float _repairAcc;
+        /// <summary>Bitta tosh saroyga beradigan shikast.</summary>
+        public const int StoneDamage = 6;
+        /// <summary>Saroy shikasti 0..1 (0 — butun, 1 — vayron).</summary>
+        public float PalaceDamage => _palace == null || _palace.MaxHitPoints <= 0 ? 0f : 1f - _palace.HitPoints / (float)_palace.MaxHitPoints;
         private List<Vector2> _spots = new List<Vector2>();
         private int _nextSpot;
         private int _lastDay = -1;
 
         /// <summary>G'alayon davom etmoqda (xalq saroy tomon yo'lda yoki saroy oldida).</summary>
         public bool Active { get; private set; }
+        /// <summary>Saroy shikasti haqida yangi ogohlantirish (Game1 ko'rsatib, null qiladi).</summary>
+        public string PalaceAlert { get; set; }
+        private double _shieldChance;
+        /// <summary>Shoh atrofidagi qo'riqchilar toshlarni to'sish ehtimoli (Game1 beradi).</summary>
+        public void SetEscortShield(int escorts) => _shieldChance = Math.Min(0.85, escorts * 0.1);
 
         /// <summary>Hozir saroy oldida turgan (tosh otayotgan) odamlar soni.</summary>
         public int Protesters
@@ -117,7 +132,7 @@ namespace AndijonSaltanatlar.CityLife
                 foreach (Rioter r in _rioters) m[(int)r.Mode]++;
                 int noPath = 0;
                 foreach (Rioter r in _rioters) if (r.Mode == Mode.Marching && r.Path == null) noPath++;
-                return "W" + m[0] + " M" + m[1] + " P" + m[2] + " R" + m[3] + " nopath" + noPath + " stones" + _stones.Count + " spots" + _spots.Count + " guards" + _guards.Count + " hold" + GuardsHolding;
+                return "W" + m[0] + " M" + m[1] + " P" + m[2] + " R" + m[3] + " nopath" + noPath + " stones" + _stones.Count + " spots" + _spots.Count + " guards" + _guards.Count + " hold" + GuardsHolding + " palace" + (_palace?.HitPoints ?? -1) + "@" + (_palace?.Position.X ?? -1) + "," + (_palace?.Position.Y ?? -1);
             }
         }
 
@@ -143,6 +158,8 @@ namespace AndijonSaltanatlar.CityLife
             }
 
             Building palace = FindPalace(buildings);
+            // O'yin qayta yuklansa binolar yangidan yaratiladi — toshlar doim hozirgi saroyga tegsin
+            if (palace != null && !ReferenceEquals(palace, _palace) && _palace != null) _palace = palace;
             bool want = TaxTooHigh(state.Policy.PopulationTax) && palace != null;
             if (want && !Active) Begin(state, map, buildings, units, palace, possessed);
             else if (!want && Active) End(state, map);
@@ -165,6 +182,16 @@ namespace AndijonSaltanatlar.CityLife
                 if (UpdateRioter(_rioters[i], dt, map, units)) _rioters.RemoveAt(i);
 
             UpdateGuards(dt, map, units, possessed);
+            _shahTarget = possessed is ShahUnit sh && !sh.IsDown ? sh : null;
+
+            // G'alayon tugagach ustalar saroyni asta tiklaydi
+            if (!Active && _palace != null && _palace.HitPoints < _palace.MaxHitPoints)
+            {
+                _repairAcc += dt * _palace.MaxHitPoints / 240f;
+                int add = (int)_repairAcc;
+                if (add > 0) { _repairAcc -= add; _palace.HitPoints = Math.Min(_palace.MaxHitPoints, _palace.HitPoints + add); }
+                if (_palace.HitPoints >= _palace.MaxHitPoints) _damageStage = 0;
+            }
 
             UpdateProjectiles(dt);
 
@@ -366,6 +393,7 @@ namespace AndijonSaltanatlar.CityLife
                         g.Arrived = true;
                         g.R.Restrained = true;
                         g.R.ShoutTimer = 1.5f;
+                        g.R.PushSpot = AwaySpot(map, rp, 2.2f);
                         u.DriveIdle();
                         u.SetFacing(rp - u.Position);
                        
@@ -378,17 +406,35 @@ namespace AndijonSaltanatlar.CityLife
                         Vector2 dir = rp - u.Position;
                         Vector2 stop = rp - (dir.LengthSquared() > 0.0001f ? Vector2.Normalize(dir) * 0.6f : Vector2.Zero);
                         StepToUnit(u, stop, dt, 1.6f);
-                        if (Vector2.Distance(u.Position, stop) < 0.08f) { g.Arrived = false; u.Position = stop; g.R.Restrained = true; g.Arrived = true; u.DriveIdle(); u.SetFacing(rp - u.Position); }
+                        if (Vector2.Distance(u.Position, stop) < 0.08f) { g.Arrived = false; u.Position = stop; g.R.Restrained = true; g.R.PushSpot = AwaySpot(map, rp, 2.2f); g.Arrived = true; u.DriveIdle(); u.SetFacing(rp - u.Position); }
                     }
                 }
                 else
                 {
-                    u.DriveIdle();
+                    // Odam bilan saroy o'rtasida turadi (saroyga yaqinlashtirmaydi) va uni orqaga surib boradi
+                    Vector2 toPal = PalaceCenter() - rp;
+                    Vector2 guardSpot = rp + (toPal.LengthSquared() > 0.0001f ? Vector2.Normalize(toPal) * 0.6f : Vector2.Zero);
+                    if (!StepToUnit(u, guardSpot, dt, 1.4f)) { }
+                    else u.DriveIdle();
                     u.SetFacing(rp - u.Position);
                     g.Talk -= dt;
                     if (g.Talk <= 0f) { g.Talk = 12f + (float)_rng.NextDouble() * 10f; }
                 }
             }
+        }
+
+        /// <summary>Saroydan uzoqroq (o'tsa bo'ladigan) nuqta.</summary>
+        private Vector2 AwaySpot(MapManager map, Vector2 from, float dist)
+        {
+            Vector2 away = from - PalaceCenter();
+            if (away.LengthSquared() < 0.0001f) away = new Vector2(0, 1);
+            away.Normalize();
+            for (float d = dist; d > 0.3f; d -= 0.4f)
+            {
+                Vector2 p = from + away * d;
+                if (map.IsWalkable((int)MathF.Floor(p.X), (int)MathF.Floor(p.Y))) return p;
+            }
+            return from;
         }
 
         private void StartGuardReturn(GuardJob g, MapManager map)
@@ -545,7 +591,14 @@ namespace AndijonSaltanatlar.CityLife
                     u.DriveIdle();
                     if (r.Restrained)
                     {
-                        // Askar to'xtatgan: tosh otmaydi, faqat ba'zan noliydi
+                        // Askar to'xtatgan: saroydan uzoqlashtiriladi, tosh otmaydi, faqat ba'zan noliydi
+                        if (r.PushSpot != Vector2.Zero && Vector2.Distance(u.Position, r.PushSpot) > 0.08f)
+                        {
+                            Vector2 pd = r.PushSpot - u.Position;
+                            float pl = pd.Length();
+                            u.DriveMove(-pd, 0.6f);   // orqasi bilan chekinadi (saroyga qarab)
+                            u.Position += pd / pl * MathF.Min(pl, 0.7f * dt);
+                        }
                         r.ShoutTimer -= dt;
                         if (r.ShoutTimer <= 0f) { r.ShoutTimer = 10f + (float)_rng.NextDouble() * 10f; u.Say(CalmLines[_rng.Next(CalmLines.Length)], 2.5f); }
                         return false;
@@ -665,6 +718,19 @@ namespace AndijonSaltanatlar.CityLife
             // Otish harakati: qo'lni ko'tarib, oldinga silkitish
             u.AttackKind = Unit.AttackOverhead;
             u.AttackTimer = Unit.SwingTime;
+            // Shoh tashqarida va yaqin bo'lsa — xalq unga ham tosh otadi
+            if (_shahTarget != null && Vector2.Distance(u.Position, _shahTarget.Position) < 9f && _rng.Next(2) == 0)
+            {
+                Vector2 sp = _shahTarget.Position;
+                float sd = Vector2.Distance(u.Position, sp);
+                u.SetFacing(sp - u.Position);
+                _stones.Add(new Stone
+                {
+                    Victim = _shahTarget, From = u.Position, To = sp + new Vector2(((float)_rng.NextDouble() - 0.5f) * 0.6f, ((float)_rng.NextDouble() - 0.5f) * 0.6f),
+                    H0 = 18f, H1 = 30f, T = -0.12f, Duration = 0.4f + sd * 0.08f, Arc = 14f + sd * 3f
+                });
+                return;
+            }
             // Nishon: saroyning old devori va tomi
             float tx = _palace.Position.X + 0.4f + (float)_rng.NextDouble() * (_palace.Size.X - 0.8f);
             float ty = _palace.Position.Y + _palace.Size.Y - 0.2f - (float)_rng.NextDouble() * 1.2f;
@@ -689,6 +755,27 @@ namespace AndijonSaltanatlar.CityLife
                 {
                     _dust.Add(new Dust { World = StoneWorld(s, 1f), Seed = (float)_rng.NextDouble() * 100f });
                     _stones.RemoveAt(i);
+                    if (s.Victim != null)
+                    {
+                        // Shohga tegdi (qo'riqchilar yaqin bo'lsa ko'p toshni qalqon bilan to'sadi)
+                        if (!s.Victim.IsDown && Vector2.Distance(s.Victim.Position, s.To) < 0.6f && _rng.NextDouble() > _shieldChance)
+                        {
+                            s.Victim.HitPoints = Math.Max(1, s.Victim.HitPoints - 4);
+                            s.Victim.TakeHitVisual(s.To - s.From);
+                        }
+                    }
+                    else if (_palace != null && _palace.HitPoints > 0)
+                    {
+                        // Saroyga tegdi — shikast; yarmida va oxirida ogohlantirish
+                        _palace.HitPoints = Math.Max(0, _palace.HitPoints - StoneDamage);
+                        int stage = _palace.HitPoints <= 0 ? 3 : PalaceDamage >= 0.66f ? 2 : PalaceDamage >= 0.33f ? 1 : 0;
+                        if (stage > _damageStage)
+                        {
+                            _damageStage = stage;
+                            PalaceAlert = stage == 3 ? "Saroy vayron bo'ldi! Xalq g'azabi saroyni yiqitdi."
+                                : stage == 2 ? "Saroy jiddiy shikastlandi! Soliqni kamaytiring!" : "Toshlar saroyni shikastlamoqda!";
+                        }
+                    }
                 }
             }
             for (int i = _dust.Count - 1; i >= 0; i--)
