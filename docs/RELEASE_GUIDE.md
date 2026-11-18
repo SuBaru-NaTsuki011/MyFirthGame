@@ -33,13 +33,13 @@ Uni relizga yuklashdan oldin **`AndijonSaltanatlar.apk`** deb nomlang.
 ## 2. GitHub'da reliz yaratish
 
 Tag nomi ilova versiyasiga mos bo'lsin: `AndijonSaltanatlar.Shared/AppVersion.cs`
-dagi `Current` qiymati bilan bir xil, oldiga `v` bilan. Hozir: **`v0.20.0`**.
+dagi `Current` qiymati bilan bir xil, oldiga `v` bilan. Hozir: **`v0.21.0`**.
 
 ### A varianti — brauzer (oson, tavsiya)
 
 1. `https://github.com/anvarovmuhammadamin011-ops/MyFirthGame/releases/new`
-2. **Choose a tag** → `v0.20.0` yozing → "Create new tag".
-3. Sarlavha: `Andijon: Saltanatlar 0.20.0`.
+2. **Choose a tag** → `v0.21.0` yozing → "Create new tag".
+3. Sarlavha: `Andijon: Taxtlar Jangi 0.21.0`.
 4. Pastga `AndijonSaltanatlar.apk` faylini sudrab tashlang (nomi aynan shunday bo'lsin).
 5. **Publish release**.
 
@@ -48,10 +48,10 @@ dagi `Current` qiymati bilan bir xil, oldiga `v` bilan. Hozir: **`v0.20.0`**.
 ```powershell
 winget install --id GitHub.cli
 gh auth login
-gh release create v0.20.0 `
+gh release create v0.21.0 `
   "AndijonSaltanatlar.Android\bin\Release\net10.0-android\publish\AndijonSaltanatlar.apk" `
   --repo anvarovmuhammadamin011-ops/MyFirthGame `
-  --title "Andijon: Saltanatlar 0.20.0" `
+  --title "Andijon: Taxtlar Jangi 0.21.0" `
   --notes "Ilova ichidan yangilash, QR orqali tarqatish."
 ```
 
@@ -67,11 +67,11 @@ doimiy APK havolasini kodlaydi.
 
 Har safar yangilik qo'shib, yangi versiya chiqarmoqchi bo'lsangiz:
 
-1. `AndijonSaltanatlar.Shared/AppVersion.cs` → `Current` ni oshiring (masalan `0.21.0`).
+1. `AndijonSaltanatlar.Shared/AppVersion.cs` → `Current` ni oshiring (masalan `0.22.0`).
 2. `AndijonSaltanatlar.Android/AndijonSaltanatlar.Android.csproj` →
-   `ApplicationDisplayVersion` ni `0.21.0`, `ApplicationVersion` ni `+1` (masalan `3`).
+   `ApplicationDisplayVersion` ni `0.22.0`, `ApplicationVersion` ni `+1` (masalan `4`).
 3. APK'ni qayta yig'ing (1-bo'lim), `AndijonSaltanatlar.apk` deb nomlang.
-4. GitHub'da **`v0.21.0`** tagli yangi reliz yarating, APK'ni yuklang (2-bo'lim).
+4. GitHub'da **`v0.22.0`** tagli yangi reliz yarating, APK'ni yuklang (2-bo'lim).
 
 Shundan keyin eski versiyadagi o'yinchilar ilovani ochganda **"Yangi versiya mavjud"**
 oynasini ko'radi → **YUKLAB OLISH** → yangi APK o'rnatiladi. Akkaunt va o'yin holati
