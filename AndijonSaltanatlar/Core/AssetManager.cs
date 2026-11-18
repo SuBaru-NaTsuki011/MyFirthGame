@@ -348,9 +348,23 @@ namespace AndijonSaltanatlar.Core
                 try
                 {
                     using var s = Microsoft.Xna.Framework.TitleContainer.OpenStream("Content/Sprites/" + key + ".png");
+#if ANDROID
+                    // Android: PNG tizimning o'z dekoderi bilan o'qiladi (Texture2D.GetData'ga tayanmaydi)
+                    using var bmp = Android.Graphics.BitmapFactory.DecodeStream(s);
+                    int bw = bmp.Width, bh = bmp.Height;
+                    var argb = new int[bw * bh];
+                    bmp.GetPixels(argb, 0, bw, 0, 0, bw, bh);
+                    var c = new Canvas(bw, bh);
+                    for (int i = 0; i < argb.Length; i++)
+                    {
+                        int v = argb[i];
+                        c.Pixels[i] = new Color((v >> 16) & 255, (v >> 8) & 255, v & 255, (v >> 24) & 255);
+                    }
+#else
                     using var btex = Texture2D.FromStream(_gd, s);
                     var c = new Canvas(btex.Width, btex.Height);
                     btex.GetData(c.Pixels);
+#endif
                     canvas = c;
                 }
                 catch (Exception) { canvas = null; }
