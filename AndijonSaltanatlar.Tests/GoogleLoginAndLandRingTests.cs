@@ -245,6 +245,15 @@ namespace AndijonSaltanatlar.Tests
         public void ServerUrl_InternetHostDefaultsToHttps(string input, string expected)
             => Assert.Equal(expected, AndijonSaltanatlar.Online.CloudSession.NormalizeUrl(input));
 
+        // Promt 5: Google kirishni tekshirish oralig'i — birinchi 30 soniya 1 s, keyin 2 s.
+        [Theory]
+        [InlineData(0, 1000)]
+        [InlineData(29.9, 1000)]
+        [InlineData(30, 2000)]
+        [InlineData(120, 2000)]
+        public void GooglePoll_FirstHalfMinuteIsFast(double elapsed, int expectedMs)
+            => Assert.Equal(expectedMs, AndijonSaltanatlar.Online.CloudSession.PollDelayMs(elapsed));
+
         // ------------------------------------------------------------------ Bulutdagi saqlash
         private SaveController Controller(GameDbContext db, int userId)
         {

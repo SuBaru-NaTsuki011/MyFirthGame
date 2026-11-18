@@ -101,6 +101,8 @@ namespace AndijonSaltanatlar.Online
 
         /// <summary>Kirish muvaffaqiyatli bo'lganda (asosiy oqimda) chaqiriladi.</summary>
         public Action SignedIn;
+        /// <summary>Kirish tugagach o'yin oynasini oldinga chiqarish (Game1 o'rnatadi; Windows'da SetForegroundWindow).</summary>
+        public Action BringToFront;
         /// <summary>Boshqa qurilma yangiroq saqlagan (409) — o'yin bulutdan qayta yuklanishi kerak.</summary>
         public Action SaveConflict;
 
@@ -215,6 +217,9 @@ namespace AndijonSaltanatlar.Online
         // ------------------------------------------------------------------
         // Google bilan kirish
         // ------------------------------------------------------------------
+        /// <summary>Google kirishni tekshirish oralig'i: birinchi 30 soniyada 1 s (tez javob), keyin 2 s.</summary>
+        public static int PollDelayMs(double elapsedSeconds) => elapsedSeconds < 30 ? 1000 : 2000;
+
         public void StartGoogleLogin(string serverUrl)
         {
             string url = NormalizeUrl(serverUrl);
@@ -242,10 +247,12 @@ namespace AndijonSaltanatlar.Online
                     OpenBrowser(start.LoginUrl);
                     SetMessage("Brauzerda Google hisobingizni tanlang, so'ng o'yinga qayting.", false);
 
+                    DateTime started = DateTime.UtcNow;
                     DateTime until = DateTime.UtcNow.AddSeconds(Math.Max(60, start.ExpiresInSeconds));
                     while (DateTime.UtcNow < until)
                     {
-                        await Task.Delay(2000, cts.Token);
+                        // Birinchi 30 soniya tez-tez (1 s), keyin sekinroq (2 s) tekshiramiz.
+                        await Task.Delay(PollDelayMs((DateTime.UtcNow - started).TotalSeconds), cts.Token);
                         HttpResponseMessage p;
                         try { p = await Send(url, HttpMethod.Get, "api/auth/google/poll?s=" + Uri.EscapeDataString(start.SessionId) + "&k=" + Uri.EscapeDataString(start.PollKey), ct: cts.Token); }
                         catch (HttpRequestException) { continue; } // vaqtincha tarmoq uzilishi — qayta urinamiz
@@ -331,6 +338,7 @@ namespace AndijonSaltanatlar.Online
             // Ochiq faylda faqat server manzili va taxallus (tokenlar — shifrlangan faylda)
             new StoredAuth { ServerUrl = url, Token = "", Username = Username, DisplayName = DisplayName, Email = "" }.Save();
             SignedIn?.Invoke();
+            try { BringToFront?.Invoke(); } catch { /* oynani oldinga chiqarish muvaffaqiyatsiz bo'lsa ham kirish tugadi */ }
         }
 
         private void ApplyAuth(AuthResponse auth)

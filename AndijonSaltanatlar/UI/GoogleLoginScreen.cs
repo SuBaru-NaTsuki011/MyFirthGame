@@ -26,6 +26,7 @@ namespace AndijonSaltanatlar.UI
         private InputManager _input;
         private string _server;
         private bool _editServer;
+        private bool _copied;
         private string _pendingKeyboard;
         private string _nick = "";
         private int _avatar;
@@ -152,6 +153,11 @@ namespace AndijonSaltanatlar.UI
                     int bw = (w - gap) / 2;
                     if (ui.Button(new Rectangle(x, y, bw, h - 8), "BRAUZERNI QAYTA OCHISH", ButtonKind.Secondary, true)) _cloud.StartGoogleLogin(_server);
                     if (ui.Button(new Rectangle(x + bw + gap, y, bw, h - 8), "BEKOR QILISH", ButtonKind.Ghost, true)) _cloud.CancelLogin();
+                    int cy = y + (h - 8) + 6;
+                    if (ui.Button(new Rectangle(x, cy, w, h - 8), _copied ? "HAVOLA NUSXALANDI" : "HAVOLANI NUSXALASH",
+                            ButtonKind.Ghost, !string.IsNullOrEmpty(_cloud.LoginUrl)))
+                        _copied = AndijonSaltanatlar.Core.Clipboard.TrySet(_cloud.LoginUrl);
+                    y = cy;
                 }
                 y += h + gap;
             }

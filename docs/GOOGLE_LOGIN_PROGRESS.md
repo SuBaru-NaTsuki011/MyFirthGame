@@ -164,3 +164,41 @@ Brauzerda haqiqiy Google hisobi bilan login **sinalmagan**: buning uchun Google 
 - **Android build:** `dotnet workload list` bo'sh, `java` yo'q. `NETSDK1139: The target platform identifier android was not recognized`.
 - **Haqiqiy Google login:** brauzer/telefon va Google Cloud test foydalanuvchisi bilan qo'lda tasdiqlash kerak.
 - **Eski Debug `bin`:** o'ldirilgan test serveridan qolgan `dotnet.exe` (PID 27680) Debug fayllarini ushlab turibdi; Release publish va live serverga ta'siri yo'q. Windows qayta ishga tushirilganda tozalanadi.
+
+## 9. Promt 5 — kirishni qulaylashtirish (bajarildi)
+
+Nima o'zgardi:
+- **Oynani oldinga chiqarish:** kirish tugagach (`FinishSignIn`) o'yin oynasi avtomatik
+  oldinga keladi (Windows: `SetForegroundWindow` + `ShowWindow` SW_RESTORE). `CloudSession.BringToFront`
+  hook, Game1 o'rnatadi.
+- **Callback sahifasi:** o'zbekcha, chiroyli, o'yin nomi (TAXTLAR JANGI), "Muvaffaqiyatli
+  kirdingiz!", ~3 soniyadan so'ng `window.close()` urinishi (`GoogleAuthController.Success`).
+- **Kutish ekrani:** "BRAUZERNI QAYTA OCHISH", "HAVOLANI NUSXALASH" (SDL/Android clipboard),
+  "BEKOR QILISH" tugmalari (`GoogleLoginScreen`).
+- **Polling:** birinchi 30 soniya 1 s, keyin 2 s (`CloudSession.PollDelayMs`).
+- **Xatolar:** o'zbekcha — vaqt tugadi, serverga ulanib bo'lmadi, bekor qilindi.
+
+### Haqiqiy Google login bilan qo'lda sinash
+
+Tayyorgarlik: server `appsettings.json` da `Google:ClientId`/`ClientSecret` sozlangan va
+`redirect_uri` ga `<server>/auth/google/callback` qo'shilgan (Google Cloud Console → OAuth).
+Test foydalanuvchi "OAuth consent screen" da qo'shilgan bo'lsin.
+
+Windows:
+1. Serverni ishga tushiring, Windows clientни oching → **GOOGLE ORQALI KIRISH**.
+2. Brauzer ochiladi; agar ochilmasa — kutish ekranida **BRAUZERNI QAYTA OCHISH** yoki
+   **HAVOLANI NUSXALASH** bosib, havolani brauzerga qo'yib oching.
+3. Google hisobni tanlang. Callback sahifasi: "Muvaffaqiyatli kirdingiz!" — ~3 s dan so'ng yopiladi.
+4. **Kutilgan:** o'yin oynasi o'zi oldinga chiqadi; yangi o'yinchi → YANGI HUKMDOR,
+   qaytgan o'yinchi → davom etadi.
+5. Oynani minimallashtirib sinang — kirgач oyna tiklanib oldinga chiqishi kerak.
+
+Xatolarni sinash:
+- Internetni uzib **KIRISH** — "serverga ulanib bo'lmadi" (o'zbekcha).
+- Brauzerni yopib kutib turing — vaqt tugagach "Kirish vaqti tugadi" ko'rinadi.
+- Kutish ekranida **BEKOR QILISH** — darhol to'xtaydi.
+
+Android (native akkaunt tanlash allaqachon bor):
+1. APK o'rnatilgan telefonда **GOOGLE ORQALI KIRISH** → tizim akkaunt tanlash oynasi.
+2. Agar native ishlamasa — brauzerga o'tadi; callback sahifasidagi **O'yinga qaytish**
+   `uz.andijon.saltanatlar://auth` deep-link orqali ilovaga qaytaradi.

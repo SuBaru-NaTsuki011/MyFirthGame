@@ -251,6 +251,7 @@ public sealed class Game1 : Game
 		// Fonda GitHub'dan yangilash tekshiriladi (internet yo'q bo'lsa jim o'tadi, o'yinni bloklamaydi).
 		StartUpdateCheck();
 		_cloud = new AndijonSaltanatlar.Online.CloudSession { LoginUrlFile = _opt.LoginUrlFile };
+		_cloud.BringToFront = BringGameWindowToFront; // login tugagach o'yin oynasi oldinga chiqadi
 		_cloud.NativeAccountPicker = NativeAccountPicker;
 		_cloud.SignedIn = OnCloudSignedIn;
 		_cloud.TokenRenewed = t => _online.UpdateToken(t);
@@ -2539,6 +2540,23 @@ public sealed class Game1 : Game
 		BeginLegacyUi(out Point v);
 		_ui.Draw(_sb, v.X, v.Y);
 		_sb.End();
+	}
+
+#if !ANDROID
+	[System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+	[System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+#endif
+	/// <summary>Login tugagach o'yin oynasini oldinga chiqaradi (minimallashgan bo'lsa tiklaydi). Windows uchun.</summary>
+	private void BringGameWindowToFront()
+	{
+#if !ANDROID
+		try
+		{
+			IntPtr h = Window.Handle;
+			if (h != IntPtr.Zero) { ShowWindow(h, 9 /* SW_RESTORE */); SetForegroundWindow(h); }
+		}
+		catch { /* oynani oldinga chiqarish ixtiyoriy */ }
+#endif
 	}
 
 	private float _rankTrainTimer;

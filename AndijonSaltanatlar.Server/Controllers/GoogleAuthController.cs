@@ -195,7 +195,7 @@ button,.btn{display:inline-block;width:100%;margin-top:18px;padding:13px;border:
         private static string Page(string title, string body)
             => "<!doctype html><html lang=\"uz\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
                + "<title>" + WebUtility.HtmlEncode(title) + "</title>" + Style + "</head><body><main class=\"card\">"
-               + "<h1>ANDIJON: SALTANATLAR</h1>" + body + "</main></body></html>";
+               + "<h1>ANDIJON: TAXTLAR JANGI</h1>" + body + "</main></body></html>";
 
         private const string GLogo = "<svg width=\"20\" height=\"20\" viewBox=\"0 0 48 48\" aria-hidden=\"true\"><path fill=\"#EA4335\" d=\"M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z\"/><path fill=\"#4285F4\" d=\"M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.4 5.7c4.3-4 6.9-9.9 6.9-17.2z\"/><path fill=\"#FBBC05\" d=\"M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z\"/><path fill=\"#34A853\" d=\"M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.9l-7.9 6.1C6.6 42.6 14.6 48 24 48z\"/></svg>";
 
@@ -214,11 +214,11 @@ button,.btn{display:inline-block;width:100%;margin-top:18px;padding:13px;border:
 
         public static string Success(string name)
             => Page("Kirish muvaffaqiyatli",
-                "<div class=\"icon ok\">&#10004;</div><h2 id=\"result\">Xush kelibsiz, " + WebUtility.HtmlEncode(name) + "!</h2>"
-                + "<p>Kirish muvaffaqiyatli. Endi o'yinga qayting — saltanatingiz qolgan joyidan davom etadi.</p>"
+                "<div class=\"icon ok\">&#10004;</div><h2 id=\"result\">Muvaffaqiyatli kirdingiz, " + WebUtility.HtmlEncode(name) + "!</h2>"
+                + "<p>O'yinga qaytishingiz mumkin — saltanatingiz qolgan joyidan davom etadi.</p>"
                 + "<a class=\"btn\" id=\"back\" href=\"uz.andijon.saltanatlar://auth\" style=\"display:none\">O'yinga qaytish</a>"
-                + "<p style=\"font-size:13px;margin-top:16px\">Bu oynani yopishingiz mumkin.</p>"
-                + "<script>if(/Android/i.test(navigator.userAgent)){var b=document.getElementById('back');b.style.display='inline-block';setTimeout(function(){location.href=b.href},600);}else{setTimeout(function(){try{window.close()}catch(e){}},2500);}</script>");
+                + "<p style=\"font-size:13px;margin-top:16px\" id=\"hint\">Bu oyna 3 soniyadan so'ng avtomatik yopiladi.</p>"
+                + "<script>if(/Android/i.test(navigator.userAgent)){var b=document.getElementById('back');b.style.display='inline-block';setTimeout(function(){location.href=b.href},600);}else{setTimeout(function(){try{window.close()}catch(e){}var h=document.getElementById('hint');if(h)h.textContent='Oynani yopib, o\\u2019yinga qayting.';},3000);}</script>");
 
         public static string Message(string title, string text, bool ok)
             => Page(title, "<div class=\"icon " + (ok ? "ok" : "bad") + "\">" + (ok ? "&#10004;" : "&#9888;") + "</div><h2 id=\"result\">"
