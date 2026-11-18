@@ -96,7 +96,21 @@ namespace AndijonSaltanatlar.UI
             if (_client.LoggedIn) _client.QueueRefresh();
         }
 
-        public void Close() { IsOpen = false; _ui.FocusId = null; _confirm = null; }
+        public void Close() { IsOpen = false; FullMap = false; _ui.FocusId = null; _confirm = null; }
+
+        /// <summary>To'liq ekranli dunyo xaritasi (M): menyu va sarlavhasiz, butun ekran — xarita.</summary>
+        public bool FullMap { get; private set; }
+
+        /// <summary>M tugmasi: katta dunyo xaritasi — kimning yeri va qasri qayerda (ma'lumot har ochilganda yangilanadi).</summary>
+        public void ToggleWorldMap()
+        {
+            if (IsOpen && FullMap) { Close(); return; }
+            ShowTab("warmap");
+            FullMap = true;
+            _warRequested = false;
+            if (_client.LoggedIn) _client.LoadWar();
+            Open();
+        }
         public void Toggle() { if (IsOpen) Close(); else Open(); }
 
         public void Prefill(string server, string user, string pass)
@@ -134,6 +148,7 @@ namespace AndijonSaltanatlar.UI
                 case "start-flag": _startStep = 1; _startRegion = -2; break; // sinov: yurt tanlashning 2-qadami
                 case "vizier": case "vazir": _sectionAfterLogin = Section.Vizier; break;
                 case "war": case "harbiy": case "warmap": _sectionAfterLogin = Section.War; _warTab = 0; break;
+                case "fullmap": _sectionAfterLogin = Section.War; _warTab = 0; FullMap = true; break;
                 case "armies": _sectionAfterLogin = Section.War; _warTab = 1; break;
                 case "army-units": _sectionAfterLogin = Section.War; _warTab = 3; break;
                 case "conflicts": _sectionAfterLogin = Section.War; _warTab = 5; break;
@@ -256,6 +271,13 @@ namespace AndijonSaltanatlar.UI
                 return;
             }
 
+            if (FullMap && _client.LoggedIn && _client.State != null && !_client.State.NeedsHome)
+            {
+                DrawFullMap(vw, vh);
+                ui.Toast(_toast, _toastError, Math.Min(1f, _toastTimer));
+                ui.End();
+                return;
+            }
             ui.Fill(new Rectangle(0, 0, vw, vh), T.Scrim);
             Rectangle win = ui.Compact ? new Rectangle(0, 0, vw, vh) : new Rectangle((vw - Math.Min(vw - 40, 1240)) / 2, (vh - Math.Min(vh - 40, 690)) / 2, Math.Min(vw - 40, 1240), Math.Min(vh - 40, 690));
             if (ui.Compact) ui.Fill(win, T.Background); else ui.Panel(win);
@@ -273,6 +295,28 @@ namespace AndijonSaltanatlar.UI
         // ------------------------------------------------------------------
         /// <summary>Google orqali qayta ulanish so'raldi (Game1 CloudSession tokeni bilan qayta ulaydi).</summary>
         public Action ReconnectRequested;
+
+        /// <summary>M — butun ekran: O'zbekiston xaritasi, har saltanatning yerlari (rangi) va qasrlari (bayroq bilan).</summary>
+        private void DrawFullMap(int vw, int vh)
+        {
+            UiKit ui = _ui; ThemeTokens T = ui.T;
+            int h = ui.ControlH, pad = ui.Compact ? 8 : 14;
+            ui.Fill(new Rectangle(0, 0, vw, vh), T.Background);
+            int headH = (int)ui.Type.LineHeight(TextStyle.ScreenTitle) + 14;
+            ui.Text("DUNYO XARITASI", new Vector2(pad, pad), TextStyle.ScreenTitle, T.Accent);
+            string hint = "Qasrni bosing — egasi  ·  M — yopish";
+            ui.TextFit(hint, new Rectangle(pad + 330, pad + 6, vw - 2 * pad - 330 - h - 20, (int)ui.Type.LineHeight(TextStyle.Secondary)), TextStyle.Secondary, T.TextSecondary);
+            if (ui.IconButton(new Rectangle(vw - pad - h, pad, h, h), "×", "Yopish (M)")) { Close(); return; }
+            var body = new Rectangle(pad, pad + headH, vw - 2 * pad, vh - 2 * pad - headH);
+            WarOverviewDto w = _client.War;
+            if (w == null)
+            {
+                if (!_warRequested) { _warRequested = true; _client.LoadWar(); }
+                ui.Paragraph("Xarita yuklanmoqda…", body, TextStyle.Body);
+                return;
+            }
+            DrawWarMap(body, w);
+        }
 
         /// <summary>
         /// Kirish endi FAQAT Google orqali (o'yin boshida). Bu yerda login/parol formasi yo'q — faqat

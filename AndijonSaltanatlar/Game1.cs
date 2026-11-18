@@ -1449,6 +1449,10 @@ public sealed class Game1 : Game
 		{
 			HandleHotkeys();
 		}
+		else if (_input.KeyPressed(Keys.M) && !_onlinePanel.WantsKeyboard)
+		{
+			_onlinePanel.ToggleWorldMap();   // M — xaritani yopish
+		}
 		if (_arenaFromMap && !_arena.Active)
 		{
 			// Yurish jangi tugadi — saltanat xaritasiga qaytamiz
@@ -1984,6 +1988,16 @@ public sealed class Game1 : Game
 		}
 		if (_input.KeyPressed(Keys.M))
 		{
+			// Onlayn dunyoga ulangan bo'lsa — katta xarita: barcha saltanatlar yerlari va qasrlari
+			if (CloudSignedIn || _online.LoggedIn)
+			{
+				_strategicMode = false;
+				_civMode = false;
+				_questMode = false;
+				if (!_online.LoggedIn && !_online.Busy) ConnectOnlineWorld();
+				_onlinePanel.ToggleWorldMap();
+				return;
+			}
 			_strategicMode = !_strategicMode;
 			_civMode = false;
 			_questMode = false;

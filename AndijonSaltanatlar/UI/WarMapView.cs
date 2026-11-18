@@ -186,8 +186,28 @@ namespace AndijonSaltanatlar.UI
             WarMapRegionDto r = w.MapRegions.FirstOrDefault(m => m.RegionId == _mapRegion);
             if (r == null)
             {
-                ui.Paragraph("Xaritadan qasrni tanlang. O'z qasrlaringiz ko'k yozuvli. Qo'shiningizni boshqa qasrga yuborsangiz, yetib borgach jang boshlanadi: AI qasrlarida sarkarda, real o'yinchida — o'yinchining o'zi (yoki u offline bo'lsa qasr sarkardasi) himoya qiladi.",
-                    new Rectangle(x, y, iw, info.Bottom - y - 10), TextStyle.Body);
+                // Kimning yeri qayerda: har saltanat — rangi, qasrlari soni, poytaxti va qasrlari ro'yxati
+                ui.TextFit("SALTANATLAR VA YERLARI", new Rectangle(x, y, iw, (int)ui.Type.LineHeight(TextStyle.PanelTitle)), TextStyle.PanelTitle, T.Accent);
+                y += (int)ui.Type.LineHeight(TextStyle.PanelTitle) + 6;
+                var groups = w.MapRegions.Where(m => m.OwnerKingdomId != 0)
+                    .GroupBy(m => m.OwnerKingdomId)
+                    .OrderByDescending(g => g.Any(m => m.IsMine)).ThenByDescending(g => g.Count());
+                foreach (var g in groups)
+                {
+                    if (y + lh * 2 > info.Bottom - 10) break;
+                    var first = g.First();
+                    var col = first.Color != null && first.Color.Length >= 3 ? new Color(first.Color[0], first.Color[1], first.Color[2]) : Color.Gray;
+                    ui.Fill(new Rectangle(x, y + 3, 14, (int)lh - 6), col);
+                    string capital = g.FirstOrDefault(m => m.IsCapital)?.Name ?? first.Name;
+                    string who = (first.IsMine ? "SIZ: " : "") + first.OwnerName + (first.OwnerIsAi ? "" : " (o'yinchi)");
+                    ui.TextFit(who + " — " + g.Count() + " qasr", new Rectangle(x + 22, y, iw - 22, (int)lh), TextStyle.Secondary, first.IsMine ? T.Primary : T.TextPrimary);
+                    y += (int)lh + 2;
+                    string list = "Saroy: " + capital + (g.Count() > 1 ? "  ·  " + string.Join(", ", g.Where(m => !m.IsCapital).Select(m => m.Name).Take(6)) : "");
+                    ui.TextFit(list, new Rectangle(x + 22, y, iw - 22, (int)lh), TextStyle.Caption, T.TextSecondary);
+                    y += (int)lh + 8;
+                }
+                int free = w.MapRegions.Count(m => m.OwnerKingdomId == 0);
+                if (free > 0 && y + lh < info.Bottom - 10) ui.TextFit("Egasiz hududlar: " + free, new Rectangle(x, y, iw, (int)lh), TextStyle.Caption, T.TextSecondary);
                 return;
             }
             ui.TextFit(r.Name + (r.IsCapital ? " · poytaxt" : ""), new Rectangle(x, y, iw, (int)ui.Type.LineHeight(TextStyle.PanelTitle)), TextStyle.PanelTitle); y += (int)ui.Type.LineHeight(TextStyle.PanelTitle) + 4;
