@@ -60,9 +60,10 @@ namespace AndijonSaltanatlar.Buildings
         public void Upgrade()
         {
             Level++;
-            MaxHitPoints += MaxHitPoints / 4;
+            // Mustahkamlik va sig'im o'sishi bino turiga bog'liq (devor ko'p HP, uy ko'p sig'im).
+            MaxHitPoints += (int)(MaxHitPoints * BuildingUpgradeEffects.HpGrowth(Type));
             HitPoints = MaxHitPoints;
-            if (PopulationCapacity > 0) PopulationCapacity += Level >= 4 ? 3 : 2;
+            if (PopulationCapacity > 0) PopulationCapacity += BuildingUpgradeEffects.CapacityDelta(Type, Level);
         }
 
         // --- IWorldObject ---

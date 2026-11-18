@@ -90,7 +90,7 @@ namespace AndijonSaltanatlar.Economy
             }
             else
             {
-                foodProduced = ComputeFoodProduction(farmers, b.Count(BuildingType.Garden), b.Count(BuildingType.Farm), foodBonus);
+                foodProduced = ComputeFoodProduction(farmers, (int)b.UpgradePower(BuildingType.Garden), (int)b.UpgradePower(BuildingType.Farm), foodBonus);
                 foodConsumed = population;
                 _res.Add(ResourceType.Food, foodProduced - foodConsumed);
             }
@@ -98,7 +98,7 @@ namespace AndijonSaltanatlar.Economy
             LastFoodConsumed = foodConsumed;
 
             // --- Tashqi (davlat darajasidagi) savdo hajmi va umumiy ishlab chiqarish ---
-            int tradeVolume = (int)((traders * 8 + b.Count(BuildingType.Market) * 6 + b.Count(BuildingType.Caravanserai) * 5) * (1f + tradeBonus));
+            int tradeVolume = (int)((traders * 8 + b.UpgradePower(BuildingType.Market) * 6 + b.UpgradePower(BuildingType.Caravanserai) * 5) * (1f + tradeBonus));
             LastTradeVolume = tradeVolume;
             LastProduction = foodProduced + tradeVolume;
 

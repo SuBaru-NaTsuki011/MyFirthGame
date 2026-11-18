@@ -863,7 +863,9 @@ namespace AndijonSaltanatlar.UI
                     title = b.Name;
                     subtitle = Building.CategoryName(b.Category);
                     desc = b.Description;
-                    rows.Add(("Daraja: " + b.Level + "/" + BuildingUpgradeSystem.MaxLevel + " (" + BuildingUpgradeSystem.LevelName(b.Level) + ")", Gold));
+                    rows.Add(("Daraja: " + b.Level + "/" + BuildingUpgradeSystem.MaxLevel + " (" + BuildingUpgradeSystem.LevelName(b) + ")", Gold));
+                    if (BuildingUpgradeSystem.CanUpgrade(b))
+                        rows.Add(("Keyingi: " + Buildings.BuildingUpgradeEffects.LevelName(b.Type, b.Level + 1) + " — " + Buildings.BuildingUpgradeEffects.Benefit(b.Type) + " oshadi", Green));
                     rows.Add((Texts.HitPoints + ": " + b.HitPoints + "/" + b.MaxHitPoints, Cream));
                     if (b.Cost > 0) rows.Add((Texts.Cost + ": " + b.Cost + " " + Texts.Coin, Muted));
                     if (b.PopulationCapacity > 0) rows.Add((Texts.Capacity + ": +" + b.PopulationCapacity + " " + Texts.Population, Green));

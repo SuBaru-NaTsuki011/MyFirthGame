@@ -12,9 +12,14 @@ namespace AndijonSaltanatlar.Progression
         public const int MaxLevel = 5;
 
         public static bool CanUpgrade(Building b) => b != null && b.Level < MaxLevel && b.BuildProgress >= 1f;
-        /// <summary>Narx bino narxi va darajasiga bog'liq: qimmat bino — qimmatroq kattalashtirish.</summary>
-        public static int UpgradeCost(Building b) => System.Math.Max(60, b.Cost / 2) * b.Level;
+        /// <summary>Narx bino narxi, darajasi va turiga bog'liq: devor arzon, saroy qimmat.</summary>
+        public static int UpgradeCost(Building b) =>
+            System.Math.Max(1, (int)(System.Math.Max(60, b.Cost / 2) * b.Level * BuildingUpgradeEffects.CostFactor(b.Type)));
 
+        /// <summary>Bino turiga xos daraja nomi (ferma — Tomorqa/Dala..., bozor — Rasta/Chorsu...).</summary>
+        public static string LevelName(Building b) => b == null ? "" : BuildingUpgradeEffects.LevelName(b.Type, b.Level);
+
+        /// <summary>Eski umumiy nom (moslik uchun). Imkoni bo'lsa LevelName(Building) ishlating.</summary>
         public static string LevelName(int level)
         {
             switch (level)

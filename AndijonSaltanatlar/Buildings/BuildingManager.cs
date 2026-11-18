@@ -56,6 +56,21 @@ namespace AndijonSaltanatlar.Buildings
         public int Count(BuildingType type) => _counts[(int)type];
 
         /// <summary>
+        /// Shu turdagi binolarning daraja-vaznli yig'indisi: 1-darajada = oddiy sanoq, yuqori daraja
+        /// ko'proq hissa qo'shadi (kattalashtirilgan bozor/ferma/karvonsaroy ko'proq ishlab chiqaradi).
+        /// </summary>
+        public float UpgradePower(BuildingType type)
+        {
+            float sum = 0f;
+            for (int i = 0; i < Buildings.Count; i++)
+            {
+                Building b = Buildings[i];
+                if (b.Type == type) sum += BuildingUpgradeEffects.EconomyFactor(b);
+            }
+            return sum;
+        }
+
+        /// <summary>
         /// Shu joyga size x size bino qo'yish mumkinmi.
         /// strictTerrain=false — generator uchun: faqat chegara va bandlik tekshiriladi.
         /// </summary>
