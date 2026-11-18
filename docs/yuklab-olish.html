@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Andijon: Saltanatlar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Tungi osmon + oltin — o'yin uslubiga mos, bitta dark olam. Markaziy ustun, QR doim oq kartada. */
+  :root{
+    --bg:#0d1420; --surface:#16212f; --surface-2:#1d2a3b;
+    --gold:#d8b45c; --gold-soft:#eccd84; --blue:#5a9bd4;
+    --text:#f2f6fb; --muted:#9fb0c3; --border:#2a3a4f;
+    --display:"Cinzel",Georgia,serif; --body:"Noto Sans",system-ui,sans-serif;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #1a2740 0%, transparent 60%),
+      radial-gradient(800px 500px at 90% 110%, #14202f 0%, transparent 55%),
+      var(--bg);
+    color:var(--text); font-family:var(--body); line-height:1.55;
+    min-height:100%; padding:32px 16px 48px;
+    display:flex; justify-content:center;
+  }
+  .wrap{width:100%; max-width:560px; display:flex; flex-direction:column; gap:22px}
+
+  header{text-align:center; display:flex; flex-direction:column; gap:8px; align-items:center}
+  .crest{width:54px; height:54px; margin-bottom:4px}
+  h1{
+    font-family:var(--display); font-weight:700; letter-spacing:.04em;
+    font-size:clamp(28px,7vw,40px); margin:0; color:var(--gold);
+    text-wrap:balance;
+  }
+  .tagline{color:var(--muted); font-size:15px; margin:0; max-width:34ch}
+  .pill{
+    display:inline-flex; gap:6px; align-items:center; align-self:center;
+    font-size:12.5px; font-weight:600; color:var(--gold-soft);
+    background:rgba(216,180,92,.1); border:1px solid rgba(216,180,92,.35);
+    padding:4px 12px; border-radius:999px;
+  }
+
+  .card{
+    background:linear-gradient(180deg,var(--surface-2),var(--surface));
+    border:1px solid var(--border); border-radius:16px; padding:22px;
+    box-shadow:0 18px 40px rgba(0,0,0,.35);
+  }
+
+  .qr-card{display:flex; flex-direction:column; align-items:center; gap:14px}
+  .qr-frame{
+    background:#ffffff; padding:16px; border-radius:12px; line-height:0;
+    border:3px solid var(--gold);
+  }
+  #qr img, #qr canvas{display:block; width:220px; height:220px}
+  .qr-hint{color:var(--muted); font-size:14px; text-align:center; margin:0}
+
+  .btn{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; text-decoration:none; font-weight:700; font-size:17px;
+    padding:15px 18px; border-radius:12px; cursor:pointer;
+    background:linear-gradient(180deg,var(--gold-soft),var(--gold));
+    color:#2a1e06; border:1px solid #b8923c;
+    box-shadow:0 8px 20px rgba(216,180,92,.25);
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn:focus-visible{outline:3px solid var(--blue); outline-offset:2px}
+  .btn svg{width:20px; height:20px}
+
+  .steps-title{
+    font-family:var(--display); font-weight:500; letter-spacing:.03em;
+    font-size:18px; color:var(--gold-soft); margin:0 0 14px;
+  }
+  ol{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:14px; counter-reset:s}
+  ol li{display:flex; gap:13px; align-items:flex-start; counter-increment:s}
+  ol li::before{
+    content:counter(s); flex:0 0 28px; height:28px; border-radius:50%;
+    display:grid; place-items:center; font-weight:700; font-size:14px;
+    color:var(--gold); background:rgba(216,180,92,.12); border:1px solid rgba(216,180,92,.4);
+  }
+  ol li b{color:var(--text)}
+  ol li span{color:var(--muted); font-size:14.5px}
+  ol li strong{color:var(--gold-soft)}
+
+  .note{
+    display:flex; gap:11px; align-items:flex-start;
+    color:var(--muted); font-size:13.5px; line-height:1.5;
+  }
+  .note svg{flex:0 0 18px; width:18px; height:18px; margin-top:1px; color:var(--blue)}
+  .note b{color:var(--text); font-weight:600}
+  footer{text-align:center; color:var(--muted); font-size:12.5px; margin-top:4px}
+  footer code{color:var(--gold-soft); background:rgba(255,255,255,.05); padding:2px 7px; border-radius:6px; font-size:12px}
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <svg class="crest" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+        <path d="M24 3l17 6v12c0 11-7.3 19.3-17 23C14.3 40.3 7 32 7 21V9l17-6z" fill="#16212f" stroke="#d8b45c" stroke-width="1.6"/>
+        <path d="M24 12l3.2 6.6 7.3 1-5.3 5 1.3 7.2L24 28.4 17.5 31.8l1.3-7.2-5.3-5 7.3-1L24 12z" fill="#d8b45c"/>
+      </svg>
+      <h1>Andijon: Saltanatlar</h1>
+      <p class="tagline">Tarixiy strategiya — shahringizni quring, savdo qiling, do'stlaringiz bilan online o'ynang.</p>
+      <span class="pill">● Android · APK · versiya 0.20.0</span>
+    </header>
+
+    <section class="card qr-card">
+      <div class="qr-frame"><div id="qr" role="img" aria-label="Yuklab olish QR kodi"></div></div>
+      <p class="qr-hint">Telefon kamerasi bilan QR'ni skaner qiling —<br>yuklab olish o'zi boshlanadi.</p>
+      <a class="btn" id="dl" href="#" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 21h16"/></svg>
+        APK'ni yuklab olish
+      </a>
+    </section>
+
+    <section class="card">
+      <p class="steps-title">Android'ga o'rnatish</p>
+      <ol>
+        <li><span><b>Yuklab oling</b> — QR'ni skaner qiling yoki yuqoridagi tugmani bosing.</span></li>
+        <li><span>Yuklangach <b>faylni oching</b> (bildirishnomada yoki "Yuklamalar" papkasida).</span></li>
+        <li><span>So'ralsa <strong>"Noma'lum manbalardan o'rnatish"</strong>ga ruxsat bering — bu Play Store'dan tashqari ilovalar uchun.</span></li>
+        <li><span><b>O'rnating</b>, ochib <b>Google orqali kiring</b> — hammangiz bitta dunyoda o'ynaysiz.</span></li>
+      </ol>
+    </section>
+
+    <div class="note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5h.01"/></svg>
+      <span><b>Yangilanishlar o'zi keladi.</b> Yangi versiya chiqsa, ilova ochilganda "Yangilang" deydi. Akkauntingiz va o'yin holati bulutda saqlanadi — yangilagach o'sha joydan davom etasiz. Bu QR doim eng so'nggi versiyaga ishora qiladi.</span>
+    </div>
+
+    <footer>Fayl: <code>AndijonSaltanatlar.apk</code> · GitHub Releases</footer>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    var APK_URL = "https://github.com/anvarovmuhammadamin011-ops/MyFirthGame/releases/latest/download/AndijonSaltanatlar.apk";
+    document.getElementById("dl").setAttribute("href", APK_URL);
+    try {
+      new QRCode(document.getElementById("qr"), {
+        text: APK_URL, width: 220, height: 220,
+        colorDark: "#0d1420", colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } catch (e) {
+      document.getElementById("qr").textContent = "QR yuklanmadi — pastdagi tugmadan yuklab oling.";
+    }
+  </script>
+</body>
+</html>

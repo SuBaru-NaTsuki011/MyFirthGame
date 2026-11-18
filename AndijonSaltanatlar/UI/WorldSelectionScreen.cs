@@ -8,6 +8,7 @@ using AndijonSaltanatlar.Shared.DTOs;
 using AndijonSaltanatlar.UI.Design;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input; // Android: KeyboardInput (soft klaviatura)
 
 namespace AndijonSaltanatlar.UI
 {
