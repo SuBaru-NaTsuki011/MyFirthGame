@@ -12,6 +12,29 @@ namespace AndijonSaltanatlar.Shared.DTOs
         public bool ChooseStart { get; set; }
     }
 
+    /// <summary>Mavjud dunyo (DUNYONI TANLASH ekrani uchun).</summary>
+    public sealed class WorldSummaryDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public int Day { get; set; }
+        public int PlayerCount { get; set; }
+        public int FreeRegionCount { get; set; }
+        /// <summary>Foydalanuvchining saltanati shu dunyodami.</summary>
+        public bool IsMine { get; set; }
+    }
+
+    /// <summary>Dunyo ro'yxati va o'yinchining joriy a'zoligi (bir Google hisob = bitta saltanat).</summary>
+    public sealed class WorldsResponse
+    {
+        public List<WorldSummaryDto> Worlds { get; set; } = new();
+        public int? MyWorldId { get; set; }
+        public int? MyKingdomId { get; set; }
+        public string MyKingdomName { get; set; } = "";
+        /// <summary>Dunyo yaratish server sozlamasida ruxsat etilganmi.</summary>
+        public bool CanCreateWorld { get; set; }
+    }
+
     /// <summary>Boshlang'ich yurt tanlash xaritasi uchun hudud.</summary>
     public sealed class StartRegionDto
     {

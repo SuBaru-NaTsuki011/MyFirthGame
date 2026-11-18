@@ -86,13 +86,15 @@ namespace AndijonSaltanatlar.Server.Services
                 }
             }
             World world = await EnsureWorldAsync(req?.WorldId > 0 ? req.WorldId : 1);
-            string name = string.IsNullOrWhiteSpace(req?.KingdomName) ? user.Username + " saltanati" : req.KingdomName.Trim();
+            // Boshqa o'yinchilarga faqat taxallus ko'rinadi (Google'dagi haqiqiy ism yoki email emas)
+            string ruler = string.IsNullOrWhiteSpace(user.DisplayName) || !user.ProfileCompleted ? user.Username : user.DisplayName;
+            string name = string.IsNullOrWhiteSpace(req?.KingdomName) ? ruler + " saltanati" : req.KingdomName.Trim();
             if (name.Length > 40) name = name.Substring(0, 40);
             int n = await _db.Kingdoms.CountAsync(k => k.WorldId == world.Id && !k.IsAi);
             (int r, int g, int b) = WorldSeeder.PlayerColor(n);
             var kingdom = new Kingdom
             {
-                WorldId = world.Id, Name = name, RulerName = user.Username, IsAi = false, OwnerUserId = user.Id,
+                WorldId = world.Id, Name = name, RulerName = ruler, IsAi = false, OwnerUserId = user.Id,
                 ColorR = r, ColorG = g, ColorB = b
             };
             _db.Kingdoms.Add(kingdom);
@@ -108,6 +110,55 @@ namespace AndijonSaltanatlar.Server.Services
             await EnsureResourcesAsync(kingdom.Id);
             if (req?.ChooseStart != true) await WorldSeeder.EnsurePlayerHomeAsync(_db, kingdom);
             return kingdom;
+        }
+
+        // ------------------------------------------------------------------
+        // Dunyolar ro'yxati (DUNYONI TANLASH) va a'zolik
+        // ------------------------------------------------------------------
+        /// <summary>
+        /// Mavjud dunyolar + foydalanuvchining saltanati qaysi dunyoda ekani. Bir hisob bitta saltanatga ega;
+        /// qaytgan o'yinchi o'z dunyosini va saltanatini shu yerdan ko'radi.
+        /// </summary>
+        public async Task<WorldsResponse> WorldsAsync(int userId)
+        {
+            if (!await _db.Worlds.AnyAsync()) await EnsureWorldAsync(1);
+
+            AppUser user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            Kingdom mine = null;
+            if (user?.KingdomId != null)
+                mine = await _db.Kingdoms.AsNoTracking().FirstOrDefaultAsync(k => k.Id == user.KingdomId);
+
+            var worlds = await _db.Worlds.AsNoTracking().OrderBy(w => w.Id).Take(20).ToListAsync();
+            var playerCounts = await _db.Kingdoms.AsNoTracking()
+                .Where(k => !k.IsAi && k.OwnerUserId != null)
+                .GroupBy(k => k.WorldId)
+                .Select(g => new { WorldId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.WorldId, x => x.Count);
+            var freeCounts = await _db.Regions.AsNoTracking()
+                .Where(r => r.OwnerKingdomId == 0)
+                .GroupBy(r => r.WorldId)
+                .Select(g => new { WorldId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.WorldId, x => x.Count);
+
+            var dto = new WorldsResponse
+            {
+                MyWorldId = mine?.WorldId,
+                MyKingdomId = mine?.Id,
+                MyKingdomName = mine?.Name ?? ""
+            };
+            foreach (World w in worlds)
+            {
+                dto.Worlds.Add(new WorldSummaryDto
+                {
+                    Id = w.Id,
+                    Name = string.IsNullOrWhiteSpace(w.Name) ? "Andijon - " + w.Id + "-dunyo" : w.Name,
+                    Day = w.Day,
+                    PlayerCount = playerCounts.GetValueOrDefault(w.Id),
+                    FreeRegionCount = freeCounts.GetValueOrDefault(w.Id),
+                    IsMine = mine != null && mine.WorldId == w.Id
+                });
+            }
+            return dto;
         }
 
         // ------------------------------------------------------------------

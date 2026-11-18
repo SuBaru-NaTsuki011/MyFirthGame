@@ -126,6 +126,9 @@ public sealed class Game1 : Game
 
 	private GoogleLoginScreen _loginScreen;
 
+	// Yangi hukmdor: profil saqlangach DUNYONI TANLASH / YURTNI TANLASH.
+	private WorldSelectionScreen _worldSelect;
+
 	private bool _loginMode;
 
 	private bool _loadingCloud;
@@ -240,6 +243,18 @@ public sealed class Game1 : Game
 		_cloud = new AndijonSaltanatlar.Online.CloudSession { LoginUrlFile = _opt.LoginUrlFile };
 		_cloud.NativeAccountPicker = NativeAccountPicker;
 		_cloud.SignedIn = OnCloudSignedIn;
+		_cloud.TokenRenewed = t => _online.UpdateToken(t);
+		// Sessiya serverda bekor qilingan/muddati tugagan: kirish ekrani (lokal zaxira saqlangan, progress yo'qolmaydi)
+		_cloud.SessionLost = () =>
+		{
+			if (_loginMode) return;
+			_online.Logout();
+			_onlinePanel.Close();
+			_worldSelect = null;
+			_fullUpgradeDone = false;
+			_loginScreen = new GoogleLoginScreen(_cloud, _cloud.ServerUrl) { Ui = _uiKit };
+			_loginMode = true;
+		};
 		_cloud.SaveConflict = OnCloudConflict;
 		_onlinePanel.ReconnectRequested = ConnectOnlineWorld;
 		_pendingStoryMode = _opt.Story || _opt.SmokeLog != null;
@@ -367,11 +382,13 @@ public sealed class Game1 : Game
 		// Oddiy ishga tushirish: avval Google bilan kirish (o'yin doimiy onlayn). Sinov parametrlari bilan — to'g'ridan-to'g'ri.
 		bool testLaunch = _opt.ScreenshotPath != null || _opt.Tab != null || _opt.Map || _opt.Civ || _opt.Story || _opt.QuestJournal || _opt.Online || _opt.Menu;
 		_menuMode = _opt.Menu;
-		_loginMode = _opt.Login || !testLaunch;
+		_loginMode = _opt.Login || _opt.AuthStage != null || !testLaunch;
 		if (_loginMode)
 		{
 			_cloud.TryResume(DefaultServer());
 			_loginScreen = new GoogleLoginScreen(_cloud, _cloud.ServerUrl.Length > 0 ? _cloud.ServerUrl : DefaultServer()) { Ui = _uiKit };
+			if (_opt.AuthStage == "profile") _loginScreen.Mode = GoogleLoginScreen.Stage.Profile;
+			else if (_opt.AuthStage == "welcome") _loginScreen.Mode = GoogleLoginScreen.Stage.Welcome;
 		}
 		if (_opt.Online)
 		{
@@ -391,7 +408,7 @@ public sealed class Game1 : Game
 			}
 		}
 		// Sinov: kirishsiz rejimda ham to'liq kuchaytirish (suratga olish uchun)
-		if (_opt.FullUpgrade && !_loginMode && !_fullUpgradeDone) { _fullUpgradeDone = true; ApplyFullUpgrade(); }
+		if ((_opt.FullUpgrade || _cloud.IsVip) && !_loginMode && !_fullUpgradeDone) { _fullUpgradeDone = true; ApplyFullUpgrade(); }
 		if (_opt.FarmDemo.HasValue)
 		{
 			Building hallF = _buildings.Buildings.FirstOrDefault(b => b.Type == BuildingType.MainHall);
@@ -861,7 +878,8 @@ public sealed class Game1 : Game
 			FarmSeeds = _state.Farming.Seeds,
 			FarmTools = _state.Farming.ToolsLevel,
 			FarmFertilizer = _state.Farming.FertilizerCharges,
-			FarmIrrigation = _state.Farming.Irrigation
+			FarmIrrigation = _state.Farming.Irrigation,
+			Interiors = AndijonSaltanatlar.Interiors.InteriorStore.Snapshot()
 		};
 		foreach (Building building in _buildings.Buildings)
 		{
@@ -1156,7 +1174,55 @@ public sealed class Game1 : Game
 	}
 
 	/// <summary>Google orqali kirildi: serverdagi saltanatni yuklaymiz (yo'q bo'lsa yangi saltanat).</summary>
+	/// <summary>
+	/// Kirgandan keyin: yangi o'yinchi — YANGI HUKMDOR (taxallus), qaytgan o'yinchi — XUSH KELIBSIZ (O'YINNI DAVOM ETTIRISH).
+	/// Sinov (skrinshot) rejimida darhol davom etadi.
+	/// </summary>
 	private void OnCloudSignedIn()
+	{
+		_fullUpgradeDone = false;   // VIP hisobda har kirishda to'liq ochiladi
+		bool auto = _opt.ScreenshotPath != null && _opt.AuthStage == null;
+		if (_loginScreen != null && !auto)
+		{
+			_loginScreen.ContinueRequested = LoadCloudGame;
+			_loginScreen.ProfileDone = ShowWorldSelection;
+			_loginScreen.Mode = _cloud.NeedsProfile ? GoogleLoginScreen.Stage.Profile : GoogleLoginScreen.Stage.Welcome;
+			return;
+		}
+		LoadCloudGame();
+	}
+
+	/// <summary>Yangi hukmdor: YANGI HUKMDOR → DUNYONI TANLASH → YURTNI TANLASH → o'yin.</summary>
+	private void ShowWorldSelection()
+	{
+		if (_loginScreen != null) _loginScreen.Mode = GoogleLoginScreen.Stage.Welcome;
+		_worldSelect = new WorldSelectionScreen(_cloud) { Ui = _uiKit };
+		_worldSelect.ContinueRequested = () => { _worldSelect = null; LoadCloudGame(); };
+		_worldSelect.WorldChosen = worldId =>
+		{
+			SetOnlineWorld(worldId);
+			_worldSelect = null;
+			LoadCloudGame();
+		};
+		_worldSelect.CancelRequested = () =>
+		{
+			int joined = _worldSelect?.JoinedWorldId ?? 0;
+			if (joined > 0) SetOnlineWorld(joined);
+			_worldSelect = null;
+			LoadCloudGame();
+		};
+		_worldSelect.Begin();
+	}
+
+	/// <summary>Keyingi onlayn ulanish aynan shu dunyoga bo'lsin (cross-platform bir xil saltanat).</summary>
+	private void SetOnlineWorld(int worldId)
+	{
+		if (worldId <= 0) return;
+		_online.Settings.WorldId = worldId;
+		_online.Settings.Save();
+	}
+
+	private void LoadCloudGame()
 	{
 		if (_loadingCloud) return;
 		_loadingCloud = true;
@@ -1176,6 +1242,7 @@ public sealed class Game1 : Game
 				return;
 			}
 			SaveGameData data = SaveManager.FromJson(json);
+			bool fresh = data == null;
 			if (data != null)
 			{
 				ApplySave(data, "Xush kelibsiz, " + _cloud.DisplayName + "! Saltanat qolgan joyidan davom etmoqda");
@@ -1187,14 +1254,16 @@ public sealed class Game1 : Game
 				NewGame(_currentSeed);
 				_camera.Jump(IsoMath.TileToWorld(new Vector2(GameConfig.CityCenter, GameConfig.CityCenter)), StartZoom());
 				_state.ShowMessage("Xush kelibsiz, " + _cloud.DisplayName + "! Yangi saltanat boshlandi");
-				UploadNow(showMessage: false);
 			}
 			_ui.AccountName = _cloud.AccountLabel;
 			_loginMode = false;
 			_menuMode = false;
 			_frames = 0;
 			_autosaveTimer = 0f;
-			if (_opt.FullUpgrade && !_fullUpgradeDone) { _fullUpgradeDone = true; ApplyFullUpgrade(); }
+			bool upgraded = (_opt.FullUpgrade || _cloud.IsVip) && !_fullUpgradeDone;
+			if (upgraded) { _fullUpgradeDone = true; ApplyFullUpgrade(); }
+			// Yangi o'yinda dastlabki saqlash VIP kuchaytirishdan KEYIN yuboriladi (aks holda eski holat yuklanadi).
+			else if (fresh) UploadNow(showMessage: false);
 			ConnectOnlineWorld();
 			if (_opt.OnlineTab != null) { _onlinePanel.ShowTab(_opt.OnlineTab); _onlinePanel.Open(); }
 			if (_opt.UnlockParcelAfterLogin.HasValue) RunUnlockParcelTest(_opt.UnlockParcelAfterLogin.Value);
@@ -1249,6 +1318,8 @@ public sealed class Game1 : Game
 		_online.Logout();
 		_cloud.SignOut();
 		_onlinePanel.Close();
+		_worldSelect = null;
+		_fullUpgradeDone = false;
 		NewGame(_currentSeed);
 		_loginScreen = new GoogleLoginScreen(_cloud, _cloud.ServerUrl) { Ui = _uiKit };
 		_loginMode = true;
@@ -1339,6 +1410,7 @@ public sealed class Game1 : Game
 		}
 		_eliteArmy = saveGameData.EliteArmy;
 		if (_eliteArmy) ApplyEliteArmy();
+		AndijonSaltanatlar.Interiors.InteriorStore.Restore(saveGameData.Interiors);
 		if (saveGameData.FarmSeeds >= 0) _state.Farming.Seeds = saveGameData.FarmSeeds;
 		_state.Farming.ToolsLevel = saveGameData.FarmTools;
 		_state.Farming.FertilizerCharges = saveGameData.FarmFertilizer;
@@ -1374,9 +1446,11 @@ public sealed class Game1 : Game
 		float num = (float)gameTime.ElapsedGameTime.TotalSeconds;
 		_input.Update(IsActive);
 		_cloud?.Pump();
+		_cloud?.Tick((float)gameTime.ElapsedGameTime.TotalSeconds);
 		if (_loginMode)
 		{
-			_loginScreen.Update(_input);
+			if (_worldSelect != null) _worldSelect.Update(_input);
+			else _loginScreen.Update(_input);
 			// Sinov: login manzili faylga yoziladi va Playwright Google sahifasini o'zi to'ldiradi.
 			if (_opt.LoginUrlFile != null && !_autoLoginStarted && _cloud.State == AndijonSaltanatlar.Online.CloudLoginState.SignedOut)
 			{
@@ -1639,6 +1713,21 @@ public sealed class Game1 : Game
 		// Uyga kirish / uy ichida yurish
 		bool canEnter = combatInput && possessedNow != null && !_combat.RaidActive && !_combat.RaidIncoming;
 		_interior.ShahAway = _combat.ShahInWorld;
+		// Bino tafsilotlari panelidagi "ICHKARIGA KIRISH" tugmasi
+		if (!_interior.Active && _ui.EnterRequested != null)
+		{
+			Building target = _ui.EnterRequested;
+			_ui.EnterRequested = null;
+			if (canEnter && possessedNow != null && AndijonSaltanatlar.Interiors.HouseInterior.IsEnterable(target))
+			{
+				if (AndijonSaltanatlar.Interiors.HouseInterior.MayEnter(target, possessedNow))
+					_interior.Enter(target, possessedNow);
+				else
+					_state.ShowMessage("Saroyga faqat soqchilar va jangchilar kira oladi!", true);
+			}
+			else if (possessedNow == null)
+				_state.ShowMessage("Avval odamni tanlab, unga kirish buyrug'ini bering", true);
+		}
 		if (_interior.Active)
 		{
 			_interior.Update(_state.Paused ? 0f : num, combatInput ? _input : null);
@@ -2406,7 +2495,8 @@ public sealed class Game1 : Game
 	{
 		Viewport viewport = GraphicsDevice.Viewport;
 		_sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
-		_loginScreen.Draw(_sb, viewport.Width, viewport.Height, _time);
+		if (_worldSelect != null) _worldSelect.Draw(_sb, viewport.Width, viewport.Height, _time);
+		else _loginScreen.Draw(_sb, viewport.Width, viewport.Height, _time);
 		_sb.End();
 	}
 

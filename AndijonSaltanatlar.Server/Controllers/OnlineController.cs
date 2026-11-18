@@ -40,6 +40,10 @@ namespace AndijonSaltanatlar.Server.Controllers
             return Ok(await _svc.StateAsync(k));
         }
 
+        /// <summary>DUNYONI TANLASH: mavjud dunyolar, o'yinchilar soni va o'z saltanati qaysi dunyoda ekani.</summary>
+        [HttpGet("worlds")]
+        public async Task<IActionResult> Worlds() => Ok(await _svc.WorldsAsync(UserId));
+
         /// <summary>Boshlang'ich yurt tanlash xaritasi: barcha hududlar, bo'sh/band holati bilan.</summary>
         [HttpGet("start-regions")]
         public async Task<IActionResult> StartRegions()
