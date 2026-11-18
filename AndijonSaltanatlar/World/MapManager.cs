@@ -149,9 +149,13 @@ namespace AndijonSaltanatlar.World
             _waterTimer += dt;
         }
 
+        /// <summary>Fasl atlasi (SeasonVisuals). null — asl atlas. Tuzilishi asl atlas bilan bir xil.</summary>
+        public Texture2D AtlasOverride { get; set; }
+
         /// <summary>Faqat ekranda ko'rinadigan tile'larni chizadi (bitta atlas — bitta draw-call).</summary>
         public void Draw(SpriteBatch sb, Vector4 view)
         {
+            Texture2D atlas = AtlasOverride ?? _atlas;
             int waterRow = 4 + ((int)(_waterTimer * 1.6f) & 1);
             const int hw = GameConfig.HalfTileW, hh = GameConfig.HalfTileH;
 
@@ -176,10 +180,10 @@ namespace AndijonSaltanatlar.World
                     if (t == TileType.Water)
                     {
                         // Qirg'oqlar: qo'shni tile suv bo'lmasa, o'sha tomonga tuproq chet chiziladi.
-                        if (IsLand(x, y - 1)) sb.Draw(_atlas, pos, TileArt.Cell(TileArt.RowBanks, 0), Color.White);
-                        if (IsLand(x - 1, y)) sb.Draw(_atlas, pos, TileArt.Cell(TileArt.RowBanks, 1), Color.White);
-                        if (IsLand(x + 1, y)) sb.Draw(_atlas, pos, TileArt.Cell(TileArt.RowBanks, 2), Color.White);
-                        if (IsLand(x, y + 1)) sb.Draw(_atlas, pos, TileArt.Cell(TileArt.RowBanks, 3), Color.White);
+                        if (IsLand(x, y - 1)) sb.Draw(atlas, pos, TileArt.Cell(TileArt.RowBanks, 0), Color.White);
+                        if (IsLand(x - 1, y)) sb.Draw(atlas, pos, TileArt.Cell(TileArt.RowBanks, 1), Color.White);
+                        if (IsLand(x + 1, y)) sb.Draw(atlas, pos, TileArt.Cell(TileArt.RowBanks, 2), Color.White);
+                        if (IsLand(x, y + 1)) sb.Draw(atlas, pos, TileArt.Cell(TileArt.RowBanks, 3), Color.White);
                     }
                 }
         }

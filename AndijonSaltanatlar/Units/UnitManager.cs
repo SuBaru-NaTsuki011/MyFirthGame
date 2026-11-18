@@ -104,6 +104,7 @@ namespace AndijonSaltanatlar.Units
             Unit best = null;
             foreach (var u in Units)
             {
+                if (u.Hidden) continue;
                 Vector2 feet = IsoMath.TileToWorld(u.Position);
                 if (MathF.Abs(world.X - feet.X) > 11f) continue;
                 if (world.Y > feet.Y + 5f || world.Y < feet.Y - 48f) continue;

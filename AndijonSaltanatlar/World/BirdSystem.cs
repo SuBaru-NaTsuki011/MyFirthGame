@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using AndijonSaltanatlar.Core;
 using AndijonSaltanatlar.Core.Graphics;
+using AndijonSaltanatlar.Environment;
 using AndijonSaltanatlar.Units;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -70,12 +71,20 @@ namespace AndijonSaltanatlar.World
         private readonly List<IWorldObject> _ground = new List<IWorldObject>();
         private float _storkTimer = 8f;
 
+        /// <summary>Joriy fasl (Game1 har kadr beradi): qishda laylaklar uchib o'tmaydi.</summary>
+        public Season Season { get; set; } = Season.Bahor;
+
         // Sprite'lar: [tur][kadr]
         private readonly Texture2D[] _pigeonGround, _pigeonFly, _sparrowGround, _sparrowFly, _storkFly;
         private readonly Texture2D _shadow;
 
         // Kaptarlar to'planadigan maydonlar (CityGenerator: markaziy maydon, bozor maydoni, saroy oldi)
-        private static readonly Vector2[] Plazas = { new Vector2(30.5f, 33.5f), new Vector2(42.5f, 37f), new Vector2(34.5f, 29f), new Vector2(27.5f, 35.5f) };
+        // (CityGenerator koordinatalari shahar bloki ichida — xaritada CityOffset qadar siljigan)
+        private static readonly Vector2[] Plazas =
+        {
+            new Vector2(30.5f, 33.5f) + new Vector2(GameConfig.CityOffset), new Vector2(42.5f, 37f) + new Vector2(GameConfig.CityOffset),
+            new Vector2(34.5f, 29f) + new Vector2(GameConfig.CityOffset), new Vector2(27.5f, 35.5f) + new Vector2(GameConfig.CityOffset)
+        };
 
         public BirdSystem(AssetManager assets, MapManager map, UnitManager units)
         {
@@ -159,7 +168,7 @@ namespace AndijonSaltanatlar.World
         {
             for (int tries = 0; tries < 60; tries++)
             {
-                int x = 12 + _rng.Next(40), y = 12 + _rng.Next(40);
+                int x = GameConfig.CityOffset + 12 + _rng.Next(40), y = GameConfig.CityOffset + 12 + _rng.Next(40);
                 if (IsOpen(x, y) && _map.GetTile(x, y) == TileType.Grass) return new Vector2(x + 0.5f, y + 0.5f);
             }
             return null;
@@ -220,7 +229,9 @@ namespace AndijonSaltanatlar.World
             if (_storkTimer <= 0f)
             {
                 _storkTimer = 25f + (float)_rng.NextDouble() * 35f;
-                if (!sleepy) SpawnStork();
+                // Laylaklar qishda issiq o'lkalarga uchib ketadi; bahorda ko'proq ko'rinadi
+                if (!sleepy && Season != Season.Qish && (Season != Season.Kuz || _rng.Next(2) == 0)) SpawnStork();
+                if (Season == Season.Bahor) _storkTimer *= 0.6f;
             }
             _birds.RemoveAll(b => b.Kind == Species.Stork && (b.Pos.X < -6 || b.Pos.Y < -6 || b.Pos.X > _map.Width + 6 || b.Pos.Y > _map.Height + 6));
         }
@@ -232,7 +243,7 @@ namespace AndijonSaltanatlar.World
             // Cho'chish: odam yaqinlashsa uchib ketadi
             foreach (Unit u in _units.Units)
             {
-                if (u.IsDown) continue;
+                if (u.IsDown || u.Hidden) continue; // uyga yashiringan odam qushni cho'chitmaydi
                 float fear = u == hero ? 2.0f : (u.State == UnitState.Walking ? 1.0f : 0.6f);
                 if (b.Kind == Species.Sparrow) fear *= 1.2f;
                 Vector2 d = b.Pos - u.Position;
@@ -368,7 +379,7 @@ namespace AndijonSaltanatlar.World
         {
             // Xaritaning bir chetidan narigi chetiga
             bool alongX = _rng.Next(2) == 0;
-            float lane = 18f + (float)_rng.NextDouble() * 28f;
+            float lane = GameConfig.CityOffset + 18f + (float)_rng.NextDouble() * 28f; // shahar ustidan
             bool forward = _rng.Next(2) == 0;
             Vector2 start = alongX ? new Vector2(forward ? -4f : _map.Width + 4f, lane) : new Vector2(lane, forward ? -4f : _map.Height + 4f);
             Vector2 dir = alongX ? new Vector2(forward ? 1 : -1, 0) : new Vector2(0, forward ? 1 : -1);

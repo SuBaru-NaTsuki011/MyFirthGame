@@ -27,6 +27,9 @@ public sealed class LaunchOptions
 
 	public int? PopTax;
 
+	/// <summary>Sinov: faslni majburan tanlash (bahor | yoz | kuz | qish).</summary>
+	public string SeasonName;
+
 	public int? Food;
 
 	public bool Map;
@@ -152,6 +155,10 @@ public sealed class LaunchOptions
 				break;
 			case "--poptax":
 				launchOptions.PopTax = int.Parse(text, CultureInfo.InvariantCulture);
+				i++;
+				break;
+			case "--real-season":
+				launchOptions.SeasonName = text;
 				i++;
 				break;
 			case "--food":

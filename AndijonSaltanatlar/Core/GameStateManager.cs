@@ -73,7 +73,13 @@ public sealed class GameStateManager
 	/// <summary>Shahar hayoti (mahallalar, murojaatlar, voqealar) — PROMPT 17/18 yagona egasi.</summary>
 	public CityLifeManager Life { get; } = new CityLifeManager();
 
-	public Season Season => SeasonManager.Of(Clock.Month);
+	/// <summary>
+	/// Joriy fasl: o'yin oyidan (har 3 oy — bir fasl). SeasonShift — faslni qo'lda oldinga surish
+	/// (N tugmasi / --season sinov parametri); saqlanmaydi.
+	/// </summary>
+	public Season Season => (Season)((((int)SeasonManager.Of(Clock.Month) + SeasonShift) % 4 + 4) % 4);
+
+	public int SeasonShift { get; set; }
 
 	public StoryModeManager Story { get; private set; }
 

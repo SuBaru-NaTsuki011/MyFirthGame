@@ -147,7 +147,14 @@ namespace AndijonSaltanatlar.CityLife
                         if (behavior.Mode == BehaviorMode.GoingToBuilding)
                         {
                             unit.IsInsideBuilding = true;
-                            unit.SetActivity(CitizenActivityIcon.Visiting);
+                            Citizen citizen = state.Pop.GetById(unit.CitizenId);
+                            int choice = citizen == null ? 0 : Math.Abs(citizen.Id + state.Day) % 3;
+                            unit.SetActivity(choice switch
+                            {
+                                1 => CitizenActivityIcon.Sitting,
+                                2 => CitizenActivityIcon.Eating,
+                                _ => CitizenActivityIcon.Visiting
+                            });
                             behavior.Mode = BehaviorMode.InsideBuilding;
                             behavior.Timer = 3.5f + (float)_random.NextDouble() * 3f;
                         }

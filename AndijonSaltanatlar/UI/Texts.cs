@@ -80,7 +80,9 @@ namespace AndijonSaltanatlar.UI
             "Uy/saroyga kirish: odam ichida bino yonida ENTER",
             "Jang: SPACE kombo (kesish-chopish-sanchish), R aylanma",
             "Shohni chiqarish: saroyda shoh yonida F",
-            "Bosqin chaqirish (sinov): B"
+            "Bosqin chaqirish (sinov): B",
+            "Keyingi fasl (ko'rish uchun): N",
+            "Aholi solig'i 35%+ bo'lsa xalq saroy oldida g'alayon qiladi"
         };
     }
 }

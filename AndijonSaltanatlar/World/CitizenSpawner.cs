@@ -39,6 +39,9 @@ namespace AndijonSaltanatlar.World
             C(CitizenArt.Farmer, 0.7f, (24.5f, 50.5f), (31.5f, 50.5f), (36.5f, 50.5f), (42.5f, 36.5f));
             C(CitizenArt.Farmer, 0.7f, (31.5f, 44.5f), (31.5f, 50.5f), (39.5f, 40.5f));
             C(CitizenArt.Shepherd, 0.72f, (12.5f, 47.5f), (18.5f, 52.5f), (24.5f, 50.5f));
+            // Qal'adan tashqaridagi yaylovlarda yana ikki cho'pon (har birining o'z podasi — LivestockSystem)
+            C(CitizenArt.Shepherd, 0.6f, (40.5f, 6.5f), (48.5f, 5.5f), (46.5f, 9.5f));
+            C(CitizenArt.Shepherd, 0.6f, (3.5f, 38.5f), (5.5f, 44.5f), (2.5f, 47.5f));
 
             // PROMPT 17: mahalla ko'chalarida yuradigan aholi (suhbatlashish mumkin bo'lgan fuqarolar ko'proq bo'lsin)
             C(CitizenArt.Citizen, 0.75f, (22.5f, 21.5f), (26.5f, 21.5f));

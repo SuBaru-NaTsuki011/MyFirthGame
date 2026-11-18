@@ -7,7 +7,7 @@ namespace AndijonSaltanatlar.LandExpansion
     /// Shahar qurilish maydonini kengaytirishni boshqaradi.
     ///
     /// Yer halqalarga bo'lingan, har halqada 4 tomon (shimol, janub, g'arb, sharq):
-    ///   1-halqa — shahar devori atrofidagi 4 mahalla (asl shahar bloki ichida);
+    ///   1-halqa — shahar devori atrofidagi 4 ochiq mahalla (asl shahar bloki ichida);
     ///   2..N-halqa — shahar blokidan tashqaridagi yerlar: yaylov (chorvachilik), dalalar (dehqonchilik),
     ///   bog'lar va karvon yo'li (savdo). Keyingi halqa faqat oldingi halqaning 4 tomoni ham ochilgandan keyin ochiladi.
     /// Markaziy shahar (asl blok, uchastkalarga kirmagan joylar) doim ochiq; blokdan tashqaridagi hech bir uchastkaga
@@ -32,10 +32,10 @@ namespace AndijonSaltanatlar.LandExpansion
         {
             Parcels.Clear();
             // 1-halqa: asl 4 mahalla (Id 1..4 — eski saqlashlar bilan mos).
-            Add(1, 1, LandSide.North, "Shimoliy mahalla", "Turar joy", new Rectangle(14 + O, 2 + O, 36, 10), 400, 60);
-            Add(2, 1, LandSide.South, "Janubiy turar joy", "Turar joy", new Rectangle(14 + O, 53 + O, 36, 9), 500, 90);
-            Add(3, 1, LandSide.West, "G'arbiy hunarmandlar mahallasi", "Hunarmandchilik", new Rectangle(2 + O, 14 + O, 10, 36), 600, 120);
-            Add(4, 1, LandSide.East, "Sharqiy savdo hududi", "Savdo", new Rectangle(54 + O, 14 + O, 9, 36), 650, 140);
+            Add(1, 1, LandSide.North, "Shimoliy mahalla", "Turar joy", new Rectangle(14 + O, 2 + O, 36, 10), 400, 60, LandParcelState.Open);
+            Add(2, 1, LandSide.South, "Janubiy turar joy", "Turar joy", new Rectangle(14 + O, 53 + O, 36, 9), 500, 90, LandParcelState.Open);
+            Add(3, 1, LandSide.West, "G'arbiy hunarmandlar mahallasi", "Hunarmandchilik", new Rectangle(O, 14 + O, 14, 36), 600, 120, LandParcelState.Open);
+            Add(4, 1, LandSide.East, "Sharqiy savdo hududi", "Savdo", new Rectangle(50 + O, 14 + O, 14, 36), 650, 140, LandParcelState.Open);
 
             // 2..N-halqa: shahar blokini o'rab turgan kvadrat halqalar. Shimol/janub burchaklarni ham qamraydi.
             string[] north = { "Shimoliy yaylov", "Shimoliy tog' etagi", "Shimoliy o'rmonzor", "Shimoliy dasht" };
@@ -66,11 +66,12 @@ namespace AndijonSaltanatlar.LandExpansion
 
         private static string Name(string baseName, int ring) => baseName;
 
-        private void Add(int id, int ring, LandSide side, string name, string purpose, Rectangle bounds, int cost, int reqPop)
+        private void Add(int id, int ring, LandSide side, string name, string purpose, Rectangle bounds, int cost, int reqPop,
+            LandParcelState state = LandParcelState.Locked)
             => Parcels.Add(new LandParcel
             {
                 Id = id, Ring = ring, Side = side, NameUz = name, PurposeUz = purpose,
-                GridBounds = bounds, UnlockCost = cost, RequiredPopulation = reqPop
+                GridBounds = bounds, UnlockCost = cost, RequiredPopulation = reqPop, State = state
             });
 
         public LandParcel ParcelAt(int x, int y)
@@ -82,7 +83,7 @@ namespace AndijonSaltanatlar.LandExpansion
         /// <summary>Tile asl shahar bloki ichidami (uchastkaga kirmagan joylari doim ochiq).</summary>
         public static bool InCityBlock(int x, int y) => x >= O && y >= O && x < O + Block && y < O + Block;
 
-        /// <summary>Tile'ga qurish mumkinmi (markaz — ha; qulflangan uchastka yoki xarita cheti — yo'q).</summary>
+        /// <summary>Tile'ga qurish mumkinmi (markaz yoki ochiq uchastka — ha; qulflangan yer — yo'q).</summary>
         public bool IsBuildable(int x, int y)
         {
             LandParcel p = ParcelAt(x, y);
