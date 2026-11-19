@@ -206,6 +206,16 @@ namespace AndijonSaltanatlar.World
                         }
                     }
 
+                    // Kiriladigan bino ustida kichik eshik belgisi (Promt 7) — ichkariga kirish mumkinligини bildiradi.
+                    if (AndijonSaltanatlar.Interiors.HouseInterior.IsEnterable(b2))
+                    {
+                        int dx = (int)(pos.X + tex.Width / 2f - 4f);
+                        int dy = (int)(pos.Y - 13f);
+                        sb.Draw(_assets.Pixel, new Rectangle(dx - 1, dy - 1, 10, 12), new Color(20, 20, 24, 200));   // ramka
+                        sb.Draw(_assets.Pixel, new Rectangle(dx, dy, 8, 10), new Color(150, 96, 52));                 // eshik yog'ochi
+                        sb.Draw(_assets.Pixel, new Rectangle(dx + 2, dy + 2, 4, 8), new Color(96, 60, 32));           // tabaqa
+                        sb.Draw(_assets.Pixel, new Rectangle(dx + 5, dy + 5, 1, 2), new Color(222, 178, 92));         // tutqich
+                    }
                 }
             }
             LastDrawnCount = _buffer.Count;

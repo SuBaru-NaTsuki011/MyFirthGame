@@ -373,6 +373,12 @@ namespace AndijonSaltanatlar.Interiors
                 case InteriorKind.Gate: BuildGate(building, season); break;
                 default: BuildPublicFallback(building, s); break;
             }
+            // Daraja interyerda aks etadi (Promt 2): yuqori daraja — hashamatliroq nom.
+            if (building.Level > 1)
+            {
+                string lvl = AndijonSaltanatlar.Buildings.BuildingUpgradeEffects.LevelName(building.Type, building.Level);
+                _subtitle = string.IsNullOrEmpty(_subtitle) ? lvl : _subtitle + " · " + lvl;
+            }
         }
 
         /// <summary>Harakatni ro'yxatga qo'shadi (ma'lumotga asoslangan interaktiv obyekt).</summary>
