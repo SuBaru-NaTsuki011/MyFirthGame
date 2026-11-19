@@ -21,7 +21,7 @@ namespace AndijonSaltanatlar.Environment
         public static Comfort CurrentComfort = Comfort.Qulay;
 
         /// <summary>Qor qatlami kuchi (0..1): qishda yer va tomlar oqaradi.</summary>
-        public static float Snow => Current == Season.Qish ? (Weather == Weather.Snowy ? 0.82f : 0.68f) : 0f;
+        public static float Snow => Current == Season.Qish ? (Weather == Weather.Snowy ? 0.95f : 0.8f) : 0f;
 
         /// <summary>Yer kataklari uchun rang (multiply tint).</summary>
         public static Color TileTint(TileType t)
@@ -129,7 +129,8 @@ namespace AndijonSaltanatlar.Environment
             {
                 case Season.Kuz: DrawLeaves(sb, px, vw, vh, time, Math.Max(12, count / 3)); break;
                 case Season.Qish:
-                    if (Weather != Weather.Snowy) DrawFlurries(sb, px, vw, vh, time, Math.Max(12, count / 3));
+                    // Qishda har doim qor yog'adi; qorli kunda esa quyuqroq.
+                    DrawFlurries(sb, px, vw, vh, time, Weather == Weather.Snowy ? Math.Max(40, count) : Math.Max(18, count / 2));
                     sb.Draw(px, new Rectangle(0, 0, vw, vh), new Color(220, 232, 255) * 0.07f);
                     break;
                 case Season.Bahor: DrawPetals(sb, px, vw, vh, time, Math.Max(6, count / 8)); break;
@@ -163,13 +164,15 @@ namespace AndijonSaltanatlar.Environment
 
         private static void DrawFlurries(SpriteBatch sb, Texture2D px, int vw, int vh, float time, int n)
         {
-            var col = new Color(240, 244, 252, 170);
             for (int i = 0; i < n; i++)
             {
                 float sx = Hash(i * 13 + 3) * vw;
-                float y = (time * 40f + Hash(i * 2) * vh) % (vh + 20) - 10;
-                float x = (sx + MathF.Sin((time + i) * 0.7f) * 18f + vw) % vw;
-                sb.Draw(px, new Rectangle((int)x, (int)y, 2, 2), col);
+                float speed = 34f + Hash(i * 29) * 34f;
+                float y = (time * speed + Hash(i * 2) * vh) % (vh + 20) - 10;
+                float x = (sx + MathF.Sin((time + i) * 0.7f) * 22f + vw) % vw;
+                int s = 2 + (i % 5 == 0 ? 1 : 0) + (Hash(i * 7) > 0.86f ? 1 : 0);
+                byte a = (byte)(150 + Hash(i * 11) * 100);
+                sb.Draw(px, new Rectangle((int)x, (int)y, s, s), new Color((byte)242, (byte)246, (byte)254, a));
             }
         }
 

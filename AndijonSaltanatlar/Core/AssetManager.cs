@@ -288,10 +288,12 @@ namespace AndijonSaltanatlar.Core
         /// </summary>
         /// <summary>Yuqori aniqlikdagi rasmlar ko'paytmasi (o'yin pikseliga nisbatan).</summary>
         public const int HR = 3;
-        private static readonly HashSet<Texture2D> HiRes = new HashSet<Texture2D>();
+        /// <summary>Odam rasmlari uy/binolarga nisbatan kichikroq ko'rinishi uchun qo'shimcha masshtab.</summary>
+        public const int UnitHR = 5;
+        private static readonly Dictionary<Texture2D, float> HiRes = new Dictionary<Texture2D, float>();
 
-        /// <summary>Rasmni chizish masshtabi: oddiy — 1, 3D modeldan olingan aniq rasm — 1/HR.</summary>
-        public static float ScaleOf(Texture2D t) => t != null && HiRes.Contains(t) ? 1f / HR : 1f;
+        /// <summary>Rasmni chizish masshtabi: oddiy — 1, 3D modeldan olingan aniq rasm — 1/HR (odamlar — 1/UnitHR).</summary>
+        public static float ScaleOf(Texture2D t) => t != null && HiRes.TryGetValue(t, out float s) ? s : 1f;
 
         /// <summary>Oyoq nuqtasi rasm pastidan necha piksel yuqorida (rasm o'z piksellarida).</summary>
         public static float FootOf(Texture2D t) => UnitArt.FootOffset / ScaleOf(t);
@@ -305,9 +307,50 @@ namespace AndijonSaltanatlar.Core
             for (int i = 0; i < mask.Length; i++) { byte a = mask[i]; data[i] = new Color(a, a, a, a); }
             w = new Texture2D(_gd, tex.Width, tex.Height, false, SurfaceFormat.Color);
             w.SetData(data);
-            if (HiRes.Contains(tex)) HiRes.Add(w);
+            if (HiRes.ContainsKey(tex)) HiRes[w] = HiRes[tex];
             _flash[tex] = w;
             return w;
+        }
+
+        private readonly Dictionary<Texture2D, Texture2D> _snowCap = new Dictionary<Texture2D, Texture2D>();
+
+        /// <summary>
+        /// Rasmning faqat yuqori qirralariga (tom, daraxt toji) tushgan qor qatlami.
+        /// Har bir ustunda eng yuqori ko'rinadigan pikseldan pastga qarab oq qatlam yasaladi —
+        /// shuning uchun qor siluetning shakliga mos tushadi.
+        /// </summary>
+        public Texture2D SnowCapOf(Texture2D tex)
+        {
+            if (tex == null) return null;
+            if (_snowCap.TryGetValue(tex, out Texture2D cached)) return cached;
+            if (!_alpha.TryGetValue(tex, out byte[] mask) || mask.Length != tex.Width * tex.Height) return null;
+
+            int w = tex.Width, h = tex.Height;
+            var data = new Color[mask.Length];
+            int thick = Math.Max(3, (int)MathF.Round(h * 0.10f));
+            for (int x = 0; x < w; x++)
+            {
+                int top = -1;
+                for (int y = 0; y < h; y++) if (mask[y * w + x] > 32) { top = y; break; }
+                if (top < 0) continue;
+                int t = thick + ((x * 17) % 5) - 2;
+                if (t < 1) t = 1;
+                for (int y = top; y < top + t && y < h; y++)
+                {
+                    if (mask[y * w + x] < 24) continue;
+                    float f = 1f - (y - top) / (float)t;
+                    byte a = (byte)Math.Clamp(150f + 105f * f, 0f, 255f);
+                    // Alfa-blend premultiplied: oq rang kanallari ham alfa bilan ko'paytiriladi.
+                    data[y * w + x] = new Color(a, a, a, a);
+                }
+            }
+
+            var cap = new Texture2D(_gd, w, h, false, SurfaceFormat.Color);
+            cap.SetData(data);
+            if (HiRes.ContainsKey(tex)) HiRes[cap] = HiRes[tex];
+            cap.Name = (tex.Name ?? "sprite") + "_snowcap";
+            _snowCap[tex] = cap;
+            return cap;
         }
 
         /// <summary>Sprite bo'lsa qaytaradi, bo'lmasa null (istisno tashlamaydi).</summary>
@@ -391,10 +434,12 @@ namespace AndijonSaltanatlar.Core
                 if (_exportDir != null) canvas.SavePng(_gd, Path.Combine(_exportDir, key + ".png"));
             }
 
-            // 3D modeldan olingan yuqori aniqlikdagi odam rasmi (HR marta katta) — mipmapli, chizishda 1/HR masshtab
-            bool hiRes = (key.StartsWith("unit_") && canvas.Height >= 120) || key.StartsWith("crop_") || key.StartsWith("carry_");
+            // 3D modeldan olingan yuqori aniqlikdagi odam rasmi (UnitHR marta katta) — mipmapli, chizishda 1/UnitHR.
+            // Ekin va yelkadagi yuk rasmlari ham yuqori aniqlikda, lekin ular 1/HR masshtabda qoladi.
+            bool isUnit = key.StartsWith("unit_") && canvas.Height >= 120;
+            bool hiRes = isUnit || key.StartsWith("crop_") || key.StartsWith("carry_");
             Texture2D tex = hiRes ? canvas.ToTextureMipmapped(_gd) : canvas.ToTexture(_gd);
-            if (hiRes) HiRes.Add(tex);
+            if (hiRes) HiRes[tex] = isUnit ? 1f / UnitHR : 1f / HR;
             tex.Name = key;
             _textures[key] = tex;
 

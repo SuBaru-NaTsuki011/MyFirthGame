@@ -66,8 +66,8 @@ namespace AndijonSaltanatlar.World
                     tint = AndijonSaltanatlar.Environment.SeasonVisuals.FoliageTint(dec.Type, dec.Position.X * 31 + dec.Position.Y);
                     sb.Draw(o.Texture, o.DrawPosition, null, tint, 0f, Vector2.Zero, 1f, o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
                     float sn = AndijonSaltanatlar.Environment.SeasonVisuals.Snow;
-                    if (sn > 0f && _assets.FlashOf(o.Texture) is Texture2D dsil)
-                        sb.Draw(dsil, o.DrawPosition, null, new Color(246, 250, 255) * (sn * 0.55f), 0f, Vector2.Zero, 1f, o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
+                    if (sn > 0f && _assets.SnowCapOf(o.Texture) is Texture2D dcap)
+                        sb.Draw(dcap, o.DrawPosition, null, Color.White * MathHelper.Clamp(0.55f + sn * 0.55f, 0f, 1f), 0f, Vector2.Zero, 1f, o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
                     continue;
                 }
 
@@ -178,11 +178,16 @@ namespace AndijonSaltanatlar.World
                     o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
                 if (bb != null && bb.Type == BuildingType.MainHall && bb.HitPoints < bb.MaxHitPoints * 0.66f)
                     DrawSmoke(sb, pos + new Vector2(tex.Width / 2f, tex.Height * 0.25f), 1f - bb.HitPoints / (float)bb.MaxHitPoints, tex.Width);
-                // Qish: tomlar va devorlar qor bilan oqaradi
+                // Qish: tomlar va devorlar qor bilan oqaradi (qor qatlami siluetning yuqori qirralariga tushadi)
                 float bsnow = AndijonSaltanatlar.Environment.SeasonVisuals.Snow;
-                if (bb != null && bsnow > 0f && _assets.FlashOf(tex) is Texture2D bsil)
-                    sb.Draw(bsil, pos, null, new Color(244, 248, 255) * (bsnow * 0.3f), 0f, Vector2.Zero, 1f,
-                        o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
+                if (bb != null && bsnow > 0f)
+                {
+                    SpriteEffects fsnow = o.Flipped ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                    if (_assets.FlashOf(tex) is Texture2D bsil)
+                        sb.Draw(bsil, pos, null, new Color(240, 246, 255) * (bsnow * 0.18f), 0f, Vector2.Zero, 1f, fsnow, 0f);
+                    if (_assets.SnowCapOf(tex) is Texture2D bcap)
+                        sb.Draw(bcap, pos, null, Color.White * MathHelper.Clamp(0.6f + bsnow * 0.5f, 0f, 1f), 0f, Vector2.Zero, 1f, fsnow, 0f);
+                }
 
                 if (o is Farm farm && farm.BuildProgress >= 1f)
                 {
