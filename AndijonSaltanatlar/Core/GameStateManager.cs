@@ -492,7 +492,7 @@ public sealed class GameStateManager
 		Population = Pop.Count;
 		Military.MaxConcurrent = Math.Max(2, buildings.Count(BuildingType.Barracks) * 2);
 		// Havo hissi (qish sovug'i, yoz issig'i) aholining kayfiyatiga ta'sir qiladi
-		Pop.AdjustHappiness(SeasonVisuals.HappinessDelta(SeasonVisuals.ComfortOf(Season, Weather.Current, 0.5f)));
+		Pop.AdjustHappiness(SeasonVisuals.HappinessDelta(SeasonVisuals.ComfortOf(Season, Weather.Current, 0.5f)) + Weather.MoodModifier() * 6f);
 		int num3 = buildings.Count(BuildingType.Barracks) * 6;
 		if (num3 > 0)
 		{

@@ -372,7 +372,8 @@ namespace AndijonSaltanatlar.Combat
             for (int i = 0; i < targets.Count && i < maxTargets; i++)
             {
                 Unit t = targets[i].u;
-                int dmg = (int)(baseDmg * PlayerDamageMultiplier * mult) + _rng.Next(0, 5);
+                // Ob-havo jangga ta'sir qiladi (bo'ron/qor zarbani pasaytiradi)
+                int dmg = (int)(baseDmg * PlayerDamageMultiplier * mult * _state.Weather.BattleModifier()) + _rng.Next(0, 5);
                 ScheduleHit(p, t, dmg, kind, knock, reach, i);
             }
         }

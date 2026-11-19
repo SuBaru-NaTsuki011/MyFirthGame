@@ -17,6 +17,17 @@ namespace AndijonSaltanatlar.Environment
             if (w == Weather.Rainy) DrawRain(sb, px, vw, vh, time, count);
             else if (w == Weather.Snowy) DrawSnow(sb, px, vw, vh, time, count);
             else if (w == Weather.Cloudy) sb.Draw(px, new Rectangle(0, 0, vw, vh), new Color(40, 44, 60, 40));
+            else if (w == Weather.Storm)
+            {
+                // Bo'ron: quyuq, qorong'i osmon + kuchli yomg'ir
+                sb.Draw(px, new Rectangle(0, 0, vw, vh), new Color(24, 28, 42, 95));
+                DrawRain(sb, px, vw, vh, time, (int)(count * 1.6f));
+            }
+            else if (w == Weather.Hot)
+            {
+                // Jazirama: issiq sarg'ish parda (quyosh jazirasi)
+                sb.Draw(px, new Rectangle(0, 0, vw, vh), new Color(255, 196, 96, 26));
+            }
         }
 
         /// <summary> Havolaning shimoli (wind) bilan silkinishi — bayroqlar uchun. </summary>
